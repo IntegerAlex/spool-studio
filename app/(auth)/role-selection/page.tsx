@@ -15,9 +15,9 @@ const roles = [
     icon: Palette,
   },
   {
-    id: 'manager' as UserRole,
-    label: 'Manager',
-    description: 'Oversee projects and team',
+    id: 'approver' as UserRole,
+    label: 'Approver',
+    description: 'Review and approve content',
     icon: Users,
   },
   {
@@ -27,9 +27,9 @@ const roles = [
     icon: Settings,
   },
   {
-    id: 'client' as UserRole,
-    label: 'Client',
-    description: 'View and approve assets',
+    id: 'uploader' as UserRole,
+    label: 'Uploader',
+    description: 'Schedule and publish assets',
     icon: Zap,
   },
 ];

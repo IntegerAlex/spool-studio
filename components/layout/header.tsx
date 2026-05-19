@@ -5,7 +5,8 @@ import { Bell, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { User } from '@/types/index';
+import type { User } from '@supabase/supabase-js';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
 interface HeaderProps {
   title: string;
@@ -15,11 +16,33 @@ export function Header({ title }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+    const supabase = createBrowserSupabaseClient();
+
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user ?? null);
+    };
+
+    loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      loadUser();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email ||
+    'User';
+  const displayRole = user?.user_metadata?.role as string | undefined;
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
 
   return (
     <header className="bg-background border-b border-border h-16 flex items-center justify-between px-8 fixed top-0 left-64 right-0 z-40">
@@ -43,12 +66,14 @@ export function Header({ title }: HeaderProps) {
         {user && (
           <div className="flex items-center space-x-3 pl-4 border-l border-border">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">{user.name}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+              <p className="text-sm font-medium text-foreground">{displayName}</p>
+              {displayRole && (
+                <p className="text-xs text-muted-foreground capitalize">{displayRole}</p>
+              )}
             </div>
             <Avatar className="w-8 h-8">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+              <AvatarImage src={avatarUrl} alt={displayName} />
+              <AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
           </div>
         )}

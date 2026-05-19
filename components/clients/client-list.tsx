@@ -70,7 +70,9 @@ export function ClientList({ clients }: ClientListProps) {
                     <div
                       className="bg-primary rounded-full h-2 transition-all"
                       style={{
-                        width: `${(client.completedDeliverables / client.monthlyDeliverables) * 100}%`,
+                        width: client.monthlyDeliverables > 0
+                          ? `${(client.completedDeliverables / client.monthlyDeliverables) * 100}%`
+                          : '0%',
                       }}
                     ></div>
                   </div>

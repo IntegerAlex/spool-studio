@@ -9,7 +9,7 @@ import { assetsApi, clientsApi } from '@/lib/api-client';
 import { Asset, Client } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, User, Calendar, MoreHorizontal } from 'lucide-react';
+import { FileText, MoreHorizontal } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,17 +43,6 @@ export default function AssetDetailPage() {
     loadData();
   }, [assetId]);
 
-  const handleAddComment = async (content: string, isInternal: boolean) => {
-    if (!asset) return;
-    const updatedAsset = await assetsApi.addComment(asset.id, content, isInternal);
-    setAsset(updatedAsset);
-  };
-
-  const handleRequestRevision = async (reason: string) => {
-    if (!asset) return;
-    const updatedAsset = await assetsApi.requestRevision(asset.id, reason);
-    setAsset(updatedAsset);
-  };
 
   if (isLoading) {
     return (
@@ -148,7 +137,7 @@ export default function AssetDetailPage() {
           <Card className="bg-muted/30 border border-border rounded-lg p-12 flex flex-col items-center justify-center min-h-64">
             <FileText className="w-16 h-16 text-muted-foreground mb-4" />
             <p className="text-muted-foreground text-center">
-              {asset.type === 'reel' ? '🎬 Instagram Reel' : asset.type === 'poster' ? '📱 Poster' : asset.type === 'carousel' ? '🖼️ Carousel' : '📸 Story'} Preview
+              {asset.type === 'reel' ? '🎬 Instagram Reel' : '📱 Poster'} Preview
             </p>
             <p className="text-sm text-muted-foreground mt-2">Google Drive integration placeholder</p>
           </Card>
@@ -160,10 +149,7 @@ export default function AssetDetailPage() {
             </Card>
           )}
 
-          <CommentsThread
-            comments={asset.comments}
-            onAddComment={handleAddComment}
-          />
+          <CommentsThread comments={asset.comments} readOnly />
         </div>
 
         <div className="space-y-6">

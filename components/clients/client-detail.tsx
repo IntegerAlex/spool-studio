@@ -27,7 +27,9 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
     loadTeam();
   }, [client.assignedTeamMembers]);
 
-  const progress = Math.round((client.completedDeliverables / client.monthlyDeliverables) * 100);
+  const progress = client.monthlyDeliverables > 0
+    ? Math.round((client.completedDeliverables / client.monthlyDeliverables) * 100)
+    : 0;
 
   return (
     <div className="space-y-6">

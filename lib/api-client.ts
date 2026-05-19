@@ -1,235 +1,307 @@
-import { mockUsers, mockClients, mockAssets, mockNotifications, mockUploadQueue, mockWorkspace } from './mock-data';
-import type { User, Client, Asset, Notification, UploadQueue, Workspace } from '@/types/index';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { mockNotifications, mockUploadQueue, mockWorkspace } from './mock-data';
+import type {
+  Asset,
+  Client,
+  Notification,
+  UploadQueue,
+  User,
+  Workspace,
+} from '@/types/index';
 
-// Simulate network delay
-const delay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
+interface ApiEnvelope<T> {
+  data?: T;
+  error?: string;
+}
 
-// Auth API
+async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ApiEnvelope<T>;
+    throw new Error(payload.error ?? 'Request failed');
+  }
+
+  const payload = (await response.json()) as ApiEnvelope<T>;
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+  return payload.data as T;
+}
+
+async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
+  const response = await fetch(input, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json()) as ApiEnvelope<T>;
+    throw new Error(payload.error ?? 'Request failed');
+  }
+
+  const payload = (await response.json()) as ApiEnvelope<T>;
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+  return payload.data as T;
+}
+
+function hydrateAsset(asset: Asset): Asset {
+  return {
+    ...asset,
+    createdAt: new Date(asset.createdAt),
+    updatedAt: new Date(asset.updatedAt),
+    scheduledAt: asset.scheduledAt ? new Date(asset.scheduledAt) : null,
+  };
+}
+
+function hydrateUser(user: User): User {
+  return {
+    ...user,
+    createdAt: new Date(user.createdAt),
+  };
+}
+
 export const authApi = {
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
-    await delay(500);
-    const user = mockUsers.find(u => u.email === email);
-    if (!user) throw new Error('User not found');
-    return { user, token: 'mock-jwt-token-' + user.id };
+    const supabase = createBrowserSupabaseClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error || !data.session) {
+      throw new Error(error?.message ?? 'Login failed');
+    }
+
+    const profile = await fetchJson<User>('/api/users/me');
+    return { user: hydrateUser(profile), token: data.session.access_token };
   },
 
   logout: async (): Promise<void> => {
-    await delay(200);
-  },
-
-  getCurrentUser: async (): Promise<User | null> => {
-    await delay(200);
-    return mockUsers[0] || null;
-  },
-
-  forgotPassword: async (email: string): Promise<void> => {
-    await delay(400);
-    if (!mockUsers.find(u => u.email === email)) {
-      throw new Error('User not found');
+    const supabase = createBrowserSupabaseClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      throw new Error(error.message);
     }
   },
 
-  resetPassword: async (token: string, newPassword: string): Promise<void> => {
-    await delay(400);
+  getCurrentUser: async (): Promise<User | null> => {
+    const user = await fetchJsonNullable<User>('/api/users/me');
+    return user ? hydrateUser(user) : null;
+  },
+
+  forgotPassword: async (email: string): Promise<void> => {
+    const supabase = createBrowserSupabaseClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      throw new Error(error.message);
+    }
+  },
+
+  resetPassword: async (_token: string, newPassword: string): Promise<void> => {
+    const supabase = createBrowserSupabaseClient();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      throw new Error(error.message);
+    }
   },
 };
 
-// Clients API
 export const clientsApi = {
   getAll: async (): Promise<Client[]> => {
-    await delay();
-    return mockClients;
+    return fetchJson<Client[]>('/api/clients');
   },
 
   getById: async (id: string): Promise<Client | null> => {
-    await delay();
-    return mockClients.find(c => c.id === id) || null;
+    return fetchJsonNullable<Client>(`/api/clients/${id}`);
   },
 
-  create: async (client: Omit<Client, 'id'>): Promise<Client> => {
-    await delay(400);
-    const newClient: Client = { ...client, id: `client_${Date.now()}` };
-    return newClient;
+  create: async (client: {
+    name: string;
+    slug: string;
+    instagramHandle?: string;
+    brandColor?: string;
+    monthlyReelsTarget?: number;
+    monthlyPostsTarget?: number;
+  }): Promise<Client> => {
+    return fetchJson<Client>('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify(client),
+    });
   },
 
-  update: async (id: string, updates: Partial<Client>): Promise<Client> => {
-    await delay(400);
-    const client = mockClients.find(c => c.id === id);
-    if (!client) throw new Error('Client not found');
-    return { ...client, ...updates };
+  update: async (
+    id: string,
+    updates: Partial<{
+      name: string;
+      slug: string;
+      instagramHandle?: string;
+      brandColor?: string;
+      monthlyReelsTarget?: number;
+      monthlyPostsTarget?: number;
+    }>
+  ): Promise<Client> => {
+    return fetchJson<Client>(`/api/clients/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
   },
 
   delete: async (id: string): Promise<void> => {
-    await delay(300);
+    await fetchJson(`/api/clients/${id}`, { method: 'DELETE' });
   },
 };
 
-// Assets API
 export const assetsApi = {
   getAll: async (): Promise<Asset[]> => {
-    await delay();
-    return mockAssets;
+    const assets = await fetchJson<Asset[]>('/api/assets');
+    return assets.map(hydrateAsset);
   },
 
   getByClientId: async (clientId: string): Promise<Asset[]> => {
-    await delay();
-    return mockAssets.filter(a => a.clientId === clientId);
+    const assets = await fetchJson<Asset[]>(
+      `/api/assets?clientId=${encodeURIComponent(clientId)}`
+    );
+    return assets.map(hydrateAsset);
   },
 
   getById: async (id: string): Promise<Asset | null> => {
-    await delay();
-    return mockAssets.find(a => a.id === id) || null;
+    const asset = await fetchJsonNullable<Asset>(`/api/assets/${id}`);
+    return asset ? hydrateAsset(asset) : null;
   },
 
-  create: async (asset: Omit<Asset, 'id' | 'createdAt' | 'updatedAt'>): Promise<Asset> => {
-    await delay(400);
-    const newAsset: Asset = {
-      ...asset,
-      id: `asset_${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    return newAsset;
+  create: async (asset: {
+    clientId: string;
+    title: string;
+    type: Asset['type'];
+    status?: Asset['status'];
+    driveFileUrl?: string;
+    thumbnailUrl?: string;
+    assignedTo?: string | null;
+    scheduledAt?: string | null;
+  }): Promise<Asset> => {
+    const created = await fetchJson<Asset>('/api/assets', {
+      method: 'POST',
+      body: JSON.stringify(asset),
+    });
+    return hydrateAsset(created);
   },
 
-  update: async (id: string, updates: Partial<Asset>): Promise<Asset> => {
-    await delay(400);
-    const asset = mockAssets.find(a => a.id === id);
-    if (!asset) throw new Error('Asset not found');
-    return { ...asset, ...updates, updatedAt: new Date() };
-  },
-
-  updateStatus: async (id: string, status: Asset['status']): Promise<Asset> => {
-    await delay(300);
-    const asset = mockAssets.find(a => a.id === id);
-    if (!asset) throw new Error('Asset not found');
-    return { ...asset, status, updatedAt: new Date() };
+  update: async (
+    id: string,
+    updates: Partial<{
+      clientId: string;
+      title: string;
+      type: Asset['type'];
+      status: Asset['status'];
+      driveFileUrl?: string;
+      thumbnailUrl?: string;
+      assignedTo?: string | null;
+      scheduledAt?: string | null;
+    }>
+  ): Promise<Asset> => {
+    const updated = await fetchJson<Asset>(`/api/assets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    return hydrateAsset(updated);
   },
 
   delete: async (id: string): Promise<void> => {
-    await delay(300);
-  },
-
-  addComment: async (assetId: string, comment: string, isInternal: boolean = false): Promise<Asset> => {
-    await delay(300);
-    const asset = mockAssets.find(a => a.id === assetId);
-    if (!asset) throw new Error('Asset not found');
-    return {
-      ...asset,
-      comments: [
-        ...asset.comments,
-        {
-          id: `comment_${Date.now()}`,
-          assetId,
-          authorId: 'user_1',
-          content: comment,
-          createdAt: new Date(),
-          replies: [],
-          isInternal,
-        },
-      ],
-    };
-  },
-
-  requestRevision: async (assetId: string, reason: string): Promise<Asset> => {
-    await delay(300);
-    const asset = mockAssets.find(a => a.id === assetId);
-    if (!asset) throw new Error('Asset not found');
-    return {
-      ...asset,
-      status: 'revision_requested',
-      revisions: [
-        ...asset.revisions,
-        {
-          id: `rev_${Date.now()}`,
-          assetId,
-          version: asset.revisions.length + 1,
-          createdBy: 'user_1',
-          createdAt: new Date(),
-          reason,
-        },
-      ],
-    };
+    await fetchJson(`/api/assets/${id}`, { method: 'DELETE' });
   },
 };
 
-// Notifications API
+export const usersApi = {
+  getAll: async (): Promise<User[]> => {
+    const users = await fetchJson<User[]>('/api/users');
+    return users.map(hydrateUser);
+  },
+
+  getById: async (id: string): Promise<User | null> => {
+    const user = await fetchJsonNullable<User>(`/api/users/${id}`);
+    return user ? hydrateUser(user) : null;
+  },
+};
+
+export const dashboardApi = {
+  getSummary: async (): Promise<{
+    pendingApprovals: number;
+    upcomingUploads: number;
+    totalClients: number;
+    uploadedThisMonth: number;
+  }> => {
+    return fetchJson('/api/dashboard/summary');
+  },
+};
+
+// Notifications API (mocked until notifications schema is implemented)
 export const notificationsApi = {
   getAll: async (userId?: string): Promise<Notification[]> => {
-    await delay();
     if (userId) {
-      return mockNotifications.filter(n => n.userId === userId);
+      return mockNotifications.filter((n) => n.userId === userId);
     }
     return mockNotifications;
   },
 
   markAsRead: async (id: string): Promise<Notification> => {
-    await delay(200);
-    const notification = mockNotifications.find(n => n.id === id);
+    const notification = mockNotifications.find((n) => n.id === id);
     if (!notification) throw new Error('Notification not found');
     return { ...notification, read: true };
   },
 
-  markAllAsRead: async (userId: string): Promise<void> => {
-    await delay(300);
+  markAllAsRead: async (): Promise<void> => {
+    return;
   },
 
   delete: async (id: string): Promise<void> => {
-    await delay(200);
+    const notification = mockNotifications.find((n) => n.id === id);
+    if (!notification) throw new Error('Notification not found');
   },
 };
 
-// Upload Queue API
+// Upload Queue API (mocked until upload queue schema is implemented)
 export const queueApi = {
   getAll: async (): Promise<UploadQueue[]> => {
-    await delay();
     return mockUploadQueue;
   },
 
   getById: async (id: string): Promise<UploadQueue | null> => {
-    await delay();
-    return mockUploadQueue.find(q => q.id === id) || null;
+    return mockUploadQueue.find((q) => q.id === id) || null;
   },
 
   create: async (queue: Omit<UploadQueue, 'id'>): Promise<UploadQueue> => {
-    await delay(400);
     return { ...queue, id: `queue_${Date.now()}` };
   },
 
   update: async (id: string, updates: Partial<UploadQueue>): Promise<UploadQueue> => {
-    await delay(300);
-    const queue = mockUploadQueue.find(q => q.id === id);
+    const queue = mockUploadQueue.find((q) => q.id === id);
     if (!queue) throw new Error('Queue item not found');
     return { ...queue, ...updates };
   },
 
-  delete: async (id: string): Promise<void> => {
-    await delay(200);
+  delete: async (): Promise<void> => {
+    return;
   },
 };
 
-// Users API
-export const usersApi = {
-  getAll: async (): Promise<User[]> => {
-    await delay();
-    return mockUsers;
-  },
-
-  getById: async (id: string): Promise<User | null> => {
-    await delay();
-    return mockUsers.find(u => u.id === id) || null;
-  },
-};
-
-// Workspace API
 export const workspaceApi = {
   get: async (): Promise<Workspace> => {
-    await delay();
     return mockWorkspace;
   },
 
   update: async (updates: Partial<Workspace>): Promise<Workspace> => {
-    await delay(400);
     return { ...mockWorkspace, ...updates };
   },
 };

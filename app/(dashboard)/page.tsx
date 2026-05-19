@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { assetsApi, clientsApi, queueApi } from '@/lib/api-client';
-import { Asset, Client, UploadQueue } from '@/types/index';
+import { assetsApi, clientsApi, dashboardApi } from '@/lib/api-client';
+import { Asset, Client } from '@/types/index';
 import {
   CheckCircle,
   Clock,
@@ -18,20 +18,25 @@ import {
 export default function DashboardPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [queue, setQueue] = useState<UploadQueue[]>([]);
+  const [summary, setSummary] = useState({
+    pendingApprovals: 0,
+    upcomingUploads: 0,
+    totalClients: 0,
+    uploadedThisMonth: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [assetsData, clientsData, queueData] = await Promise.all([
+        const [assetsData, clientsData, summaryData] = await Promise.all([
           assetsApi.getAll(),
           clientsApi.getAll(),
-          queueApi.getAll(),
+          dashboardApi.getSummary(),
         ]);
         setAssets(assetsData);
         setClients(clientsData);
-        setQueue(queueData);
+        setSummary(summaryData);
       } finally {
         setIsLoading(false);
       }
@@ -40,10 +45,10 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
-  const pendingApprovals = assets.filter((a) => a.status === 'ready_for_review').length;
-  const upcomingUploads = queue.filter((q) => q.status === 'scheduled').length;
-  const totalClients = clients.length;
-  const completedThisMonth = assets.filter((a) => a.status === 'uploaded').length;
+  const pendingApprovals = summary.pendingApprovals;
+  const upcomingUploads = summary.upcomingUploads;
+  const totalClients = summary.totalClients;
+  const completedThisMonth = summary.uploadedThisMonth;
 
   const overviewCards = [
     {

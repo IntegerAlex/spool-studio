@@ -37,7 +37,13 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
   }
 
   const getUser = (userId: string) => {
-    return users.get(userId) || { id: userId, name: 'Unknown', email: 'unknown@example.com', role: 'designer' as const };
+    return users.get(userId) || {
+      id: userId,
+      name: 'Unknown',
+      email: 'unknown@example.com',
+      role: 'designer' as const,
+      createdAt: new Date(),
+    };
   };
 
   return (

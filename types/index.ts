@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'designer' | 'client';
+export type UserRole = 'admin' | 'designer' | 'approver' | 'uploader';
 
 export interface User {
   id: string;
@@ -12,6 +12,7 @@ export interface User {
 export interface Client {
   id: string;
   name: string;
+  slug?: string;
   instagramHandle: string;
   monthlyDeliverables: number;
   completedDeliverables: number;
@@ -21,7 +22,7 @@ export interface Client {
 }
 
 export type AssetStatus = 'draft' | 'in_design' | 'ready_for_review' | 'revision_requested' | 'approved' | 'scheduled' | 'uploaded' | 'archived';
-export type AssetType = 'reel' | 'poster' | 'carousel' | 'story';
+export type AssetType = 'reel' | 'poster';
 
 export interface Asset {
   id: string;
@@ -31,9 +32,12 @@ export interface Asset {
   type: AssetType;
   status: AssetStatus;
   fileUrl?: string;
-  driveFileId?: string;
+  driveFileUrl?: string;
+  thumbnailUrl?: string;
+  createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
+  scheduledAt?: Date | null;
   assignedTo: string[];
   revisions: Revision[];
   comments: Comment[];

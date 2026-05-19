@@ -11,11 +11,12 @@ import { MessageCircle } from 'lucide-react';
 
 interface CommentsThreadProps {
   comments: Comment[];
-  onAddComment: (content: string, isInternal: boolean) => void;
+  onAddComment?: (content: string, isInternal: boolean) => void;
   isLoading?: boolean;
+  readOnly?: boolean;
 }
 
-export function CommentsThread({ comments, onAddComment, isLoading }: CommentsThreadProps) {
+export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: CommentsThreadProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [users, setUsers] = useState<Map<string, User>>(new Map());
@@ -33,7 +34,7 @@ export function CommentsThread({ comments, onAddComment, isLoading }: CommentsTh
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !onAddComment || readOnly) return;
 
     setIsSubmitting(true);
     try {
@@ -46,7 +47,13 @@ export function CommentsThread({ comments, onAddComment, isLoading }: CommentsTh
   };
 
   const getUser = (userId: string) => {
-    return users.get(userId) || { id: userId, name: 'Unknown', email: 'unknown@example.com', role: 'designer' as const };
+    return users.get(userId) || {
+      id: userId,
+      name: 'Unknown',
+      email: 'unknown@example.com',
+      role: 'designer' as const,
+      createdAt: new Date(),
+    };
   };
 
   return (
@@ -96,7 +103,7 @@ export function CommentsThread({ comments, onAddComment, isLoading }: CommentsTh
             placeholder="Add a comment..."
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            disabled={isSubmitting}
+            disabled={isSubmitting || readOnly || !onAddComment}
             rows={3}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
           />
@@ -108,7 +115,7 @@ export function CommentsThread({ comments, onAddComment, isLoading }: CommentsTh
               type="checkbox"
               checked={isInternal}
               onChange={(e) => setIsInternal(e.target.checked)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || readOnly || !onAddComment}
               className="w-4 h-4 rounded border-border bg-background cursor-pointer"
             />
             <span className="text-sm text-muted-foreground">Internal note</span>
@@ -116,12 +123,17 @@ export function CommentsThread({ comments, onAddComment, isLoading }: CommentsTh
 
           <Button
             type="submit"
-            disabled={isSubmitting || !newComment.trim()}
+            disabled={isSubmitting || !newComment.trim() || readOnly || !onAddComment}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isSubmitting ? 'Adding...' : 'Add Comment'}
           </Button>
         </div>
+        {readOnly && (
+          <p className="text-xs text-muted-foreground">
+            Commenting is not available yet.
+          </p>
+        )}
       </form>
     </div>
   );
