@@ -1,5 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { canTransitionStatus } from '@/lib/asset-workflow';
 import type { Asset } from '@/types/index';
+import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import {
   deleteAsset as deleteAssetRow,
   getAssetById,
@@ -8,6 +10,7 @@ import {
   listAssetsByClientId,
   updateAsset as updateAssetRow,
 } from '@/repositories/assets-repository';
+import { getUserById } from '@/repositories/users-repository';
 import type { Database } from '@/types/database';
 
 export interface AssetInput {
@@ -76,6 +79,19 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     throw new Error('Unauthorized');
   }
 
+  await getOrCreateCurrentUserProfile();
+
+  if (input.status === 'scheduled' && !input.scheduledAt) {
+    throw new Error('Scheduled assets require a scheduled date');
+  }
+
+  if (input.assignedTo) {
+    const assignedUser = await getUserById(input.assignedTo, supabase);
+    if (!assignedUser) {
+      throw new Error('Assigned user not found');
+    }
+  }
+
   const record = await insertAsset(
     {
       client_id: input.clientId,
@@ -103,6 +119,22 @@ export async function updateAsset(
   assetId: string,
   input: Partial<AssetInput>
 ): Promise<Asset> {
+  const existing = await getAssetById(assetId);
+  if (!existing) {
+    throw new Error('Asset not found');
+  }
+
+  if (input.status !== undefined) {
+    if (!canTransitionStatus(existing.status, input.status)) {
+      throw new Error('Invalid status transition');
+    }
+
+    const scheduledAt = input.scheduledAt ?? existing.scheduled_at;
+    if (input.status === 'scheduled' && !scheduledAt) {
+      throw new Error('Scheduled assets require a scheduled date');
+    }
+  }
+
   const updates: Record<string, unknown> = {};
   if (input.clientId !== undefined) updates.client_id = input.clientId;
   if (input.title !== undefined) updates.title = input.title;

@@ -25,6 +25,10 @@ function normalizeInstagramHandle(handle?: string | null): string {
   return handle.startsWith('@') ? handle : `@${handle}`;
 }
 
+function normalizeSlug(slug: string): string {
+  return slug.trim().toLowerCase();
+}
+
 function getMonthStart(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
@@ -104,7 +108,7 @@ export async function createClient(input: ClientInput): Promise<Client> {
   const record = await insertClient(
     {
       name: input.name,
-      slug: input.slug,
+      slug: normalizeSlug(input.slug),
       instagram_handle: input.instagramHandle ?? null,
       brand_color: input.brandColor ?? null,
       monthly_reels_target: input.monthlyReelsTarget ?? 0,
@@ -130,7 +134,7 @@ export async function updateClient(
 ): Promise<Client> {
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name;
-  if (input.slug !== undefined) updates.slug = input.slug;
+  if (input.slug !== undefined) updates.slug = normalizeSlug(input.slug);
   if (input.instagramHandle !== undefined) updates.instagram_handle = input.instagramHandle;
   if (input.brandColor !== undefined) updates.brand_color = input.brandColor;
   if (input.monthlyReelsTarget !== undefined) {

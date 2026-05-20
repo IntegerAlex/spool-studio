@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUserProfile } from '@/services/users-service';
+import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 
 export async function GET() {
-  const user = await getCurrentUserProfile();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const user = await getOrCreateCurrentUserProfile();
+    return NextResponse.json({ data: user });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unauthorized';
+    return NextResponse.json({ error: message }, { status: 401 });
   }
-  return NextResponse.json({ data: user });
 }

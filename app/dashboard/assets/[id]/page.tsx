@@ -5,11 +5,16 @@ import { useParams } from 'next/navigation';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { CommentsThread } from '@/components/assets/comments-thread';
 import { RevisionPanel } from '@/components/assets/revision-panel';
-import { assetsApi, clientsApi } from '@/lib/api-client';
-import { Asset, Client } from '@/types/index';
+import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
+import { StatusBadge } from '@/components/assets/status-badge';
+import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
+import { Asset, Client, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, MoreHorizontal } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { getAllowedTransitions, getTransitionActionLabel } from '@/lib/asset-workflow';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,24 +22,53 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function AssetDetailPage() {
   const params = useParams();
-  const assetId = params.id as string;
+  const assetId = params.id as string | undefined;
+  const router = useRouter();
+  const { toast } = useToast();
 
   const [asset, setAsset] = useState<Asset | null>(null);
   const [client, setClient] = useState<Client | null>(null);
+  const [userMap, setUserMap] = useState<Map<string, User>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showDelete, setShowDelete] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        if (!assetId) {
+          setError('Asset id is required');
+          setIsLoading(false);
+          return;
+        }
+        setError(null);
         const assetData = await assetsApi.getById(assetId);
         if (assetData) {
           setAsset(assetData);
-          const clientData = await clientsApi.getById(assetData.clientId);
+          const [clientData, usersData] = await Promise.all([
+            clientsApi.getById(assetData.clientId),
+            usersApi.getAll(),
+          ]);
           setClient(clientData);
+          setUserMap(new Map(usersData.map((user) => [user.id, user])));
         }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load asset';
+        setError(message);
       } finally {
         setIsLoading(false);
       }
@@ -56,6 +90,23 @@ export default function AssetDetailPage() {
         />
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading asset...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Breadcrumb
+          items={[
+            { label: 'Dashboard', href: '/dashboard' },
+            { label: 'Assets', href: '/dashboard/assets' },
+            { label: 'Error' },
+          ]}
+        />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
     );
@@ -97,17 +148,7 @@ export default function AssetDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className={`inline-block px-4 py-2 rounded-full text-sm font-semibold ${
-            asset.status === 'approved'
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-              : asset.status === 'revision_requested'
-              ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-              : asset.status === 'scheduled'
-              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
-              : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-          }`}>
-            {asset.status.replace(/_/g, ' ')}
-          </span>
+          <StatusBadge status={asset.status} className="px-4 py-2 text-sm" />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -116,6 +157,23 @@ export default function AssetDetailPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border border-border">
+              <AssetFormDialog
+                mode="edit"
+                asset={asset}
+                onSaved={(updated) => {
+                  setAsset(updated);
+                  clientsApi.getById(updated.clientId).then(setClient).catch(() => undefined);
+                }}
+                trigger={
+                  <DropdownMenuItem
+                    className="text-foreground cursor-pointer hover:bg-muted"
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    Edit Asset
+                  </DropdownMenuItem>
+                }
+              />
+              <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem className="text-foreground cursor-pointer hover:bg-muted">
                 Download Asset
               </DropdownMenuItem>
@@ -124,7 +182,13 @@ export default function AssetDetailPage() {
                 Share
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem className="text-destructive cursor-pointer hover:bg-destructive/10">
+              <DropdownMenuItem
+                className="text-destructive cursor-pointer hover:bg-destructive/10"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  setShowDelete(true);
+                }}
+              >
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -182,7 +246,7 @@ export default function AssetDetailPage() {
                       key={userId}
                       className="px-3 py-1 text-xs bg-primary/10 text-primary rounded-full"
                     >
-                      {userId}
+                      {userMap.get(userId)?.name ?? userId}
                     </span>
                   ))
                 ) : (
@@ -192,27 +256,78 @@ export default function AssetDetailPage() {
             </div>
 
             <div className="border-t border-border pt-4 space-y-2">
-              {asset.status === 'ready_for_review' && (
-                <>
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                    ✓ Approve
-                  </Button>
-                  <Button variant="outline" className="w-full border-border text-foreground hover:bg-muted">
-                    Request Revisions
-                  </Button>
-                </>
-              )}
-              {asset.status === 'revision_requested' && (
-                <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                  Mark as Ready
+              {getAllowedTransitions(asset.status).map((nextStatus) => (
+                <Button
+                  key={nextStatus}
+                  className="w-full"
+                  variant={nextStatus === 'revision_requested' ? 'outline' : 'default'}
+                  disabled={isSaving}
+                  onClick={async () => {
+                    if (nextStatus === 'scheduled' && !asset.scheduledAt) {
+                      toast({
+                        title: 'Missing schedule',
+                        description: 'Add a scheduled date before moving to Scheduled.',
+                        variant: 'destructive',
+                      });
+                      return;
+                    }
+                    try {
+                      setIsSaving(true);
+                      const updated = await assetsApi.update(asset.id, { status: nextStatus });
+                      setAsset(updated);
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : 'Failed to update status';
+                      toast({
+                        title: 'Status update failed',
+                        description: message,
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }}
+                >
+                  {getTransitionActionLabel(asset.status, nextStatus)}
                 </Button>
-              )}
+              ))}
             </div>
           </Card>
 
           <RevisionPanel revisions={asset.revisions} assetTitle={asset.title} />
         </div>
       </div>
+
+      <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete asset?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the asset and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                try {
+                  await assetsApi.delete(asset.id);
+                  toast({ title: 'Asset deleted' });
+                  router.push('/dashboard/assets');
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : 'Failed to delete asset';
+                  toast({
+                    title: 'Delete failed',
+                    description: message,
+                    variant: 'destructive',
+                  });
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

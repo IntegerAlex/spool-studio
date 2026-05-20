@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import { getClientDetail, updateClient, removeClient } from '@/services/clients-service';
 
 interface RouteContext {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const client = await getClientDetail(context.params.id);
+  const params = await context.params;
+  console.info('[api/clients/[id]] params', params);
+  const clientId = params?.id;
+  if (!clientId) {
+    return NextResponse.json({ error: 'Client id is required' }, { status: 400 });
+  }
+  const client = await getClientDetail(clientId);
   if (!client) {
     return NextResponse.json({ error: 'Client not found' }, { status: 404 });
   }
@@ -15,8 +21,14 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    const params = await context.params;
+    console.info('[api/clients/[id]] params', params);
+    const clientId = params?.id;
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client id is required' }, { status: 400 });
+    }
     const body = await request.json();
-    const client = await updateClient(context.params.id, {
+    const client = await updateClient(clientId, {
       name: body.name,
       slug: body.slug,
       instagramHandle: body.instagramHandle,
@@ -33,7 +45,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    await removeClient(context.params.id);
+    const params = await context.params;
+    console.info('[api/clients/[id]] params', params);
+    const clientId = params?.id;
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client id is required' }, { status: 400 });
+    }
+    await removeClient(clientId);
     return NextResponse.json({ data: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete client';

@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { User } from '@/types/index';
-import { getUserById, listUsers } from '@/repositories/users-repository';
+import { getUserById, insertUser, listUsers } from '@/repositories/users-repository';
 
 function mapUser(user: Awaited<ReturnType<typeof getUserById>>): User | null {
   if (!user) {
@@ -18,6 +18,14 @@ function mapUser(user: Awaited<ReturnType<typeof getUserById>>): User | null {
 }
 
 export async function getCurrentUserProfile(): Promise<User | null> {
+  try {
+    return await getOrCreateCurrentUserProfile();
+  } catch (error) {
+    return null;
+  }
+}
+
+export async function getOrCreateCurrentUserProfile(): Promise<User> {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -25,11 +33,43 @@ export async function getCurrentUserProfile(): Promise<User | null> {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    return null;
+    throw new Error('Unauthorized');
   }
 
-  const profile = await getUserById(user.id, supabase);
-  return mapUser(profile);
+  const existing = await getUserById(user.id, supabase);
+  if (existing) {
+    const mapped = mapUser(existing);
+    if (!mapped) {
+      throw new Error('Failed to map user profile');
+    }
+    return mapped;
+  }
+
+  if (!user.email) {
+    throw new Error('Authenticated user is missing email');
+  }
+
+  const fullName =
+    (user.user_metadata?.full_name as string | undefined) ??
+    (user.user_metadata?.name as string | undefined) ??
+    user.email;
+
+  const inserted = await insertUser(
+    {
+      id: user.id,
+      email: user.email,
+      full_name: fullName,
+      avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+    },
+    supabase
+  );
+
+  const mapped = mapUser(inserted);
+  if (!mapped) {
+    throw new Error('Failed to map user profile');
+  }
+
+  return mapped;
 }
 
 export async function getUsers(): Promise<User[]> {

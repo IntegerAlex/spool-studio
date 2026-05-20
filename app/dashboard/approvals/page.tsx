@@ -13,10 +13,12 @@ export default function ApprovalsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [clients, setClients] = useState<Map<string, Client>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        setError(null);
         const [assetsData, clientsData] = await Promise.all([
           assetsApi.getAll(),
           clientsApi.getAll(),
@@ -29,6 +31,9 @@ export default function ApprovalsPage() {
           (a) => a.status === 'ready_for_review' || a.status === 'revision_requested'
         );
         setAssets(approvalsAssets);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load approvals';
+        setError(message);
       } finally {
         setIsLoading(false);
       }
@@ -46,6 +51,17 @@ export default function ApprovalsPage() {
         <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Approvals' }]} />
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading approvals...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Approvals' }]} />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
     );

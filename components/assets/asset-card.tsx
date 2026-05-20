@@ -4,6 +4,7 @@ import { Asset } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { FileText, MessageCircle } from 'lucide-react';
+import { StatusBadge } from '@/components/assets/status-badge';
 
 interface AssetCardProps {
   asset: Asset;
@@ -25,17 +26,7 @@ export function AssetCard({ asset }: AssetCardProps) {
               <span className="text-xs text-muted-foreground uppercase tracking-wide">
                 {asset.type}
               </span>
-              <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                asset.status === 'approved'
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                  : asset.status === 'revision_requested'
-                  ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                  : asset.status === 'scheduled'
-                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
-                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-              }`}>
-                {asset.status.replace(/_/g, ' ')}
-              </span>
+              <StatusBadge status={asset.status} />
             </div>
 
             <p className="text-xs text-muted-foreground">

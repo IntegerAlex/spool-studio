@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { AssetCard } from '@/components/assets/asset-card';
+import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { assetsApi } from '@/lib/api-client';
@@ -30,14 +31,19 @@ const statuses: AssetStatus[] = [
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<AssetStatus | 'all'>('all');
 
   useEffect(() => {
     const loadAssets = async () => {
       try {
+        setError(null);
         const data = await assetsApi.getAll();
         setAssets(data);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load assets';
+        setError(message);
       } finally {
         setIsLoading(false);
       }
@@ -62,6 +68,17 @@ export default function AssetsPage() {
         <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Assets' }]} />
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading assets...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Assets' }]} />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
     );
@@ -110,10 +127,16 @@ export default function AssetsPage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            <Plus className="w-4 h-4 mr-2" />
-            New Asset
-          </Button>
+          <AssetFormDialog
+            mode="create"
+            onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
+            trigger={
+              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                New Asset
+              </Button>
+            }
+          />
         </div>
       </div>
 

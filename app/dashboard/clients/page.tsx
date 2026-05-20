@@ -37,7 +37,13 @@ export default function ClientsPage() {
   return (
     <div className="space-y-8">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Clients' }]} />
-      <ClientList clients={clients} />
+      <ClientList
+        clients={clients}
+        onCreated={(client) => {
+          console.info('[clients-page] created client', client);
+          setClients((prev) => [client, ...prev]);
+        }}
+      />
     </div>
   );
 }

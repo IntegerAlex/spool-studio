@@ -3,6 +3,7 @@
 import { Client } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ClientFormDialog } from '@/components/clients/client-form-dialog';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Search, Plus } from 'lucide-react';
@@ -10,9 +11,10 @@ import { useState } from 'react';
 
 interface ClientListProps {
   clients: Client[];
+  onCreated?: (client: Client) => void;
 }
 
-export function ClientList({ clients }: ClientListProps) {
+export function ClientList({ clients, onCreated }: ClientListProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredClients = clients.filter(
@@ -33,10 +35,15 @@ export function ClientList({ clients }: ClientListProps) {
             className="pl-10 bg-muted border-border"
           />
         </div>
-        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Client
-        </Button>
+        <ClientFormDialog
+          onSaved={onCreated}
+          trigger={
+            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Client
+            </Button>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

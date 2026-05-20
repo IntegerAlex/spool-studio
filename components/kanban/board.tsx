@@ -2,8 +2,8 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { Asset, AssetStatus } from '@/types/index';
+import { canTransitionStatus } from '@/lib/asset-workflow';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
   GripVertical,
@@ -15,7 +15,6 @@ import {
   MessageSquare,
   MoreHorizontal,
   Copy,
-  Archive,
   Eye,
 } from 'lucide-react';
 
@@ -122,7 +121,7 @@ function KanbanCard({ asset, onQuickApprove }: { asset: Asset; onQuickApprove?: 
   );
 }
 
-export function KanbanBoard({ assets }: KanbanBoardProps) {
+export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
   const [collapsedColumns, setCollapsedColumns] = useState<Set<AssetStatus>>(new Set());
   const [draggedItem, setDraggedItem] = useState<{ assetId: string; fromStatus: AssetStatus } | null>(null);
 
@@ -154,7 +153,15 @@ export function KanbanBoard({ assets }: KanbanBoardProps) {
   const handleDrop = (e: React.DragEvent, toStatus: AssetStatus) => {
     e.preventDefault();
     e.currentTarget.classList.remove('ring-2', 'ring-primary');
-    // Drag logic would be handled by parent component
+    if (!draggedItem || draggedItem.fromStatus === toStatus) {
+      return;
+    }
+    if (!canTransitionStatus(draggedItem.fromStatus, toStatus)) {
+      setDraggedItem(null);
+      return;
+    }
+    setDraggedItem(null);
+    onStatusChange?.(draggedItem.assetId, toStatus);
   };
 
   const assetsByStatus = useMemo(() => {
@@ -217,7 +224,14 @@ export function KanbanBoard({ assets }: KanbanBoardProps) {
                 ) : (
                   statusAssets.map((asset) => (
                     <div key={asset.id} draggable onDragStart={() => handleDragStart(asset.id, status.id)}>
-                      <KanbanCard asset={asset} />
+                      <KanbanCard
+                        asset={asset}
+                        onQuickApprove={
+                          onStatusChange && canTransitionStatus(asset.status, 'approved')
+                            ? () => onStatusChange(asset.id, 'approved')
+                            : undefined
+                        }
+                      />
                     </div>
                   ))
                 )}

@@ -6,6 +6,7 @@ import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { assetsApi, clientsApi, dashboardApi } from '@/lib/api-client';
 import { Asset, Client } from '@/types/index';
+import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import {
   CheckCircle,
   Clock,
@@ -25,10 +26,12 @@ export default function DashboardPage() {
     uploadedThisMonth: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        setError(null);
         const [assetsData, clientsData, summaryData] = await Promise.all([
           assetsApi.getAll(),
           clientsApi.getAll(),
@@ -37,6 +40,9 @@ export default function DashboardPage() {
         setAssets(assetsData);
         setClients(clientsData);
         setSummary(summaryData);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load dashboard';
+        setError(message);
       } finally {
         setIsLoading(false);
       }
@@ -87,6 +93,17 @@ export default function DashboardPage() {
         <Breadcrumb items={[{ label: 'Dashboard' }]} />
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <Breadcrumb items={[{ label: 'Dashboard' }]} />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
     );
@@ -177,9 +194,18 @@ export default function DashboardPage() {
           <Card className="p-6 border border-border">
             <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-2">
-              <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">
-                New Asset
-              </button>
+              <AssetFormDialog
+                mode="create"
+                onSaved={(asset) => {
+                  setAssets((prev) => [asset, ...prev]);
+                  dashboardApi.getSummary().then(setSummary).catch(() => undefined);
+                }}
+                trigger={
+                  <button className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">
+                    New Asset
+                  </button>
+                }
+              />
               <button className="w-full px-4 py-2 border border-border text-foreground rounded-lg hover:bg-muted transition-colors text-sm font-medium">
                 View Calendar
               </button>

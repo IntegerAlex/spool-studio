@@ -39,3 +39,21 @@ export async function getUserById(
 
   return data ?? null;
 }
+
+export async function insertUser(
+  payload: Database['public']['Tables']['users']['Insert'],
+  client?: SupabaseClient<Database>
+): Promise<DbUser> {
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('users')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+}
