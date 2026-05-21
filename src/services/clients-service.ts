@@ -8,6 +8,7 @@ import {
   updateClient as updateClientRow,
 } from '@/repositories/clients-repository';
 import { listAssetSummaries } from '@/repositories/assets-repository';
+import { createClientDriveFolders } from '@/integrations/google-drive/folder-service';
 
 export interface ClientInput {
   name: string;
@@ -71,6 +72,8 @@ function mapClient(
     completedDeliverables,
     assignedTeamMembers,
     brandColor: client.brand_color ?? undefined,
+    driveFolderId: client.drive_folder_id ?? undefined,
+    driveFolderUrl: client.drive_folder_url ?? undefined,
   };
 }
 
@@ -118,8 +121,53 @@ export async function createClient(input: ClientInput): Promise<Client> {
     supabase
   );
 
+  let updatedRecord = record;
+
+  try {
+    console.info('[clients-service] Starting Drive folder provisioning for client', {
+      clientId: record.id,
+      clientName: record.name,
+    });
+
+    const driveFolders = await createClientDriveFolders(record.name);
+
+    console.info('[clients-service] Drive folder provisioning succeeded', {
+      clientId: record.id,
+      clientName: record.name,
+      rootFolderId: driveFolders.root.id,
+      rootFolderUrl: driveFolders.root.url,
+    });
+
+    updatedRecord = await updateClientRow(
+      record.id,
+      {
+        drive_folder_id: driveFolders.root.id,
+        drive_folder_url: driveFolders.root.url,
+      },
+      supabase
+    );
+
+    const persistedRecord = await getClientById(record.id, supabase);
+    if (persistedRecord) {
+      updatedRecord = persistedRecord;
+    }
+
+    console.info('[clients-service] Supabase Drive metadata persistence succeeded', {
+      clientId: record.id,
+      driveFolderId: updatedRecord.drive_folder_id,
+      driveFolderUrl: updatedRecord.drive_folder_url,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to provision Drive folders';
+    console.error('[clients-service] Drive folder provisioning failed', {
+      clientId: record.id,
+      clientName: record.name,
+      error: message,
+    });
+  }
+
   const assetSummaries = await listAssetSummaries(supabase);
-  const mapped = mapClient(record, assetSummaries);
+  const mapped = mapClient(updatedRecord, assetSummaries);
 
   if (!mapped) {
     throw new Error('Failed to map client');

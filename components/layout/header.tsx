@@ -16,22 +16,28 @@ export function Header({ title }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
+    let isActive = true;
     const supabase = createBrowserSupabaseClient();
 
     const loadUser = async () => {
       const { data } = await supabase.auth.getUser();
-      setUser(data.user ?? null);
+      if (isActive) {
+        setUser(data.user ?? null);
+      }
     };
 
-    loadUser();
+    void loadUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadUser();
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isActive) {
+        setUser(session?.user ?? null);
+      }
     });
 
     return () => {
+      isActive = false;
       subscription.unsubscribe();
     };
   }, []);

@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { usersApi } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
 import { User } from '@/types/index';
-import { Edit2, ExternalLink } from 'lucide-react';
+import { Copy, Edit2, ExternalLink, FolderOpen } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useToast } from '@/hooks/use-toast';
 
 interface ClientDetailProps {
   client: Client;
@@ -16,20 +17,48 @@ interface ClientDetailProps {
 
 export function ClientDetail({ client, assets }: ClientDetailProps) {
   const [team, setTeam] = useState<User[]>([]);
+  const { toast } = useToast();
 
   useEffect(() => {
+    let isActive = true;
+
     const loadTeam = async () => {
-      const allUsers = await usersApi.getAll();
-      const teamUsers = allUsers.filter((u) => client.assignedTeamMembers.includes(u.id));
-      setTeam(teamUsers);
+      try {
+        const allUsers = await usersApi.getAll();
+        const teamUsers = allUsers.filter((u) => client.assignedTeamMembers.includes(u.id));
+        if (isActive) {
+          setTeam(teamUsers);
+        }
+      } catch {
+        if (isActive) {
+          setTeam([]);
+        }
+      }
     };
 
-    loadTeam();
+    void loadTeam();
+
+    return () => {
+      isActive = false;
+    };
   }, [client.assignedTeamMembers]);
 
   const progress = client.monthlyDeliverables > 0
     ? Math.round((client.completedDeliverables / client.monthlyDeliverables) * 100)
     : 0;
+
+  const handleCopyFolderLink = async () => {
+    if (!client.driveFolderUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(client.driveFolderUrl);
+      toast({ title: 'Folder link copied' });
+    } catch {
+      toast({ title: 'Unable to copy folder link', variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -46,10 +75,27 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
             <ExternalLink className="w-4 h-4" />
           </a>
         </div>
-        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-          <Edit2 className="w-4 h-4 mr-2" />
-          Edit Client
-        </Button>
+        <div className="flex flex-col items-end gap-2">
+          {client.driveFolderUrl && (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button asChild variant="outline" className="border-border text-foreground hover:bg-muted">
+                <a href={client.driveFolderUrl} target="_blank" rel="noreferrer">
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Open Drive Folder
+                </a>
+              </Button>
+              <Button variant="outline" className="border-border text-foreground hover:bg-muted" onClick={handleCopyFolderLink}>
+                <Copy className="w-4 h-4 mr-2" />
+                Copy Folder Link
+              </Button>
+            </div>
+          )}
+
+          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Edit2 className="w-4 h-4 mr-2" />
+            Edit Client
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

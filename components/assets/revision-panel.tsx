@@ -1,14 +1,20 @@
 'use client';
 
-import { Revision } from '@/types/index';
+import type { AssetComment, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { usersApi } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
-import { User } from '@/types/index';
 import { Download, AlertCircle } from 'lucide-react';
 
+type RevisionRecord = AssetComment & {
+  version?: number;
+  createdBy?: string;
+  reason?: string;
+  fileUrl?: string;
+};
+
 interface RevisionPanelProps {
-  revisions: Revision[];
+  revisions: RevisionRecord[];
   assetTitle: string;
 }
 
@@ -16,13 +22,27 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
   const [users, setUsers] = useState<Map<string, User>>(new Map());
 
   useEffect(() => {
+    let isActive = true;
+
     const loadUsers = async () => {
-      const allUsers = await usersApi.getAll();
-      const userMap = new Map(allUsers.map((u) => [u.id, u]));
-      setUsers(userMap);
+      try {
+        const allUsers = await usersApi.getAll();
+        const userMap = new Map(allUsers.map((u) => [u.id, u]));
+        if (isActive) {
+          setUsers(userMap);
+        }
+      } catch {
+        if (isActive) {
+          setUsers(new Map());
+        }
+      }
     };
 
-    loadUsers();
+    void loadUsers();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   if (revisions.length === 0) {
@@ -52,7 +72,10 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
 
       <div className="space-y-4">
         {revisions.map((revision, index) => {
-          const author = getUser(revision.createdBy);
+          const authorId = revision.userId ?? revision.createdBy ?? 'unknown';
+          const author = getUser(authorId);
+          const versionLabel = revision.version ?? index + 1;
+          const revisionNote = revision.message || revision.reason || 'Revision update';
           return (
             <div
               key={revision.id}
@@ -61,7 +84,7 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <p className="font-medium text-foreground text-sm">
-                    Version {revision.version}
+                    Version {versionLabel}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Requested by {author.name}
@@ -72,7 +95,7 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
                 </span>
               </div>
 
-              <p className="text-sm text-foreground mb-3">{revision.reason}</p>
+              <p className="text-sm text-foreground mb-3">{revisionNote}</p>
 
               {revision.fileUrl && (
                 <button className="inline-flex items-center space-x-2 text-sm text-primary hover:underline">

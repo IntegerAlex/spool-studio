@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { queueApi, assetsApi, clientsApi } from '@/lib/api-client';
 import { UploadQueue, Asset, Client } from '@/types/index';
 import { Download, Copy, Calendar } from 'lucide-react';
+import { ExternalLink, Folder } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
 export default function QueuePage() {
@@ -117,6 +119,35 @@ export default function QueuePage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-card border border-border">
+                      {asset?.driveFileUrl && (
+                        <DropdownMenuItem asChild>
+                          <a href={asset.driveFileUrl} target="_blank" rel="noreferrer" className="text-foreground cursor-pointer hover:bg-muted">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Open in Drive
+                          </a>
+                        </DropdownMenuItem>
+                      )}
+                      {asset?.driveFolderUrl && (
+                        <DropdownMenuItem asChild>
+                          <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer" className="text-foreground cursor-pointer hover:bg-muted">
+                            <Folder className="w-4 h-4 mr-2" />
+                            Open folder
+                          </a>
+                        </DropdownMenuItem>
+                      )}
+                      {asset?.driveFileUrl && (
+                        <DropdownMenuItem
+                          className="text-foreground cursor-pointer hover:bg-muted"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
+                          }}
+                        >
+                          <Copy className="w-4 h-4 mr-2" />
+                          Copy link
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
                     <DropdownMenuItem className="text-foreground cursor-pointer hover:bg-muted">
                       <Download className="w-4 h-4 mr-2" />
                       Download Asset

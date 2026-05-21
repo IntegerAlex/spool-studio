@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { AssetCard } from '@/components/assets/asset-card';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
@@ -36,31 +36,49 @@ export default function AssetsPage() {
   const [selectedStatus, setSelectedStatus] = useState<AssetStatus | 'all'>('all');
 
   useEffect(() => {
+    let isActive = true;
+
     const loadAssets = async () => {
       try {
         setError(null);
         const data = await assetsApi.getAll();
-        setAssets(data);
+        if (isActive) {
+          setAssets(data);
+        }
       } catch (err) {
+        if (!isActive) {
+          return;
+        }
         const message = err instanceof Error ? err.message : 'Failed to load assets';
         setError(message);
       } finally {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadAssets();
+    void loadAssets();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
-  const filteredAssets = assets.filter((asset) => {
-    const matchesSearch =
-      asset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      asset.description?.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredAssets = useMemo(
+    () =>
+      assets.filter((asset) => {
+        const normalizedSearch = searchQuery.toLowerCase();
+        const matchesSearch =
+          asset.title.toLowerCase().includes(normalizedSearch) ||
+          asset.description?.toLowerCase().includes(normalizedSearch);
 
-    const matchesStatus = selectedStatus === 'all' || asset.status === selectedStatus;
+        const matchesStatus = selectedStatus === 'all' || asset.status === selectedStatus;
 
-    return matchesSearch && matchesStatus;
-  });
+        return matchesSearch && matchesStatus;
+      }),
+    [assets, searchQuery, selectedStatus]
+  );
 
   if (isLoading) {
     return (

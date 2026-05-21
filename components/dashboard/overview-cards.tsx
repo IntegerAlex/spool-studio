@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { ArrowUp, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 
 interface OverviewCard {
   title: string;
@@ -18,9 +18,9 @@ interface OverviewCardsProps {
 export function OverviewCards({ cards }: OverviewCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      {cards.map((card, index) => (
+      {cards.map((card) => (
         <Card
-          key={index}
+          key={card.title}
           className="p-6 bg-card border border-border hover:shadow-lg transition-shadow"
         >
           <div className="flex items-start justify-between">

@@ -1,16 +1,22 @@
 'use client';
 
-import { Comment } from '@/types/index';
+import type { AssetComment, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usersApi } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
-import { User } from '@/types/index';
 import { MessageCircle } from 'lucide-react';
 
+type CommentRecord = AssetComment & {
+  authorId?: string;
+  content?: string;
+  isInternal?: boolean;
+  replies?: unknown[];
+};
+
 interface CommentsThreadProps {
-  comments: Comment[];
+  comments: CommentRecord[];
   onAddComment?: (content: string, isInternal: boolean) => void;
   isLoading?: boolean;
   readOnly?: boolean;
@@ -23,13 +29,27 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    let isActive = true;
+
     const loadUsers = async () => {
-      const allUsers = await usersApi.getAll();
-      const userMap = new Map(allUsers.map((u) => [u.id, u]));
-      setUsers(userMap);
+      try {
+        const allUsers = await usersApi.getAll();
+        const userMap = new Map(allUsers.map((u) => [u.id, u]));
+        if (isActive) {
+          setUsers(userMap);
+        }
+      } catch {
+        if (isActive) {
+          setUsers(new Map());
+        }
+      }
     };
 
-    loadUsers();
+    void loadUsers();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,10 +85,13 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: 
 
       <div className="space-y-4">
         {comments.map((comment) => {
-          const author = getUser(comment.authorId);
+          const authorId = comment.userId ?? comment.authorId ?? 'unknown';
+          const author = getUser(authorId);
+          const commentBody = comment.message || comment.content || '';
+          const isInternalComment = comment.type === 'internal_note' || comment.isInternal === true;
           return (
             <div key={comment.id} className={`p-4 border rounded-lg ${
-              comment.isInternal
+              isInternalComment
                 ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800'
                 : 'bg-muted border-border'
             }`}>
@@ -80,7 +103,7 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 mb-1">
                     <p className="font-medium text-foreground text-sm">{author.name}</p>
-                    {comment.isInternal && (
+                    {isInternalComment && (
                       <span className="px-2 py-0.5 text-xs bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300 rounded">
                         Internal
                       </span>
@@ -89,7 +112,7 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: 
                   <p className="text-xs text-muted-foreground mb-2">
                     {new Date(comment.createdAt).toLocaleString()}
                   </p>
-                  <p className="text-sm text-foreground">{comment.content}</p>
+                  <p className="text-sm text-foreground">{commentBody}</p>
                 </div>
               </div>
             </div>

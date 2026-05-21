@@ -19,10 +19,14 @@ export interface Client {
   assignedTeamMembers: string[];
   brandColor?: string;
   logo?: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
 }
 
 export type AssetStatus = 'draft' | 'in_design' | 'ready_for_review' | 'revision_requested' | 'approved' | 'scheduled' | 'uploaded' | 'archived';
 export type AssetType = 'reel' | 'poster';
+export type CommentType = 'comment' | 'revision' | 'approval_note' | 'internal_note';
+export type RevisionStatus = 'open' | 'resolved';
 
 export interface Asset {
   id: string;
@@ -33,34 +37,44 @@ export interface Asset {
   status: AssetStatus;
   fileUrl?: string;
   driveFileUrl?: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
   thumbnailUrl?: string;
   createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
   scheduledAt?: Date | null;
   assignedTo: string[];
-  revisions: Revision[];
-  comments: Comment[];
+  revisions: AssetComment[];
+  comments: AssetComment[];
 }
 
-export interface Revision {
+export interface AssetComment {
   id: string;
   assetId: string;
-  version: number;
-  createdBy: string;
+  userId: string;
+  type: CommentType;
+  message: string;
+  revisionStatus?: RevisionStatus | null;
   createdAt: Date;
-  reason: string;
+  updatedAt: Date;
+  authorId?: string;
+  content?: string;
+  replies?: AssetComment[];
+  isInternal?: boolean;
+  version?: number;
+  createdBy?: string;
+  reason?: string;
   fileUrl?: string;
 }
 
-export interface Comment {
+export interface AssetActivityLog {
   id: string;
   assetId: string;
-  authorId: string;
-  content: string;
+  userId?: string | null;
+  action: string;
+  metadata: Record<string, unknown>;
   createdAt: Date;
-  replies: Comment[];
-  isInternal: boolean;
 }
 
 export interface Notification {

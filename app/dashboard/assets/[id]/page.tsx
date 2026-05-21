@@ -11,7 +11,7 @@ import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
 import { Asset, Client, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, MoreHorizontal } from 'lucide-react';
+import { Copy, FileText, FolderOpen, MoreHorizontal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAllowedTransitions, getTransitionActionLabel } from '@/lib/asset-workflow';
@@ -46,6 +46,12 @@ export default function AssetDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  const driveFolderLabel = asset?.type === 'reel'
+    ? 'Reels'
+    : asset?.type === 'poster'
+      ? 'Posters'
+      : 'Exports';
 
   useEffect(() => {
     const loadData = async () => {
@@ -198,12 +204,100 @@ export default function AssetDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-muted/30 border border-border rounded-lg p-12 flex flex-col items-center justify-center min-h-64">
-            <FileText className="w-16 h-16 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground text-center">
-              {asset.type === 'reel' ? '🎬 Instagram Reel' : '📱 Poster'} Preview
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">Google Drive integration placeholder</p>
+          <Card className="bg-muted/30 border border-border rounded-lg p-4 flex flex-col min-h-64">
+            <div className="flex flex-col items-center justify-center gap-4">
+              {asset.thumbnailUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={asset.thumbnailUrl} alt={asset.title} className="w-full max-h-80 object-contain rounded" />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <FileText className="w-16 h-16 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground text-center">
+                    {asset.type === 'reel' ? '🎬 Instagram Reel' : '📱 Poster'} Preview
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                {asset.driveFileUrl && (
+                  <Button asChild variant="default">
+                    <a href={asset.driveFileUrl} target="_blank" rel="noreferrer">
+                      Open file
+                    </a>
+                  </Button>
+                )}
+
+                {asset.driveFolderUrl && (
+                  <Button asChild variant="ghost">
+                    <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer">
+                      Open folder
+                    </a>
+                  </Button>
+                )}
+
+                {asset.driveFileUrl && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
+                      toast({ title: 'Link copied' });
+                    }}
+                  >
+                    Copy link
+                  </Button>
+                )}
+              </div>
+
+              <Card className="w-full border border-border bg-muted/20 p-4 text-left">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Drive destination</p>
+                    <h2 className="mt-1 text-lg font-semibold text-foreground">{driveFolderLabel}</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {asset.driveFolderUrl
+                        ? 'Linked folder ready for upload handoff.'
+                        : 'No Drive folder has been linked yet.'}
+                    </p>
+                  </div>
+
+                  <span className="inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground">
+                    {driveFolderLabel}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  {asset.driveFolderUrl ? (
+                    <>
+                      <Button asChild variant="default">
+                        <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer">
+                          <FolderOpen className="mr-2 h-4 w-4" />
+                          Open Folder
+                        </a>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-border text-foreground hover:bg-muted"
+                        onClick={() => {
+                          void navigator.clipboard.writeText(asset.driveFolderUrl ?? '');
+                          toast({ title: 'Folder link copied' });
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy Folder Link
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      The folder association will appear here once Drive lookup succeeds.
+                    </p>
+                  )}
+                </div>
+
+                {asset.driveFolderId && (
+                  <p className="mt-3 text-xs text-muted-foreground">Folder ID: {asset.driveFolderId}</p>
+                )}
+              </Card>
+            </div>
           </Card>
 
           {asset.description && (

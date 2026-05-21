@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { OverviewCards } from '@/components/dashboard/overview-cards';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
@@ -29,6 +29,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isActive = true;
+
     const loadData = async () => {
       try {
         setError(null);
@@ -37,18 +39,30 @@ export default function DashboardPage() {
           clientsApi.getAll(),
           dashboardApi.getSummary(),
         ]);
+        if (!isActive) {
+          return;
+        }
         setAssets(assetsData);
         setClients(clientsData);
         setSummary(summaryData);
       } catch (err) {
+        if (!isActive) {
+          return;
+        }
         const message = err instanceof Error ? err.message : 'Failed to load dashboard';
         setError(message);
       } finally {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
       }
     };
 
-    loadData();
+    void loadData();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const pendingApprovals = summary.pendingApprovals;
@@ -56,36 +70,49 @@ export default function DashboardPage() {
   const totalClients = summary.totalClients;
   const completedThisMonth = summary.uploadedThisMonth;
 
-  const overviewCards = [
-    {
-      title: 'Pending Approvals',
-      value: pendingApprovals,
-      icon: <CheckCircle className="w-6 h-6" />,
-      change: '+2 from yesterday',
-      trend: 'up' as const,
-    },
-    {
-      title: 'Assets Uploaded Today',
-      value: completedThisMonth,
-      icon: <Upload className="w-6 h-6" />,
-      change: 'On track',
-      trend: 'neutral' as const,
-    },
-    {
-      title: 'Upcoming Uploads',
-      value: upcomingUploads,
-      icon: <Calendar className="w-6 h-6" />,
-      change: 'Next 7 days',
-      trend: 'neutral' as const,
-    },
-    {
-      title: 'Active Clients',
-      value: totalClients,
-      icon: <Users className="w-6 h-6" />,
-      change: '100% active',
-      trend: 'up' as const,
-    },
-  ];
+  const overviewCards = useMemo(
+    () => [
+      {
+        title: 'Pending Approvals',
+        value: pendingApprovals,
+        icon: <CheckCircle className="w-6 h-6" />,
+        change: '+2 from yesterday',
+        trend: 'up' as const,
+      },
+      {
+        title: 'Assets Uploaded Today',
+        value: completedThisMonth,
+        icon: <Upload className="w-6 h-6" />,
+        change: 'On track',
+        trend: 'neutral' as const,
+      },
+      {
+        title: 'Upcoming Uploads',
+        value: upcomingUploads,
+        icon: <Calendar className="w-6 h-6" />,
+        change: 'Next 7 days',
+        trend: 'neutral' as const,
+      },
+      {
+        title: 'Active Clients',
+        value: totalClients,
+        icon: <Users className="w-6 h-6" />,
+        change: '100% active',
+        trend: 'up' as const,
+      },
+    ],
+    [completedThisMonth, pendingApprovals, totalClients, upcomingUploads]
+  );
+
+  const assetStatusBreakdown = useMemo(
+    () => [
+      { label: 'Draft', count: assets.filter((a) => a.status === 'draft').length },
+      { label: 'In Review', count: assets.filter((a) => a.status === 'ready_for_review').length },
+      { label: 'Approved', count: assets.filter((a) => a.status === 'approved').length },
+      { label: 'Scheduled', count: assets.filter((a) => a.status === 'scheduled').length },
+    ],
+    [assets]
+  );
 
   if (isLoading) {
     return (
@@ -174,12 +201,7 @@ export default function DashboardPage() {
           <Card className="p-6 border border-border">
             <h3 className="text-lg font-semibold text-foreground mb-4">Asset Status Breakdown</h3>
             <div className="space-y-3">
-              {[
-                { label: 'Draft', count: assets.filter((a) => a.status === 'draft').length },
-                { label: 'In Review', count: assets.filter((a) => a.status === 'ready_for_review').length },
-                { label: 'Approved', count: assets.filter((a) => a.status === 'approved').length },
-                { label: 'Scheduled', count: assets.filter((a) => a.status === 'scheduled').length },
-              ].map((status) => (
+              {assetStatusBreakdown.map((status) => (
                 <div
                   key={status.label}
                   className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"

@@ -140,6 +140,8 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
       return;
     }
 
+    let isActive = true;
+
     const loadOptions = async () => {
       setIsLoadingOptions(true);
       setLoadError(null);
@@ -148,17 +150,28 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
           clientsApi.getAll(),
           usersApi.getAll(),
         ]);
-        setClients(clientsData);
-        setUsers(usersData);
+        if (isActive) {
+          setClients(clientsData);
+          setUsers(usersData);
+        }
       } catch (error) {
+        if (!isActive) {
+          return;
+        }
         const message = error instanceof Error ? error.message : 'Failed to load form options';
         setLoadError(message);
       } finally {
-        setIsLoadingOptions(false);
+        if (isActive) {
+          setIsLoadingOptions(false);
+        }
       }
     };
 
-    loadOptions();
+    void loadOptions();
+
+    return () => {
+      isActive = false;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -322,6 +335,10 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              Drive folders are assigned automatically from the selected client and asset type.
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

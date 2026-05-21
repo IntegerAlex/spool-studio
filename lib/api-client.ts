@@ -1,5 +1,7 @@
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
-import { mockNotifications, mockUploadQueue, mockWorkspace } from './mock-data';
+import { mockNotifications } from './mock-data/notifications';
+import { mockUploadQueue } from './mock-data/upload-queue';
+import { mockWorkspace } from './mock-data/workspace';
 import type {
   Asset,
   Client,
@@ -12,6 +14,30 @@ import type {
 interface ApiEnvelope<T> {
   data?: T;
   error?: string;
+}
+
+const pendingRequests = new Map<string, Promise<unknown>>();
+
+function buildRequestKey(input: RequestInfo, init?: RequestInit): string {
+  const requestUrl = typeof input === 'string' ? input : String(input);
+  const method = init?.method ?? 'GET';
+  const body = typeof init?.body === 'string' ? init.body : '';
+
+  return `${method}:${requestUrl}:${body}`;
+}
+
+async function dedupeRequest<T>(key: string, loader: () => Promise<T>): Promise<T> {
+  const pending = pendingRequests.get(key) as Promise<T> | undefined;
+  if (pending) {
+    return pending;
+  }
+
+  const request = loader().finally(() => {
+    pendingRequests.delete(key);
+  });
+
+  pendingRequests.set(key, request as Promise<unknown>);
+  return request;
 }
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -35,6 +61,10 @@ async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> 
   return payload.data as T;
 }
 
+async function fetchJsonDeduped<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  return dedupeRequest(buildRequestKey(input, init), () => fetchJson<T>(input, init));
+}
+
 async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
   const response = await fetch(input, {
     headers: { 'Content-Type': 'application/json' },
@@ -54,6 +84,10 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
     throw new Error(payload.error);
   }
   return payload.data as T;
+}
+
+async function fetchJsonNullableDeduped<T>(input: RequestInfo): Promise<T | null> {
+  return dedupeRequest(buildRequestKey(input), () => fetchJsonNullable<T>(input));
 }
 
 function hydrateAsset(asset: Asset): Asset {
@@ -97,7 +131,7 @@ export const authApi = {
   },
 
   getCurrentUser: async (): Promise<User | null> => {
-    const user = await fetchJsonNullable<User>('/api/users/me');
+    const user = await fetchJsonNullableDeduped<User>('/api/users/me');
     return user ? hydrateUser(user) : null;
   },
 
@@ -120,11 +154,11 @@ export const authApi = {
 
 export const clientsApi = {
   getAll: async (): Promise<Client[]> => {
-    return fetchJson<Client[]>('/api/clients');
+    return fetchJsonDeduped<Client[]>('/api/clients');
   },
 
   getById: async (id: string): Promise<Client | null> => {
-    return fetchJsonNullable<Client>(`/api/clients/${id}`);
+    return fetchJsonNullableDeduped<Client>(`/api/clients/${id}`);
   },
 
   create: async (client: {
@@ -165,19 +199,19 @@ export const clientsApi = {
 
 export const assetsApi = {
   getAll: async (): Promise<Asset[]> => {
-    const assets = await fetchJson<Asset[]>('/api/assets');
+    const assets = await fetchJsonDeduped<Asset[]>('/api/assets');
     return assets.map(hydrateAsset);
   },
 
   getByClientId: async (clientId: string): Promise<Asset[]> => {
-    const assets = await fetchJson<Asset[]>(
+    const assets = await fetchJsonDeduped<Asset[]>(
       `/api/assets?clientId=${encodeURIComponent(clientId)}`
     );
     return assets.map(hydrateAsset);
   },
 
   getById: async (id: string): Promise<Asset | null> => {
-    const asset = await fetchJsonNullable<Asset>(`/api/assets/${id}`);
+    const asset = await fetchJsonNullableDeduped<Asset>(`/api/assets/${id}`);
     return asset ? hydrateAsset(asset) : null;
   },
 
@@ -225,12 +259,12 @@ export const assetsApi = {
 
 export const usersApi = {
   getAll: async (): Promise<User[]> => {
-    const users = await fetchJson<User[]>('/api/users');
+    const users = await fetchJsonDeduped<User[]>('/api/users');
     return users.map(hydrateUser);
   },
 
   getById: async (id: string): Promise<User | null> => {
-    const user = await fetchJsonNullable<User>(`/api/users/${id}`);
+    const user = await fetchJsonNullableDeduped<User>(`/api/users/${id}`);
     return user ? hydrateUser(user) : null;
   },
 };
@@ -242,7 +276,7 @@ export const dashboardApi = {
     totalClients: number;
     uploadedThisMonth: number;
   }> => {
-    return fetchJson('/api/dashboard/summary');
+    return fetchJsonDeduped('/api/dashboard/summary');
   },
 };
 

@@ -3,7 +3,7 @@
 import { Asset } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
-import { FileText, MessageCircle } from 'lucide-react';
+import { FileText, MessageCircle, ExternalLink, Copy } from 'lucide-react';
 import { StatusBadge } from '@/components/assets/status-badge';
 
 interface AssetCardProps {
@@ -14,8 +14,55 @@ export function AssetCard({ asset }: AssetCardProps) {
   return (
     <Link href={`/dashboard/assets/${asset.id}`}>
       <Card className="overflow-hidden hover:shadow-lg transition-all border border-border cursor-pointer h-full flex flex-col">
-        <div className="bg-muted h-32 flex items-center justify-center border-b border-border">
-          <FileText className="w-8 h-8 text-muted-foreground" />
+        <div className="relative h-32 flex items-center justify-center border-b border-border bg-muted">
+          {asset.thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={asset.thumbnailUrl} alt={asset.title} className="object-cover w-full h-32" />
+          ) : (
+            <div className="flex items-center justify-center w-full h-full">
+              <FileText className="w-8 h-8 text-muted-foreground" />
+            </div>
+          )}
+
+          <div className="absolute top-2 right-2 flex space-x-2">
+            {asset.driveFileUrl && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    window.open(asset.driveFileUrl ?? '', '_blank', 'noopener,noreferrer');
+                  } catch (_) {
+                    // ignore open errors
+                  }
+                }}
+                title="Open in Drive"
+                aria-label="Open in Drive"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-card/80 border border-border text-muted-foreground hover:bg-muted"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+            )}
+
+            {asset.driveFileUrl && (
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  try {
+                    await navigator.clipboard.writeText(asset.driveFileUrl ?? '');
+                  } catch (_) {
+                    // ignore clipboard errors
+                  }
+                }}
+                title="Copy link"
+                className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-card/80 border border-border text-muted-foreground hover:bg-muted"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="p-4 flex-1 flex flex-col">
