@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { Card } from '@/components/ui/card';
 import { getUser } from '@/lib/supabase/auth';
 import { LoginForm } from './login-form';
+
+export const dynamic = 'force-dynamic';
 
 export default async function LoginPage() {
   const user = await getUser();
@@ -18,7 +21,9 @@ export default async function LoginPage() {
         </div>
 
         <Card className="p-8 space-y-6 border border-border">
-          <LoginForm />
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
         </Card>
       </div>
     </div>

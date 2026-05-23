@@ -1,13 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createAsset, getAssets, getAssetsByClientId } from '@/services/assets-service';
 import { assetStatusValues } from '@/lib/asset-workflow';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const clientId = searchParams.get('clientId');
+  try {
+    const { searchParams } = new URL(request.url);
+    const clientId = searchParams.get('clientId');
 
-  const assets = clientId ? await getAssetsByClientId(clientId) : await getAssets();
-  return NextResponse.json({ data: assets });
+    const assets = clientId ? await getAssetsByClientId(clientId) : await getAssets();
+    return NextResponse.json({ data: assets });
+  } catch (error) {
+    logProductionRuntimeError('api-assets-get', error);
+    return NextResponse.json({ data: [] });
+  }
 }
 
 export async function POST(request: Request) {
@@ -57,7 +63,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, data: asset }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create asset';
-    console.error('[api/assets] create error', { error });
+    logProductionRuntimeError('api-assets-post', error);
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

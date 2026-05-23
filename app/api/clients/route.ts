@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient, getClients } from '@/services/clients-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export async function GET() {
-  const clients = await getClients();
-  return NextResponse.json({ data: clients });
+  try {
+    const clients = await getClients();
+    return NextResponse.json({ data: clients });
+  } catch (error) {
+    logProductionRuntimeError('api-clients-get', error);
+    return NextResponse.json({ data: [] });
+  }
 }
 
 export async function POST(request: Request) {
@@ -23,6 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: client }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create client';
+    logProductionRuntimeError('api-clients-post', error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

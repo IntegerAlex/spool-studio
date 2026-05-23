@@ -1,21 +1,27 @@
 import { NextResponse } from 'next/server';
 import { getAssetDetail, updateAsset, removeAsset, setAssetCurrentRevision } from '@/services/assets-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const params = await context.params;
-  const assetId = params?.id;
-  if (!assetId) {
-    return NextResponse.json({ error: 'Asset id is required' }, { status: 400 });
+  try {
+    const params = await context.params;
+    const assetId = params?.id;
+    if (!assetId) {
+      return NextResponse.json({ error: 'Asset id is required' }, { status: 400 });
+    }
+    const asset = await getAssetDetail(assetId);
+    if (!asset) {
+      return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
+    }
+    return NextResponse.json({ data: asset });
+  } catch (error) {
+    logProductionRuntimeError('api-assets-id-get', error);
+    return NextResponse.json({ data: null });
   }
-  const asset = await getAssetDetail(assetId);
-  if (!asset) {
-    return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
-  }
-  return NextResponse.json({ data: asset });
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -43,6 +49,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ data: asset });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update asset';
+    logProductionRuntimeError('api-assets-id-patch', error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
@@ -58,6 +65,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ data: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete asset';
+    logProductionRuntimeError('api-assets-id-delete', error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

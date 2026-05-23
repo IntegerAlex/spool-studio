@@ -9,6 +9,7 @@ import {
 } from '@/repositories/asset-comments-repository';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import type { Database } from '@/types/database';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export interface CommentInput {
   assetId: string;
@@ -38,10 +39,15 @@ function mapComment(
 }
 
 export async function getCommentsByAssetId(assetId: string): Promise<AssetComment[]> {
-  const rows = await listCommentsByAssetId(assetId);
-  return rows
-    .map((row) => mapComment(row))
-    .filter((comment): comment is AssetComment => Boolean(comment));
+  try {
+    const rows = await listCommentsByAssetId(assetId);
+    return rows
+      .map((row) => mapComment(row))
+      .filter((comment): comment is AssetComment => Boolean(comment));
+  } catch (error) {
+    logProductionRuntimeError('comments-loader', error, { assetId });
+    return [];
+  }
 }
 
 export async function createComment(input: CommentInput): Promise<AssetComment> {

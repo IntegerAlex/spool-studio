@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getUsers } from '@/services/users-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export async function GET() {
-  const users = await getUsers();
-  return NextResponse.json({ data: users });
+  try {
+    const users = await getUsers();
+    return NextResponse.json({ data: users });
+  } catch (error) {
+    logProductionRuntimeError('api-users-get', error);
+    return NextResponse.json({ data: [] });
+  }
 }

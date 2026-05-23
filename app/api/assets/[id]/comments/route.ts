@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createComment, getCommentsByAssetId } from '@/services/comments-service';
 import { logAssetActivity } from '@/services/activity-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -9,14 +10,19 @@ interface RouteContext {
 const allowedTypes = ['comment', 'revision', 'approval_note', 'internal_note'];
 
 export async function GET(_request: Request, context: RouteContext) {
-  const params = await context.params;
-  const assetId = params?.id;
-  if (!assetId) {
-    return NextResponse.json({ error: 'Asset id is required' }, { status: 400 });
-  }
+  try {
+    const params = await context.params;
+    const assetId = params?.id;
+    if (!assetId) {
+      return NextResponse.json({ error: 'Asset id is required' }, { status: 400 });
+    }
 
-  const comments = await getCommentsByAssetId(assetId);
-  return NextResponse.json({ data: comments });
+    const comments = await getCommentsByAssetId(assetId);
+    return NextResponse.json({ data: comments });
+  } catch (error) {
+    logProductionRuntimeError('api-assets-comments-get', error);
+    return NextResponse.json({ data: [] });
+  }
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -68,6 +74,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ data: comment }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create comment';
+    logProductionRuntimeError('api-assets-comments-post', error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

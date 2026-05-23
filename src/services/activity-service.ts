@@ -6,6 +6,7 @@ import {
 } from '@/repositories/asset-activity-repository';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import type { Json } from '@/types/database';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export interface ActivityInput {
   assetId: string;
@@ -51,8 +52,13 @@ function mapActivity(row: Awaited<ReturnType<typeof insertActivity>>): AssetActi
 }
 
 export async function getAssetActivity(assetId: string): Promise<AssetActivityLog[]> {
-  const rows = await listActivityByAssetId(assetId);
-  return rows.map((row) => mapActivity(row));
+  try {
+    const rows = await listActivityByAssetId(assetId);
+    return rows.map((row) => mapActivity(row));
+  } catch (error) {
+    logProductionRuntimeError('activity-loader', error, { assetId });
+    return [];
+  }
 }
 
 export async function logAssetActivity(input: ActivityInput): Promise<AssetActivityLog> {

@@ -9,6 +9,7 @@ import {
 } from '@/repositories/clients-repository';
 import { listAssetSummaries } from '@/repositories/assets-repository';
 import { createClientDriveFolders } from '@/integrations/google-drive/folder-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export interface ClientInput {
   name: string;
@@ -78,23 +79,33 @@ function mapClient(
 }
 
 export async function getClients(): Promise<Client[]> {
-  const [clients, assetSummaries] = await Promise.all([
-    listClients(),
-    listAssetSummaries(),
-  ]);
+  try {
+    const [clients, assetSummaries] = await Promise.all([
+      listClients(),
+      listAssetSummaries(),
+    ]);
 
-  return clients
-    .map((client) => mapClient(client, assetSummaries))
-    .filter((client): client is Client => Boolean(client));
+    return clients
+      .map((client) => mapClient(client, assetSummaries))
+      .filter((client): client is Client => Boolean(client));
+  } catch (error) {
+    logProductionRuntimeError('clients-loader', error);
+    return [];
+  }
 }
 
 export async function getClientDetail(clientId: string): Promise<Client | null> {
-  const [client, assetSummaries] = await Promise.all([
-    getClientById(clientId),
-    listAssetSummaries(),
-  ]);
+  try {
+    const [client, assetSummaries] = await Promise.all([
+      getClientById(clientId),
+      listAssetSummaries(),
+    ]);
 
-  return mapClient(client, assetSummaries);
+    return mapClient(client, assetSummaries);
+  } catch (error) {
+    logProductionRuntimeError('client-detail-loader', error, { clientId });
+    return null;
+  }
 }
 
 export async function createClient(input: ClientInput): Promise<Client> {

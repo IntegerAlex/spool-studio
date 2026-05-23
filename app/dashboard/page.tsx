@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { assetsApi, clientsApi, dashboardApi } from '@/lib/api-client';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { Asset, Client } from '@/types/index';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import {
@@ -178,6 +179,17 @@ export default function DashboardPage() {
           return;
         }
         const message = err instanceof Error ? err.message : 'Failed to load dashboard';
+        logProductionRuntimeError('dashboard-loader', err, {
+          pathname: '/dashboard',
+        });
+        setAssets([]);
+        setClients([]);
+        setSummary({
+          pendingApprovals: 0,
+          upcomingUploads: 0,
+          totalClients: 0,
+          uploadedThisMonth: 0,
+        });
         setError(message);
       } finally {
         if (isActive) {

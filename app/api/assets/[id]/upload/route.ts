@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { uploadAssetFile } from '@/services/assets-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export const runtime = 'nodejs';
 
@@ -179,6 +180,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ success: true, data: result }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to upload asset file';
+    logProductionRuntimeError('api-assets-upload', error, { assetId });
     console.error('[upload][route-crash]', {
       assetId,
       message,

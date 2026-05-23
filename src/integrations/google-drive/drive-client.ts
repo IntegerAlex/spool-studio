@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import type { DriveClient, DriveAuthConfig } from './types';
+import { logGoogleEnvCheck, logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive'] as const;
 
@@ -24,6 +25,8 @@ function logDriveAuthDiagnostics(config: {
 }
 
 function getDriveAuthConfig(): DriveAuthConfig {
+  logGoogleEnvCheck();
+
   const clientEmail = pickEnv('GOOGLE_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_DRIVE_CLIENT_EMAIL');
   const privateKey =
     process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n') ??
@@ -104,6 +107,9 @@ export async function authenticateDrive(): Promise<DriveClient> {
       response?: { status?: number; data?: unknown };
     };
     const message = maybe?.message ?? 'Google Drive authentication failed';
+    logProductionRuntimeError('google-drive-auth', error, {
+      code: maybe?.code ?? maybe?.status ?? maybe?.response?.status ?? null,
+    });
     console.error('[google-drive][auth] service account authorization failed', {
       error: message,
       code: maybe?.code ?? maybe?.status ?? maybe?.response?.status ?? null,

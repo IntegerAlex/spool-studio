@@ -1,6 +1,7 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { User } from '@/types/index';
 import { getUserById, insertUser, listUsers } from '@/repositories/users-repository';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 function mapUser(user: Awaited<ReturnType<typeof getUserById>>): User | null {
   if (!user) {
@@ -21,6 +22,7 @@ export async function getCurrentUserProfile(): Promise<User | null> {
   try {
     return await getOrCreateCurrentUserProfile();
   } catch (error) {
+    logProductionRuntimeError('current-user-profile', error);
     return null;
   }
 }
@@ -73,8 +75,13 @@ export async function getOrCreateCurrentUserProfile(): Promise<User> {
 }
 
 export async function getUsers(): Promise<User[]> {
-  const rows = await listUsers();
-  return rows
-    .map((user) => mapUser(user))
-    .filter((user): user is User => Boolean(user));
+  try {
+    const rows = await listUsers();
+    return rows
+      .map((user) => mapUser(user))
+      .filter((user): user is User => Boolean(user));
+  } catch (error) {
+    logProductionRuntimeError('users-loader', error);
+    return [];
+  }
 }

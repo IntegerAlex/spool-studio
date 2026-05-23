@@ -1,13 +1,22 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { requireUser } from '@/lib/supabase/auth';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { redirect } from 'next/navigation';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  await requireUser();
+  try {
+    await requireUser();
+  } catch (error) {
+    logProductionRuntimeError('dashboard-layout', error, {
+      pathname: '/dashboard',
+    });
+    redirect('/login');
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-foreground">

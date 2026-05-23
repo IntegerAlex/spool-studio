@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
+import { logGoogleEnvCheck, logMailgunEnvCheck, logSupabaseEnvCheck } from '@/lib/runtime-diagnostics'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -34,6 +35,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  logSupabaseEnvCheck()
+  logGoogleEnvCheck()
+  logMailgunEnvCheck()
+
   return (
     <html lang="en" className="bg-background text-foreground">
       <body className={`${inter.className} bg-background text-foreground antialiased`}>

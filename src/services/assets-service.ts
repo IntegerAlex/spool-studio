@@ -10,6 +10,7 @@ import {
   sendAssetUploadNotification,
   sendRevisionUploadNotification,
 } from '@/lib/notifications/mailgun';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import {
   deleteAsset as deleteAssetRow,
   getAssetById,
@@ -123,14 +124,22 @@ export async function resolveAssetDriveFolder(
   assetType: Database['public']['Enums']['asset_type'],
   clientId: string
 ): Promise<Awaited<ReturnType<typeof getAssetDriveFolder>> | null> {
-  const supabase = await createServerSupabaseClient();
-  const client = await getClientById(clientId, supabase);
+  try {
+    const supabase = await createServerSupabaseClient();
+    const client = await getClientById(clientId, supabase);
 
-  if (!client?.drive_folder_id) {
+    if (!client?.drive_folder_id) {
+      return null;
+    }
+
+    return getAssetDriveFolder(client.drive_folder_id, assetType);
+  } catch (error) {
+    logProductionRuntimeError('asset-drive-folder', error, {
+      assetType,
+      clientId,
+    });
     return null;
   }
-
-  return getAssetDriveFolder(client.drive_folder_id, assetType);
 }
 
 async function resolveDriveFolderMetadata(
@@ -188,73 +197,88 @@ async function resolveDriveFolderMetadata(
 }
 
 export async function getAssets(): Promise<Asset[]> {
-  const rows = await listAssets();
-  return rows
-    .map((asset) => mapAsset(asset))
-    .filter((asset): asset is Asset => Boolean(asset));
+  try {
+    const rows = await listAssets();
+    return rows
+      .map((asset) => mapAsset(asset))
+      .filter((asset): asset is Asset => Boolean(asset));
+  } catch (error) {
+    logProductionRuntimeError('assets-loader', error);
+    return [];
+  }
 }
 
 export async function getAssetsByClientId(clientId: string): Promise<Asset[]> {
-  const rows = await listAssetsByClientId(clientId);
-  return rows
-    .map((asset) => mapAsset(asset))
-    .filter((asset): asset is Asset => Boolean(asset));
+  try {
+    const rows = await listAssetsByClientId(clientId);
+    return rows
+      .map((asset) => mapAsset(asset))
+      .filter((asset): asset is Asset => Boolean(asset));
+  } catch (error) {
+    logProductionRuntimeError('assets-by-client-loader', error, { clientId });
+    return [];
+  }
 }
 
 export async function getAssetDetail(assetId: string): Promise<Asset | null> {
-  const row = await getAssetById(assetId);
-  const mapped = mapAsset(row);
-  if (!mapped) return null;
   try {
-    const revisions = await listRevisionsByAssetId(assetId);
-    mapped.revisions = revisions.map((r) => ({
-      id: r.id,
-      assetId: r.asset_id,
-      versionNumber: r.version_number,
-      uploadedBy: r.uploaded_by ?? undefined,
-      uploadedAt: new Date(r.uploaded_at),
-      driveFileId: r.drive_file_id,
-      driveFileUrl: r.drive_file_url ?? undefined,
-      fileSize: r.file_size ?? undefined,
-      mimeType: r.mime_type ?? undefined,
-      mediaWidth: r.media_width ?? undefined,
-      mediaHeight: r.media_height ?? undefined,
-      durationSeconds: r.duration_seconds ?? undefined,
-      changeNote: r.change_note ?? undefined,
-      metadata: r.metadata ?? undefined,
-      createdAt: new Date(r.created_at),
-    }));
-    // populate revision pointers/count from asset row
-    mapped.currentRevisionId = row?.current_revision_id ?? undefined;
-    mapped.revisionCount = row?.revision_count ?? mapped.revisions.length;
-    if (row?.latest_revision_id) {
-      const latest = revisions.find((r) => r.id === row.latest_revision_id);
-      if (latest) {
-        mapped.latestRevision = {
-          id: latest.id,
-          assetId: latest.asset_id,
-          versionNumber: latest.version_number,
-          uploadedBy: latest.uploaded_by ?? undefined,
-          uploadedAt: new Date(latest.uploaded_at),
-          driveFileId: latest.drive_file_id,
-          driveFileUrl: latest.drive_file_url ?? undefined,
-          fileSize: latest.file_size ?? undefined,
-          mimeType: latest.mime_type ?? undefined,
-          mediaWidth: latest.media_width ?? undefined,
-          mediaHeight: latest.media_height ?? undefined,
-          durationSeconds: latest.duration_seconds ?? undefined,
-          changeNote: latest.change_note ?? undefined,
-          metadata: latest.metadata ?? undefined,
-          createdAt: new Date(latest.created_at),
-        };
+    const row = await getAssetById(assetId);
+    const mapped = mapAsset(row);
+    if (!mapped) return null;
+    try {
+      const revisions = await listRevisionsByAssetId(assetId);
+      mapped.revisions = revisions.map((r) => ({
+        id: r.id,
+        assetId: r.asset_id,
+        versionNumber: r.version_number,
+        uploadedBy: r.uploaded_by ?? undefined,
+        uploadedAt: new Date(r.uploaded_at),
+        driveFileId: r.drive_file_id,
+        driveFileUrl: r.drive_file_url ?? undefined,
+        fileSize: r.file_size ?? undefined,
+        mimeType: r.mime_type ?? undefined,
+        mediaWidth: r.media_width ?? undefined,
+        mediaHeight: r.media_height ?? undefined,
+        durationSeconds: r.duration_seconds ?? undefined,
+        changeNote: r.change_note ?? undefined,
+        metadata: r.metadata ?? undefined,
+        createdAt: new Date(r.created_at),
+      }));
+      // populate revision pointers/count from asset row
+      mapped.currentRevisionId = row?.current_revision_id ?? undefined;
+      mapped.revisionCount = row?.revision_count ?? mapped.revisions.length;
+      if (row?.latest_revision_id) {
+        const latest = revisions.find((r) => r.id === row.latest_revision_id);
+        if (latest) {
+          mapped.latestRevision = {
+            id: latest.id,
+            assetId: latest.asset_id,
+            versionNumber: latest.version_number,
+            uploadedBy: latest.uploaded_by ?? undefined,
+            uploadedAt: new Date(latest.uploaded_at),
+            driveFileId: latest.drive_file_id,
+            driveFileUrl: latest.drive_file_url ?? undefined,
+            fileSize: latest.file_size ?? undefined,
+            mimeType: latest.mime_type ?? undefined,
+            mediaWidth: latest.media_width ?? undefined,
+            mediaHeight: latest.media_height ?? undefined,
+            durationSeconds: latest.duration_seconds ?? undefined,
+            changeNote: latest.change_note ?? undefined,
+            metadata: latest.metadata ?? undefined,
+            createdAt: new Date(latest.created_at),
+          };
+        }
       }
+    } catch (error) {
+      logProductionRuntimeError('asset-revisions-loader', error, { assetId });
+      mapped.revisions = [];
     }
-  } catch (error) {
-    console.error('[revisions][load][failed]', { assetId, error });
-    mapped.revisions = [];
-  }
 
-  return mapped;
+    return mapped;
+  } catch (error) {
+    logProductionRuntimeError('asset-detail-loader', error, { assetId });
+    return null;
+  }
 }
 
 export async function setAssetCurrentRevision(assetId: string, revisionId: string): Promise<void> {

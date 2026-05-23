@@ -1,23 +1,36 @@
 import { redirect } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from './server';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export async function getSession() {
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      logProductionRuntimeError('supabase-get-session', error);
+      return null;
+    }
+    return data.session;
+  } catch (error) {
+    logProductionRuntimeError('supabase-get-session', error);
     return null;
   }
-  return data.session;
 }
 
 export async function getUser(): Promise<User | null> {
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase.auth.getUser();
-  if (error) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      logProductionRuntimeError('supabase-get-user', error);
+      return null;
+    }
+    return data.user ?? null;
+  } catch (error) {
+    logProductionRuntimeError('supabase-get-user', error);
     return null;
   }
-  return data.user ?? null;
 }
 
 export async function requireUser(): Promise<User> {

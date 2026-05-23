@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export async function GET() {
   try {
@@ -7,6 +8,7 @@ export async function GET() {
     return NextResponse.json({ data: user });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unauthorized';
+    logProductionRuntimeError('api-users-me', error);
     return NextResponse.json({ error: message }, { status: 401 });
   }
 }

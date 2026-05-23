@@ -1,22 +1,28 @@
 import { NextResponse } from 'next/server';
 import { getClientDetail, updateClient, removeClient } from '@/services/clients-service';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const params = await context.params;
-  console.info('[api/clients/[id]] params', params);
-  const clientId = params?.id;
-  if (!clientId) {
-    return NextResponse.json({ error: 'Client id is required' }, { status: 400 });
+  try {
+    const params = await context.params;
+    console.info('[api/clients/[id]] params', params);
+    const clientId = params?.id;
+    if (!clientId) {
+      return NextResponse.json({ error: 'Client id is required' }, { status: 400 });
+    }
+    const client = await getClientDetail(clientId);
+    if (!client) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
+    return NextResponse.json({ data: client });
+  } catch (error) {
+    logProductionRuntimeError('api-clients-id-get', error);
+    return NextResponse.json({ data: null });
   }
-  const client = await getClientDetail(clientId);
-  if (!client) {
-    return NextResponse.json({ error: 'Client not found' }, { status: 404 });
-  }
-  return NextResponse.json({ data: client });
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -39,6 +45,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ data: client });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update client';
+    logProductionRuntimeError('api-clients-id-patch', error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
@@ -55,6 +62,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ data: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to delete client';
+    logProductionRuntimeError('api-clients-id-delete', error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

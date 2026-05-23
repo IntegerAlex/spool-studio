@@ -1,5 +1,6 @@
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
+import { logMailgunEnvCheck, logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 const MAILGUN_LOG_PREFIX = '[notifications][mailgun]';
 
@@ -32,6 +33,8 @@ let mailgunClient: MailgunClient | null = null;
 let mailgunInitializationLogged = false;
 
 function getMailgunConfig() {
+  logMailgunEnvCheck();
+
   const apiKey = process.env.MAILGUN_API_KEY;
   const domain = process.env.MAILGUN_DOMAIN;
   const from = process.env.MAILGUN_FROM;
@@ -153,10 +156,15 @@ async function sendMailgunNotification(
       ...context,
     });
   } catch (error) {
+    logProductionRuntimeError('mailgun-send', error, {
+      subject,
+      to,
+      ...context,
+    });
     console.error(`${MAILGUN_LOG_PREFIX} send-failure`, {
       subject,
       to,
-      error,
+      message: error instanceof Error ? error.message : 'unknown',
       ...context,
     });
   }
