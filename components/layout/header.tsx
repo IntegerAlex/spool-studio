@@ -5,6 +5,7 @@ import { Bell, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { usePathname } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
@@ -13,6 +14,7 @@ interface HeaderProps {
 }
 
 export function Header({ title }: HeaderProps) {
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -47,42 +49,55 @@ export function Header({ title }: HeaderProps) {
     user?.user_metadata?.name ||
     user?.email ||
     'User';
-  const displayRole = user?.user_metadata?.role as string | undefined;
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
+    .slice(0, 2) || 'CO';
+
+  const routeTitle = (() => {
+    if (pathname === '/dashboard' || pathname === '/dashboard/') return 'Dashboard';
+    if (pathname.startsWith('/dashboard/assets/')) return 'Asset Details';
+    if (pathname.startsWith('/dashboard/assets')) return 'Assets';
+    if (pathname.startsWith('/dashboard/clients')) return 'Clients';
+    if (pathname.startsWith('/dashboard/approvals')) return 'Approvals';
+    if (pathname.startsWith('/dashboard/kanban')) return 'Kanban';
+    if (pathname.startsWith('/dashboard/queue')) return 'Upload Queue';
+    if (pathname.startsWith('/dashboard/calendar')) return 'Calendar';
+    if (pathname.startsWith('/dashboard/settings')) return 'Settings';
+    return title;
+  })();
 
   return (
-    <header className="bg-background border-b border-border h-16 flex items-center justify-between px-8 fixed top-0 left-64 right-0 z-40">
-      <div className="flex-1">
-        <h2 className="text-2xl font-bold text-foreground">{title}</h2>
+    <header className="fixed left-[220px] top-0 z-40 flex h-11 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="min-w-0">
+          <h2 className="truncate text-[15px] font-medium text-white">{routeTitle}</h2>
+        </div>
       </div>
 
-      <div className="flex items-center space-x-4">
-        <div className="hidden md:flex relative w-64">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className="flex items-center gap-3">
+        <div className="relative hidden md:flex w-[200px]">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#71717a]" />
           <Input
             placeholder="Search..."
-            className="pl-10 bg-muted border-border"
+            className="h-8 border-[rgba(255,255,255,0.07)] bg-transparent pl-9 text-[13px] text-white placeholder:text-[#71717a] focus-visible:border-[rgba(99,102,241,0.5)] focus-visible:ring-[rgba(99,102,241,0.2)]"
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted">
-          <Bell className="w-5 h-5" />
+        <Button variant="ghost" size="icon" className="size-8 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white">
+          <Bell className="h-[18px] w-[18px]" />
         </Button>
 
-        {user && (
-          <div className="flex items-center space-x-3 pl-4 border-l border-border">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-foreground">{displayName}</p>
-              {displayRole && (
-                <p className="text-xs text-muted-foreground capitalize">{displayRole}</p>
-              )}
-            </div>
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={avatarUrl} alt={displayName} />
-              <AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
-            </Avatar>
-          </div>
-        )}
+        <Avatar className="size-8 border border-[rgba(255,255,255,0.08)] bg-[var(--surface-elevated)]">
+          <AvatarImage src={avatarUrl} alt={displayName} />
+          <AvatarFallback className="bg-[var(--surface-elevated)] text-[12px] font-semibold text-white">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
       </div>
     </header>
   );

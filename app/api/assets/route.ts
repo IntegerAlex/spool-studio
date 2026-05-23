@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAsset, getAssets, getAssetsByClientId } from '@/services/assets-service';
+import { assetStatusValues } from '@/lib/asset-workflow';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -19,16 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error }, { status: 400 });
     }
     const allowedTypes = ['reel', 'poster'];
-    const allowedStatuses = [
-      'draft',
-      'in_design',
-      'ready_for_review',
-      'revision_requested',
-      'approved',
-      'scheduled',
-      'uploaded',
-      'archived',
-    ];
+    const allowedStatuses = [...assetStatusValues];
     if (!allowedTypes.includes(body.type)) {
       const error = `Invalid asset type: ${body.type}`;
       console.warn('[api/assets] enum mismatch', { error, type: body.type });

@@ -25,17 +25,17 @@ export default function ClientsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Clients' }]} />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading clients...</p>
+          <p className="text-[#71717a]">Loading clients...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Clients' }]} />
       <ClientList
         clients={clients}

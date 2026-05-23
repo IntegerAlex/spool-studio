@@ -1,30 +1,31 @@
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
+import { Spinner } from '@/components/ui/spinner'
 
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-[13px] font-medium transition-[color,box-shadow,transform,border-color,background-color] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-[rgba(99,102,241,0.5)] focus-visible:ring-[rgba(99,102,241,0.1)] focus-visible:ring-[3px] aria-invalid:ring-[rgba(239,68,68,0.1)] aria-invalid:border-[#ef4444]",
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        default: 'bg-[#6366f1] text-white shadow-none hover:bg-[#4f46e5]',
         destructive:
-          'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
+          'border border-[rgba(239,68,68,0.3)] bg-transparent text-[#f87171] shadow-none hover:bg-[rgba(239,68,68,0.08)] hover:text-[#f87171] focus-visible:ring-[rgba(239,68,68,0.12)]',
         outline:
-          'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+          'border border-[rgba(255,255,255,0.1)] bg-transparent text-[#a1a1aa] shadow-none hover:bg-[rgba(255,255,255,0.06)] hover:text-white',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'border border-[rgba(255,255,255,0.1)] bg-transparent text-[#a1a1aa] shadow-none hover:bg-[rgba(255,255,255,0.06)] hover:text-white',
         ghost:
-          'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+          'bg-transparent text-[#a1a1aa] hover:bg-[rgba(255,255,255,0.06)] hover:text-white',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-9 px-4 py-2 has-[>svg]:px-3',
-        sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
+        default: 'h-[34px] px-3 py-2 has-[>svg]:px-3',
+        sm: 'h-[34px] rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-        icon: 'size-9',
+        icon: 'size-8',
         'icon-sm': 'size-8',
         'icon-lg': 'size-10',
       },
@@ -40,6 +41,7 @@ function Button({
   className,
   variant,
   size,
+  children,
   asChild = false,
   ...props
 }: React.ComponentProps<'button'> &
@@ -47,13 +49,31 @@ function Button({
     asChild?: boolean
   }) {
   const Comp = asChild ? Slot : 'button'
+  const loadingProps = props as React.ComponentProps<'button'> & {
+    'data-loading'?: string | boolean
+  }
+  const isLoading = Boolean(loadingProps['data-loading']) || Boolean(loadingProps['aria-busy'])
+  const content = (
+    <span className={cn('inline-flex items-center justify-center gap-2', isLoading && 'relative text-transparent')}>
+      <span className={cn('inline-flex items-center justify-center gap-2', isLoading && 'invisible')}>
+        {children}
+      </span>
+      {isLoading && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Spinner className="size-3.5" />
+        </span>
+      )}
+    </span>
+  )
 
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-    />
+    >
+      {content}
+    </Comp>
   )
 }
 

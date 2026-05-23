@@ -3,10 +3,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import type { Asset, AssetStatus, Client, User } from '@/types/index';
 import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
-import { assetStatusLabels, getAllowedTransitions } from '@/lib/asset-workflow';
+import {
+  canUploadFromStatus,
+  getUploadEligibilityReason,
+  assetStatusValues,
+  assetEditorStatusLabels,
+  assetStatusLabels,
+  getUserSelectableStatuses,
+  isUserSelectableStatus,
+} from '@/lib/asset-workflow';
 import {
   Dialog,
   DialogContent,
@@ -36,16 +44,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 
 const assetTypes = ['reel', 'poster'] as const;
-const assetStatuses = [
-  'draft',
-  'in_design',
-  'ready_for_review',
-  'revision_requested',
-  'approved',
-  'scheduled',
-  'uploaded',
-  'archived',
-] as const;
+const assetStatuses = assetStatusValues;
+const selectableStatuses = getUserSelectableStatuses();
 const UNASSIGNED_VALUE = '__unassigned__';
 
 const formSchema = z
@@ -114,14 +114,14 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
   const [users, setUsers] = useState<User[]>([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'uploaded' | 'failed'>('idle');
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const statusOptions = useMemo(() => {
-    const currentStatus = resolveAssetStatus(asset?.status);
-    const allowed = getAllowedTransitions(currentStatus);
-    const all = new Set<AssetStatus>([currentStatus, ...allowed]);
-    return assetStatuses.filter((status) => all.has(status));
-  }, [asset]);
+    return selectableStatuses.filter((status) => isUserSelectableStatus(status));
+  }, []);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -129,11 +129,33 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
       title: asset?.title ?? '',
       clientId: asset?.clientId ?? '',
       type: resolveAssetType(asset?.type),
-      status: resolveAssetStatus(asset?.status),
+      status: mode === 'create' ? 'draft' : resolveAssetStatus(asset?.status),
       assignedTo: asset?.assignedTo?.[0] ?? '',
       scheduledAt: toDatetimeLocal(asset?.scheduledAt ?? null),
     },
   });
+
+  const watchedStatus = useWatch({ control: form.control, name: 'status' });
+  const currentUploadStatus = (watchedStatus ?? resolveAssetStatus(asset?.status)) as AssetStatus;
+  const uploadAllowed = canUploadFromStatus(currentUploadStatus);
+  const uploadBlockedReason = getUploadEligibilityReason(currentUploadStatus);
+
+  useEffect(() => {
+    console.info('[asset][upload-eligibility]', {
+      assetId: asset?.id ?? 'new',
+      currentWorkflowStatus: currentUploadStatus,
+      uploadAllowed,
+      reason: uploadAllowed ? 'Upload allowed from current workflow state.' : uploadBlockedReason,
+    });
+  }, [asset?.id, currentUploadStatus, uploadAllowed, uploadBlockedReason]);
+
+  useEffect(() => {
+    if (!uploadAllowed && selectedFile) {
+      setSelectedFile(null);
+      setUploadState('idle');
+      setUploadError(null);
+    }
+  }, [selectedFile, uploadAllowed]);
 
   useEffect(() => {
     if (!open) {
@@ -182,11 +204,20 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
       title: asset?.title ?? '',
       clientId: asset?.clientId ?? '',
       type: resolveAssetType(asset?.type),
-      status: resolveAssetStatus(asset?.status),
+      status: mode === 'create' ? 'draft' : resolveAssetStatus(asset?.status),
       assignedTo: asset?.assignedTo?.[0] ?? '',
       scheduledAt: toDatetimeLocal(asset?.scheduledAt ?? null),
     });
   }, [asset, form, open]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setSelectedFile(null);
+      setUploadState('idle');
+      setUploadError(null);
+    }
+  };
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
@@ -194,7 +225,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
         clientId: values.clientId,
         title: values.title,
         type: values.type,
-        status: values.status,
+        status: mode === 'create' ? 'draft' : values.status,
         assignedTo: values.assignedTo ? values.assignedTo : null,
         scheduledAt: toIsoString(values.scheduledAt),
       } as const;
@@ -203,6 +234,43 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
         mode === 'create'
           ? await assetsApi.create(payload)
           : await assetsApi.update(asset?.id ?? '', payload);
+
+      if (selectedFile && uploadAllowed) {
+        setUploadState('uploading');
+        setUploadError(null);
+
+        try {
+          const uploaded = await assetsApi.uploadFile(saved.id, selectedFile);
+          setUploadState('uploaded');
+          toast({
+            title: 'Asset uploaded',
+            description: `${uploaded.title} was uploaded successfully.`,
+          });
+          onSaved?.(uploaded);
+          setOpen(false);
+          return;
+        } catch (uploadError) {
+          const message = uploadError instanceof Error ? uploadError.message : 'Failed to upload file';
+          setUploadState('failed');
+          setUploadError(message);
+          toast({
+            title: 'Upload failed',
+            description: message,
+            variant: 'destructive',
+          });
+          onSaved?.(saved);
+          return;
+        }
+      }
+
+      if (selectedFile && !uploadAllowed) {
+        setUploadError(uploadBlockedReason);
+        toast({
+          title: 'Upload blocked',
+          description: uploadBlockedReason,
+          variant: 'destructive',
+        });
+      }
 
       toast({
         title: mode === 'create' ? 'Asset created' : 'Asset updated',
@@ -222,7 +290,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader>
@@ -311,35 +379,85 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || statusOptions[0]}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {statusOptions.map((status) => (
-                          <SelectItem key={status} value={status}>
-                            {assetStatusLabels[status]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {mode === 'create' ? (
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground sm:col-span-1">
+                  <p className="font-medium text-foreground">Status: Draft</p>
+                  <p className="mt-1">Assets automatically enter the workflow pipeline after creation.</p>
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value && isUserSelectableStatus(field.value as AssetStatus) ? field.value : undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {statusOptions.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {assetEditorStatusLabels[status] ?? assetStatusLabels[status]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
               Drive folders are assigned automatically from the selected client and asset type.
             </div>
+
+            <FormItem>
+              <FormLabel>Upload File</FormLabel>
+              <FormControl>
+                <Input
+                  type="file"
+                  disabled={!uploadAllowed || isLoadingOptions || form.formState.isSubmitting || uploadState === 'uploading'}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    setSelectedFile(file);
+                    setUploadState('idle');
+                    setUploadError(null);
+                  }}
+                />
+              </FormControl>
+              <p className="text-xs text-muted-foreground">
+                {selectedFile ? `Selected: ${selectedFile.name}` : 'Optional: choose a file to upload after saving.'}
+              </p>
+              {!uploadAllowed && (
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  {uploadBlockedReason}
+                </p>
+              )}
+            </FormItem>
+
+            {(uploadState !== 'idle' || uploadError) && (
+              <div
+                className={`rounded-md border px-3 py-2 text-sm ${
+                  uploadState === 'uploaded'
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                    : uploadState === 'failed'
+                      ? 'border-destructive/30 bg-destructive/5 text-destructive'
+                      : 'border-border bg-muted/30 text-muted-foreground'
+                }`}
+              >
+                {uploadState === 'uploading' && 'Uploading file...'}
+                {uploadState === 'uploaded' && 'File uploaded successfully.'}
+                {uploadState === 'failed' && (uploadError ?? 'Upload failed.')}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
@@ -392,8 +510,12 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saving...' : 'Save Asset'}
+              <Button type="submit" disabled={form.formState.isSubmitting || uploadState === 'uploading'}>
+                {form.formState.isSubmitting || uploadState === 'uploading'
+                  ? 'Saving...'
+                  : selectedFile
+                    ? 'Save & Upload'
+                    : 'Save Asset'}
               </Button>
             </DialogFooter>
           </form>

@@ -10,11 +10,11 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   await requireUser();
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="min-h-screen bg-[var(--background)] text-foreground">
       <Sidebar />
-      <div className="ml-64 flex flex-col">
+      <div className="ml-[220px] flex min-h-screen flex-col bg-[var(--surface-main)]">
         <Header title="Dashboard" />
-        <main className="mt-16 p-8 flex-1">
+        <main className="flex-1 px-6 pt-16 pb-5">
           {children}
         </main>
       </div>

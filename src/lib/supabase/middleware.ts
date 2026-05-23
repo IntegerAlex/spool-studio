@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/database';
 
+const DEBUG_MIDDLEWARE = process.env.DEBUG_MIDDLEWARE === 'true';
+
 const protectedPrefixes = ['/dashboard'];
 
 function isProtectedPath(pathname: string): boolean {
@@ -25,7 +27,22 @@ function getSupabaseAnonKey(): string {
   return key;
 }
 
+function shouldLogMiddleware(pathname: string): boolean {
+  return DEBUG_MIDDLEWARE || /^\/api\/assets\/[^/]+\/upload\/?$/.test(pathname);
+}
+
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
+  const pathname = request.nextUrl.pathname;
+
+  if (shouldLogMiddleware(pathname)) {
+    console.info('[middleware][forwarded-request]', {
+      pathname,
+      method: request.method,
+      contentType: request.headers.get('content-type'),
+      headerNames: Array.from(request.headers.keys()),
+    });
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -51,13 +68,29 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
 
-  if (isProtectedPath(request.nextUrl.pathname) && !user) {
+  try {
+    const result = await supabase.auth.getUser();
+    user = result.data.user;
+  } catch (error) {
+    console.error('[middleware][session-error]', {
+      pathname,
+      method: request.method,
+      error,
+    });
+    throw error;
+  }
+
+  if (isProtectedPath(pathname) && !user) {
+    console.warn('[auth][middleware][redirect]', {
+      pathname,
+      method: request.method,
+      redirectedFrom: pathname,
+    });
+
     const redirectUrl = new URL('/login', request.url);
-    redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname);
+    redirectUrl.searchParams.set('redirectedFrom', pathname);
     return NextResponse.redirect(redirectUrl);
   }
 

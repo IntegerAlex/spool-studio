@@ -25,6 +25,8 @@ export interface DriveFolderResult {
 export interface DriveFolderAccessDiagnostics {
   id: string;
   name: string;
+  driveType: 'shared-drive' | 'my-drive' | 'unknown';
+  inheritedPermissions: boolean | null;
   canAddChildren: boolean | null;
   canEdit: boolean | null;
   serviceAccountHasEditorAccess: boolean | null;

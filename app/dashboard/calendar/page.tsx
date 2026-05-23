@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { Card } from '@/components/ui/card';
 import { queueApi, assetsApi, clientsApi } from '@/lib/api-client';
 import { UploadQueue, Asset, Client } from '@/types/index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date(2024, 4)); // May 2024
@@ -66,6 +66,17 @@ export default function CalendarPage() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
+  const getEventColorClasses = (assetType: Asset['type']) => {
+    switch (assetType) {
+      case 'reel':
+        return 'bg-[rgba(99,102,241,0.14)] text-[#c7d2fe] border-[rgba(99,102,241,0.16)]';
+      case 'poster':
+        return 'bg-[rgba(16,185,129,0.14)] text-[#a7f3d0] border-[rgba(16,185,129,0.16)]';
+      default:
+        return 'bg-[rgba(245,158,11,0.14)] text-[#fde68a] border-[rgba(245,158,11,0.16)]';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -78,35 +89,35 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Calendar' }]} />
 
-      <Card className="p-6 border border-border">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-foreground">{monthName}</h2>
+      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 className="text-[16px] font-medium text-white">{monthName}</h2>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
               onClick={handlePrevMonth}
-              className="border-border text-foreground hover:bg-muted"
+              className="h-8 w-8 border-[rgba(255,255,255,0.08)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="icon"
               onClick={handleNextMonth}
-              className="border-border text-foreground hover:bg-muted"
+              className="h-8 w-8 border-[rgba(255,255,255,0.08)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-2 mb-2">
+        <div className="mb-2 grid grid-cols-7 gap-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="text-center font-semibold text-muted-foreground text-sm py-2">
+            <div key={day} className="py-2 text-center text-[11px] uppercase tracking-[0.18em] text-[#52525b]">
               {day}
             </div>
           ))}
@@ -114,7 +125,7 @@ export default function CalendarPage() {
 
         <div className="grid grid-cols-7 gap-2">
           {emptyDays.map((_, i) => (
-            <div key={`empty-${i}`} className="aspect-square"></div>
+            <div key={`empty-${i}`} className="aspect-square" />
           ))}
 
           {days.map((day) => {
@@ -124,33 +135,34 @@ export default function CalendarPage() {
             return (
               <div
                 key={day}
-                className={`aspect-square p-2 rounded-lg border-2 transition-colors ${
-                  isToday ? 'border-primary bg-primary/5' : 'border-border'
-                } ${uploads.length > 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-card'}`}
+                className={cn(
+                  'aspect-square rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[#161616] p-2 transition-colors hover:bg-[#1a1a1a]',
+                  isToday && 'border-[var(--primary)]'
+                )}
               >
-                <div className="h-full flex flex-col">
-                  <p className={`text-sm font-semibold ${isToday ? 'text-primary' : 'text-foreground'}`}>
+                <div className="flex h-full flex-col">
+                  <p className={cn('text-[12px] font-medium', isToday ? 'text-[var(--primary)]' : 'text-white')}>
                     {day}
                   </p>
                   {uploads.length > 0 && (
-                    <div className="mt-auto">
-                      <p className="text-xs text-green-700 dark:text-green-400 font-semibold">
-                        {uploads.length} upload{uploads.length !== 1 ? 's' : ''}
-                      </p>
-                      <div className="space-y-1 mt-1">
+                    <div className="mt-auto space-y-1.5 pb-0.5">
+                      <div className="space-y-1">
                         {uploads.slice(0, 2).map((upload) => {
                           const asset = assets.get(upload.assetId);
                           return (
-                            <p
+                            <div
                               key={upload.id}
-                              className="text-xs text-foreground truncate bg-white dark:bg-black/20 px-1 py-0.5 rounded"
+                              className={cn('flex h-[18px] items-center gap-1 rounded-full border px-2 text-[10px] font-medium', getEventColorClasses(asset?.type ?? 'poster'))}
                               title={asset?.title}
                             >
-                              {asset?.title.slice(0, 12)}...
-                            </p>
+                              <span className="min-w-0 truncate">{asset?.title || 'Unknown asset'}</span>
+                            </div>
                           );
                         })}
                       </div>
+                      {uploads.length > 2 && (
+                        <p className="text-[10px] text-[#71717a]">+{uploads.length - 2} more</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -158,11 +170,12 @@ export default function CalendarPage() {
             );
           })}
         </div>
-      </Card>
 
-      <Card className="p-6 border border-border">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Upcoming Scheduled Uploads</h3>
-        <div className="space-y-3">
+      </div>
+
+      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4">
+        <h3 className="mb-4 text-[13px] font-medium text-white">Upcoming Scheduled Uploads</h3>
+        <div className="space-y-2">
           {queue
             .filter((q) => q.status === 'scheduled')
             .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
@@ -172,21 +185,21 @@ export default function CalendarPage() {
               const client = asset ? clients.get(asset.clientId) : null;
 
               return (
-                <div key={item.id} className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+                <div key={item.id} className="flex items-center justify-between rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)]">
                   <div>
-                    <p className="font-medium text-foreground text-sm">{asset?.title || 'Unknown'}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[13px] font-medium text-white">{asset?.title || 'Unknown'}</p>
+                    <p className="text-[12px] text-[#71717a]">
                       {client?.name || 'Unknown'} • {new Date(item.scheduledDate).toLocaleDateString()}
                     </p>
                   </div>
-                  <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                  <span className="rounded-full border border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#34d399]">
                     {item.platform}
                   </span>
                 </div>
               );
             })}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }

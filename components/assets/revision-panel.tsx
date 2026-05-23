@@ -1,17 +1,12 @@
-'use client';
+ 'use client';
 
-import type { AssetComment, User } from '@/types/index';
+import type { AssetRevision, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { usersApi } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
 import { Download, AlertCircle } from 'lucide-react';
 
-type RevisionRecord = AssetComment & {
-  version?: number;
-  createdBy?: string;
-  reason?: string;
-  fileUrl?: string;
-};
+type RevisionRecord = AssetRevision;
 
 interface RevisionPanelProps {
   revisions: RevisionRecord[];
@@ -72,10 +67,10 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
 
       <div className="space-y-4">
         {revisions.map((revision, index) => {
-          const authorId = revision.userId ?? revision.createdBy ?? 'unknown';
+          const authorId = revision.uploadedBy ?? 'unknown';
           const author = getUser(authorId);
-          const versionLabel = revision.version ?? index + 1;
-          const revisionNote = revision.message || revision.reason || 'Revision update';
+          const versionLabel = revision.versionNumber ?? index + 1;
+          const revisionNote = revision.changeNote ?? 'Revision upload';
           return (
             <div
               key={revision.id}
@@ -97,11 +92,11 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
 
               <p className="text-sm text-foreground mb-3">{revisionNote}</p>
 
-              {revision.fileUrl && (
-                <button className="inline-flex items-center space-x-2 text-sm text-primary hover:underline">
+              {revision.driveFileUrl && (
+                <a className="inline-flex items-center space-x-2 text-sm text-primary hover:underline" href={revision.driveFileUrl} target="_blank" rel="noreferrer">
                   <Download className="w-4 h-4" />
-                  <span>Download Revision</span>
-                </button>
+                  <span>Open Revision</span>
+                </a>
               )}
             </div>
           );

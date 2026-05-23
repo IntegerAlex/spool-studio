@@ -1,11 +1,13 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
   Users,
-  Image,
+  Image as ImageIcon,
   CheckSquare,
   Calendar,
   Settings,
@@ -13,8 +15,10 @@ import {
   LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
 
 const menuItems = [
   {
@@ -30,7 +34,7 @@ const menuItems = [
   {
     label: 'Assets',
     href: '/dashboard/assets',
-    icon: Image,
+    icon: ImageIcon,
   },
   {
     label: 'Approvals',
@@ -62,6 +66,46 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+    const supabase = createBrowserSupabaseClient();
+
+    const loadUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (isActive) {
+        setUser(data.user ?? null);
+      }
+    };
+
+    void loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isActive) {
+        setUser(session?.user ?? null);
+      }
+    });
+
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const initials = useMemo(() => {
+    const source =
+      user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'CO';
+    return source
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('')
+      .slice(0, 2) || 'CO';
+  }, [user]);
 
   const handleLogout = async () => {
     const supabase = createBrowserSupabaseClient();
@@ -71,17 +115,21 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-sidebar border-r border-sidebar-border h-screen flex flex-col fixed left-0 top-0">
-      <div className="p-6 border-b border-sidebar-border">
-        <Link href="/dashboard" className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">
-            <span className="text-sidebar-primary-foreground font-bold">C</span>
-          </div>
-          <h1 className="text-lg font-bold text-sidebar-foreground">Content Ops</h1>
+    <aside className="fixed left-0 top-0 flex h-screen w-[220px] flex-col border-r border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-[10px] py-[12px]">
+      <div className="flex h-16 items-center px-2">
+        <Link href="/dashboard" className="flex min-w-0 items-center">
+          <Image
+            src="/asset_flow.png"
+            alt="Asset Flow"
+            width={240}
+            height={72}
+            priority
+            className="h-16 w-auto shrink-0 object-contain"
+          />
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-1 py-3">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -90,27 +138,34 @@ export function Sidebar() {
             <Link key={item.href} href={item.href}>
               <div
                 className={cn(
-                  'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors',
+                  'group relative flex h-[34px] items-center gap-2 rounded-md px-2 text-[13px] transition-colors',
                   isActive
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                    ? 'bg-[rgba(99,102,241,0.12)] text-white before:absolute before:left-0 before:top-1 before:h-[calc(100%-0.5rem)] before:w-0.5 before:rounded-full before:bg-[var(--primary)]'
+                    : 'text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#a1a1aa]'
                 )}
               >
-                <Icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
+                <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-[#52525b] group-hover:text-[#a1a1aa]')} />
+                <span className="font-medium leading-none">{item.label}</span>
               </div>
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border space-y-2">
+      <div className="space-y-3 border-t border-[rgba(255,255,255,0.06)] px-2 py-3">
+        <div className="flex items-center justify-start px-1">
+          <Avatar className="size-8 border border-[rgba(255,255,255,0.08)] bg-[var(--surface-elevated)]">
+            <AvatarFallback className="bg-[var(--surface-elevated)] text-[12px] font-semibold text-white">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </div>
         <Button
           onClick={handleLogout}
-          variant="outline"
-          className="w-full justify-start text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent"
+          variant="ghost"
+          className="h-8 w-full justify-start px-1 text-[13px] font-medium text-[#71717a] hover:bg-transparent hover:text-white"
         >
-          <LogOut className="w-4 h-4 mr-2" />
+          <LogOut className="h-4 w-4" />
           Sign Out
         </Button>
       </div>

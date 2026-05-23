@@ -5,22 +5,45 @@ import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { workspaceApi, usersApi } from '@/lib/api-client';
 import { Workspace, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Bell, Lock, Users, Palette, Save } from 'lucide-react';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Bell, Lock, Palette, Save, Users, Sparkles } from 'lucide-react';
+
+const sections = [
+  {
+    id: 'workspace',
+    label: 'Workspace',
+    description: 'Branding and identity',
+    icon: Palette,
+  },
+  {
+    id: 'team',
+    label: 'Team',
+    description: 'People and access',
+    icon: Users,
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    description: 'Delivery preferences',
+    icon: Bell,
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    description: 'Passwords and account risk',
+    icon: Lock,
+  },
+] as const;
 
 export default function SettingsPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [workspaceName, setWorkspaceName] = useState('');
+  const [activeSection, setActiveSection] = useState<(typeof sections)[number]['id']>('workspace');
 
   useEffect(() => {
     const loadData = async () => {
@@ -44,208 +67,270 @@ export default function SettingsPage() {
     if (workspace) {
       const updated = await workspaceApi.update({ name: workspaceName });
       setWorkspace(updated);
+      setWorkspaceName(updated.name);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading settings...</p>
+        <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
+          <Card className="space-y-2 p-2">
+            {sections.map((section) => (
+              <div key={section.id} className="flex h-11 items-center gap-3 rounded-[8px] px-3">
+                <Skeleton className="size-7 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-2.5 w-24" />
+                </div>
+              </div>
+            ))}
+          </Card>
+          <div className="space-y-4">
+            <Skeleton className="h-28 rounded-[12px]" />
+            <Skeleton className="h-52 rounded-[12px]" />
+            <Skeleton className="h-40 rounded-[12px]" />
+          </div>
         </div>
       </div>
     );
   }
 
+  const activeMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
 
-      <Tabs defaultValue="workspace" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-muted border border-border p-1 rounded-lg">
-          <TabsTrigger value="workspace" className="flex items-center space-x-2">
-            <Palette className="w-4 h-4" />
-            <span className="hidden sm:inline">Workspace</span>
-          </TabsTrigger>
-          <TabsTrigger value="team" className="flex items-center space-x-2">
-            <Users className="w-4 h-4" />
-            <span className="hidden sm:inline">Team</span>
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center space-x-2">
-            <Bell className="w-4 h-4" />
-            <span className="hidden sm:inline">Notifications</span>
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center space-x-2">
-            <Lock className="w-4 h-4" />
-            <span className="hidden sm:inline">Security</span>
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="workspace" className="space-y-6">
-          <Card className="p-6 border border-border space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <aside className="rounded-[12px] border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-2">
+          <div className="mb-2 flex items-center gap-2 rounded-[8px] px-3 py-2">
+            <Sparkles className="size-4 text-[#818cf8]" />
             <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4">Workspace Settings</h3>
+              <p className="text-[12px] font-medium text-white">Settings</p>
+              <p className="text-[10px] text-[#71717a]">Workspace controls</p>
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Workspace Name
-                </label>
-                <Input
-                  value={workspaceName}
-                  onChange={(e) => setWorkspaceName(e.target.value)}
-                  className="bg-background text-foreground border-border"
-                  placeholder="Your workspace name"
-                />
+          <nav className="space-y-1">
+            {sections.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => setActiveSection(section.id)}
+                  className={`flex h-11 w-full items-center gap-3 rounded-[8px] px-3 text-left transition-colors ${
+                    isActive
+                      ? 'bg-[rgba(99,102,241,0.12)] text-white'
+                      : 'text-[#a1a1aa] hover:bg-[rgba(255,255,255,0.04)] hover:text-white'
+                  }`}
+                >
+                  <Icon className={`size-4 ${isActive ? 'text-[#c7d2fe]' : 'text-[#71717a]'}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium">{section.label}</span>
+                    <span className="block text-[10px] text-inherit/70">{section.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="space-y-6">
+          <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">{activeMeta.label}</p>
+                <h3 className="text-[18px] font-medium text-white">
+                  {activeSection === 'workspace' && 'Workspace identity'}
+                  {activeSection === 'team' && 'Team access'}
+                  {activeSection === 'notifications' && 'Notification routing'}
+                  {activeSection === 'security' && 'Security controls'}
+                </h3>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Workspace ID
-                </label>
-                <Input
-                  value={workspace?.id || ''}
-                  disabled
-                  className="bg-muted text-muted-foreground border-border"
-                />
-              </div>
+              {activeSection === 'workspace' && (
+                <Button onClick={handleSaveWorkspace}>
+                  <Save className="mr-2 size-4" />
+                  Save changes
+                </Button>
+              )}
 
-              <Button
-                onClick={handleSaveWorkspace}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save Changes
-              </Button>
+              {activeSection === 'team' && (
+                <Button>
+                  Invite member
+                </Button>
+              )}
+
+              {activeSection === 'notifications' && (
+                <Button>
+                  Save preferences
+                </Button>
+              )}
+
+              {activeSection === 'security' && (
+                <Button>
+                  Update password
+                </Button>
+              )}
             </div>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="team" className="space-y-6">
-          <Card className="p-6 border border-border space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-foreground">Team Members</h3>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                Invite Member
-              </Button>
-            </div>
+          {activeSection === 'workspace' && (
+            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
+              <div className="space-y-1">
+                <h4 className="text-[15px] font-medium text-white">Workspace details</h4>
+                <p className="text-[13px] text-[#71717a]">These values shape the workspace identity everywhere in the app.</p>
+              </div>
 
-            <div className="space-y-3">
-              {teamMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={member.avatar} alt={member.name} />
-                      <AvatarFallback>{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-foreground">{member.name}</p>
-                      <p className="text-sm text-muted-foreground">{member.email}</p>
+              <div className="mt-6 space-y-3">
+                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                  <div>
+                    <p className="text-[13px] font-medium text-white">Workspace name</p>
+                    <p className="text-[11px] text-[#71717a]">The primary display name for the organization</p>
+                  </div>
+                  <Input
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    className="max-w-[260px]"
+                    placeholder="Your workspace name"
+                  />
+                </div>
+
+                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                  <div>
+                    <p className="text-[13px] font-medium text-white">Workspace ID</p>
+                    <p className="text-[11px] text-[#71717a]">Read-only identifier used by integrations</p>
+                  </div>
+                  <Input
+                    value={workspace?.id || ''}
+                    disabled
+                    className="max-w-[260px]"
+                  />
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {activeSection === 'team' && (
+            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
+              <div className="space-y-1">
+                <h4 className="text-[15px] font-medium text-white">Team members</h4>
+                <p className="text-[13px] text-[#71717a]">Review access and keep workspace collaborators aligned.</p>
+              </div>
+
+              <div className="mt-6 space-y-2">
+                {teamMembers.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar className="size-9">
+                        <AvatarImage src={member.avatar} alt={member.name} />
+                        <AvatarFallback>{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-medium text-white">{member.name}</p>
+                        <p className="truncate text-[11px] text-[#71717a]">{member.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] capitalize text-[#cbd5e1]">
+                        {member.role}
+                      </span>
+                      <Button variant="outline" size="sm">
+                        Manage
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="px-3 py-1 text-xs font-semibold bg-primary/10 text-primary rounded-full capitalize">
-                      {member.role}
-                    </span>
-                    <Button variant="outline" size="sm" className="border-border text-foreground hover:bg-muted">
-                      Manage
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {activeSection === 'notifications' && (
+            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
+              <div className="space-y-1">
+                <h4 className="text-[15px] font-medium text-white">Notification preferences</h4>
+                <p className="text-[13px] text-[#71717a]">Choose which lifecycle events surface in your inbox and workspace alerts.</p>
+              </div>
+
+              <div className="mt-6 space-y-2">
+                {[
+                  { id: 'approvals', label: 'Asset approvals', description: 'Get notified when assets are ready for review' },
+                  { id: 'revisions', label: 'Revision requests', description: 'Get notified when revisions are requested' },
+                  { id: 'uploads', label: 'Upload confirmations', description: 'Get notified when assets are uploaded' },
+                  { id: 'comments', label: 'New comments', description: 'Get notified about comments on your assets' },
+                ].map((pref) => (
+                  <div key={pref.id} className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                    <div>
+                      <p className="text-[13px] font-medium text-white">{pref.label}</p>
+                      <p className="text-[11px] text-[#71717a]">{pref.description}</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      defaultChecked
+                      className="size-4 rounded border-[rgba(255,255,255,0.14)] bg-[#161616] accent-[#818cf8]"
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {activeSection === 'security' && (
+            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
+              <div className="space-y-1">
+                <h4 className="text-[15px] font-medium text-white">Password management</h4>
+                <p className="text-[13px] text-[#71717a]">Update your credentials and keep the workspace locked down.</p>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                  <div>
+                    <p className="text-[13px] font-medium text-white">Current password</p>
+                    <p className="text-[11px] text-[#71717a]">Required before changing your password</p>
+                  </div>
+                  <Input type="password" placeholder="Enter your current password" className="max-w-[260px]" />
+                </div>
+
+                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                  <div>
+                    <p className="text-[13px] font-medium text-white">New password</p>
+                    <p className="text-[11px] text-[#71717a]">Use a long, unique password</p>
+                  </div>
+                  <Input type="password" placeholder="Enter new password" className="max-w-[260px]" />
+                </div>
+
+                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                  <div>
+                    <p className="text-[13px] font-medium text-white">Confirm password</p>
+                    <p className="text-[11px] text-[#71717a]">Re-enter the new password exactly</p>
+                  </div>
+                  <Input type="password" placeholder="Confirm new password" className="max-w-[260px]" />
+                </div>
+
+                <div className="rounded-[10px] border border-[rgba(239,68,68,0.16)] bg-[rgba(239,68,68,0.06)] px-4 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-[13px] font-medium text-[#fca5a5]">Danger zone</p>
+                      <p className="text-[11px] text-[#f87171]/80">Deleting the account removes the workspace history.</p>
+                    </div>
+                    <Button variant="outline" className="border-[#ef4444]/30 text-[#fca5a5] hover:bg-[rgba(239,68,68,0.08)] hover:text-white">
+                      Delete account
                     </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-6">
-          <Card className="p-6 border border-border space-y-6">
-            <h3 className="text-lg font-semibold text-foreground">Notification Preferences</h3>
-
-            <div className="space-y-4">
-              {[
-                { id: 'approvals', label: 'Asset Approvals', description: 'Get notified when assets are ready for review' },
-                { id: 'revisions', label: 'Revision Requests', description: 'Get notified when revisions are requested' },
-                { id: 'uploads', label: 'Upload Confirmations', description: 'Get notified when assets are uploaded' },
-                { id: 'comments', label: 'New Comments', description: 'Get notified about comments on your assets' },
-              ].map((pref) => (
-                <div key={pref.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
-                  <div>
-                    <p className="font-medium text-foreground">{pref.label}</p>
-                    <p className="text-sm text-muted-foreground">{pref.description}</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="w-4 h-4 rounded border-border cursor-pointer"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Save className="w-4 h-4 mr-2" />
-              Save Preferences
-            </Button>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-6">
-          <Card className="p-6 border border-border space-y-6">
-            <h3 className="text-lg font-semibold text-foreground">Security Settings</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Current Password
-                </label>
-                <Input
-                  type="password"
-                  className="bg-background text-foreground border-border"
-                  placeholder="Enter your current password"
-                />
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  New Password
-                </label>
-                <Input
-                  type="password"
-                  className="bg-background text-foreground border-border"
-                  placeholder="Enter new password"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-2">
-                  Confirm Password
-                </label>
-                <Input
-                  type="password"
-                  className="bg-background text-foreground border-border"
-                  placeholder="Confirm new password"
-                />
-              </div>
-
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                Update Password
-              </Button>
-            </div>
-
-            <div className="pt-6 border-t border-border space-y-4">
-              <h4 className="font-semibold text-foreground">Danger Zone</h4>
-              <Button variant="outline" className="border-destructive text-destructive hover:bg-destructive/10">
-                Delete Account
-              </Button>
-            </div>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </Card>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

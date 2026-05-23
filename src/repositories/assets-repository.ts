@@ -125,3 +125,21 @@ export async function deleteAsset(
     throw new Error(error.message);
   }
 }
+
+export async function listRevisionsByAssetId(
+  assetId: string,
+  client?: SupabaseClient<Database>
+): Promise<Database['public']['Tables']['asset_revisions']['Row'][]> {
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('asset_revisions')
+    .select('*')
+    .eq('asset_id', assetId)
+    .order('version_number', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}

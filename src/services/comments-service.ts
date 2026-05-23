@@ -30,6 +30,7 @@ function mapComment(
     userId: comment.user_id,
     type: comment.type as CommentType,
     message: comment.message,
+    isInternal: comment.type === 'internal_note',
     revisionStatus: comment.revision_status as RevisionStatus | null,
     createdAt: new Date(comment.created_at),
     updatedAt: new Date(comment.updated_at),

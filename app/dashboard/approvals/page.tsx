@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { assetsApi, clientsApi } from '@/lib/api-client';
 import { Asset, Client } from '@/types/index';
 import Link from 'next/link';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Image as ImageIcon } from 'lucide-react';
+import { StatusBadge } from '@/components/assets/status-badge';
+import { getAssetIcon } from '@/lib/asset-display';
+import { cn } from '@/lib/utils';
 
 export default function ApprovalsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -45,6 +47,55 @@ export default function ApprovalsPage() {
   const readyForReview = assets.filter((a) => a.status === 'ready_for_review');
   const revisionRequested = assets.filter((a) => a.status === 'revision_requested');
 
+  const renderAssetRow = (asset: Asset, clientName: string, isPending: boolean) => {
+    const AssetIcon = getAssetIcon(asset);
+
+    return (
+      <div key={asset.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[rgba(255,255,255,0.03)]">
+        <Link href={`/dashboard/assets/${asset.id}`} className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[6px] border border-[rgba(255,255,255,0.06)] bg-[#0f0f0f]">
+            {asset.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" />
+            ) : (
+              <AssetIcon className="h-5 w-5 text-[#71717a]" />
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-white">{asset.title}</p>
+            <p className="truncate text-[12px] text-[#71717a]">{clientName}</p>
+          </div>
+        </Link>
+
+        <div className="shrink-0">
+          <StatusBadge status={asset.status} />
+        </div>
+
+        {isPending ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[12px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399]"
+            >
+              Approve
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5]"
+            >
+              Reject
+            </Button>
+          </div>
+        ) : (
+          <div className="shrink-0 text-[12px] text-[#71717a]">Resolved</div>
+        )}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-8">
@@ -68,108 +119,46 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Approvals' }]} />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-6 border border-border">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <Clock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Pending Review</p>
-              <p className="text-2xl font-bold text-foreground">{readyForReview.length}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 border border-border">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-              <XCircle className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Need Revisions</p>
-              <p className="text-2xl font-bold text-foreground">{revisionRequested.length}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-6 border border-border">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Assets</p>
-              <p className="text-2xl font-bold text-foreground">{assets.length}</p>
-            </div>
-          </div>
-        </Card>
+      <div className="flex items-center gap-4">
+        <h1 className="text-[18px] font-medium text-white">Approvals</h1>
+        <div className="flex items-center gap-2 text-[12px] text-[#71717a]">
+          <span>{readyForReview.length} pending</span>
+          <span className="h-1 w-1 rounded-full bg-[rgba(255,255,255,0.2)]" />
+          <span>{revisionRequested.length} resolved</span>
+        </div>
       </div>
 
-      <div className="space-y-6">
-        {readyForReview.length > 0 && (
-          <Card className="p-6 border border-border">
-            <h2 className="text-xl font-semibold text-foreground mb-4">Ready for Review</h2>
-            <div className="space-y-3">
-              {readyForReview.map((asset) => {
-                const client = clients.get(asset.clientId);
-                return (
-                  <div
-                    key={asset.id}
-                    className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">{asset.title}</p>
-                      <p className="text-sm text-muted-foreground">{client?.name || 'Unknown Client'}</p>
-                    </div>
-                    <Link href={`/dashboard/assets/${asset.id}`}>
-                      <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                        Review
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
+      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111]">
+        <div className="border-b border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
+          Pending
+        </div>
+        <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+          {readyForReview.length > 0 ? (
+            readyForReview.map((asset) => {
+              const client = clients.get(asset.clientId);
+              return renderAssetRow(asset, client?.name || 'Unknown Client', true);
+            })
+          ) : (
+            <div className="px-4 py-10 text-center text-[13px] text-[#71717a]">No items pending approval</div>
+          )}
+        </div>
 
-        {revisionRequested.length > 0 && (
-          <Card className="p-6 border border-border">
-            <h2 className="text-xl font-semibold text-foreground mb-4">Awaiting Revisions</h2>
-            <div className="space-y-3">
-              {revisionRequested.map((asset) => {
-                const client = clients.get(asset.clientId);
-                return (
-                  <div
-                    key={asset.id}
-                    className="flex items-center justify-between p-4 border border-orange-200 dark:border-orange-900/30 rounded-lg bg-orange-50/50 dark:bg-orange-900/10"
-                  >
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">{asset.title}</p>
-                      <p className="text-sm text-muted-foreground">{client?.name || 'Unknown Client'}</p>
-                    </div>
-                    <Link href={`/dashboard/assets/${asset.id}`}>
-                      <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 dark:border-orange-800 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20">
-                        Follow Up
-                      </Button>
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        )}
-
-        {assets.length === 0 && (
-          <Card className="p-12 border border-border text-center">
-            <p className="text-muted-foreground mb-4">No items pending approval</p>
-            <p className="text-sm text-muted-foreground">All assets are either approved or archived</p>
-          </Card>
-        )}
+        <div className="border-t border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
+          Resolved
+        </div>
+        <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+          {revisionRequested.length > 0 ? (
+            revisionRequested.map((asset) => {
+              const client = clients.get(asset.clientId);
+              return renderAssetRow(asset, client?.name || 'Unknown Client', false);
+            })
+          ) : (
+            <div className="px-4 py-10 text-center text-[13px] text-[#71717a]">No resolved review items</div>
+          )}
+        </div>
       </div>
     </div>
   );

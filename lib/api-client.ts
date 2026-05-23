@@ -4,6 +4,7 @@ import { mockUploadQueue } from './mock-data/upload-queue';
 import { mockWorkspace } from './mock-data/workspace';
 import type {
   Asset,
+  AssetComment,
   Client,
   Notification,
   UploadQueue,
@@ -95,6 +96,7 @@ function hydrateAsset(asset: Asset): Asset {
     ...asset,
     createdAt: new Date(asset.createdAt),
     updatedAt: new Date(asset.updatedAt),
+    uploadedAt: asset.uploadedAt ? new Date(asset.uploadedAt) : null,
     scheduledAt: asset.scheduledAt ? new Date(asset.scheduledAt) : null,
   };
 }
@@ -103,6 +105,14 @@ function hydrateUser(user: User): User {
   return {
     ...user,
     createdAt: new Date(user.createdAt),
+  };
+}
+
+function hydrateComment(comment: AssetComment): AssetComment {
+  return {
+    ...comment,
+    createdAt: new Date(comment.createdAt),
+    updatedAt: new Date(comment.updatedAt),
   };
 }
 
@@ -232,6 +242,25 @@ export const assetsApi = {
     return hydrateAsset(created);
   },
 
+  uploadFile: async (assetId: string, file: File): Promise<Asset> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`/api/assets/${assetId}/upload`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'same-origin',
+    });
+
+    const payload = (await response.json()) as ApiEnvelope<{ asset?: Asset; error?: string }>;
+
+    if (!response.ok || payload.error || !payload.data?.asset) {
+      throw new Error(payload.error ?? 'Upload failed');
+    }
+
+    return hydrateAsset(payload.data.asset);
+  },
+
   update: async (
     id: string,
     updates: Partial<{
@@ -266,6 +295,30 @@ export const usersApi = {
   getById: async (id: string): Promise<User | null> => {
     const user = await fetchJsonNullableDeduped<User>(`/api/users/${id}`);
     return user ? hydrateUser(user) : null;
+  },
+};
+
+export const commentsApi = {
+  getByAssetId: async (assetId: string): Promise<AssetComment[]> => {
+    const comments = await fetchJson<AssetComment[]>(`/api/assets/${assetId}/comments`);
+    return comments.map(hydrateComment);
+  },
+
+  create: async (
+    assetId: string,
+    input: {
+      message: string;
+      isInternal?: boolean;
+    }
+  ): Promise<AssetComment> => {
+    const created = await fetchJson<AssetComment>(`/api/assets/${assetId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message: input.message,
+        type: input.isInternal ? 'internal_note' : 'comment',
+      }),
+    });
+    return hydrateComment(created);
   },
 };
 

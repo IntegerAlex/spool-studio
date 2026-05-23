@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAssetDetail, updateAsset, removeAsset } from '@/services/assets-service';
+import { getAssetDetail, updateAsset, removeAsset, setAssetCurrentRevision } from '@/services/assets-service';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -26,6 +26,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Asset id is required' }, { status: 400 });
     }
     const body = await request.json();
+    // If the request asks to activate a specific revision, handle that first.
+    if (body.currentRevisionId) {
+      await setAssetCurrentRevision(assetId, body.currentRevisionId);
+    }
     const asset = await updateAsset(assetId, {
       clientId: body.clientId,
       title: body.title,

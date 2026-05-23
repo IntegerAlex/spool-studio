@@ -23,7 +23,19 @@ export interface Client {
   driveFolderUrl?: string;
 }
 
-export type AssetStatus = 'draft' | 'in_design' | 'ready_for_review' | 'revision_requested' | 'approved' | 'scheduled' | 'uploaded' | 'archived';
+export type AssetStatus =
+  | 'draft'
+  | 'uploading'
+  | 'uploaded'
+  | 'processing'
+  | 'approved'
+  | 'published'
+  | 'failed'
+  | 'archived'
+  | 'in_design'
+  | 'ready_for_review'
+  | 'revision_requested'
+  | 'scheduled';
 export type AssetType = 'reel' | 'poster';
 export type CommentType = 'comment' | 'revision' | 'approval_note' | 'internal_note';
 export type RevisionStatus = 'open' | 'resolved';
@@ -35,18 +47,49 @@ export interface Asset {
   description?: string;
   type: AssetType;
   status: AssetStatus;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  fileExtension?: string | null;
+  uploadedAt?: Date | null;
+  uploadedBy?: string | null;
+  driveFileId?: string | null;
   fileUrl?: string;
   driveFileUrl?: string;
   driveFolderId?: string;
   driveFolderUrl?: string;
   thumbnailUrl?: string;
+  mediaWidth?: number | null;
+  mediaHeight?: number | null;
+  durationSeconds?: number | null;
   createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
   scheduledAt?: Date | null;
   assignedTo: string[];
-  revisions: AssetComment[];
+  revisions: AssetRevision[];
+  // Revision/versioning fields
+  currentRevisionId?: string | null;
+  latestRevision?: AssetRevision | null;
+  revisionCount?: number;
   comments: AssetComment[];
+}
+
+export interface AssetRevision {
+  id: string;
+  assetId: string;
+  versionNumber: number;
+  uploadedBy?: string | null;
+  uploadedAt: Date;
+  driveFileId: string;
+  driveFileUrl?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  mediaWidth?: number | null;
+  mediaHeight?: number | null;
+  durationSeconds?: number | null;
+  changeNote?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
 }
 
 export interface AssetComment {

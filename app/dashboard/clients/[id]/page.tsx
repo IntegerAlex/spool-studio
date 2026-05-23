@@ -45,7 +45,7 @@ export default function ClientDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <Breadcrumb
           items={[
             { label: 'Dashboard', href: '/dashboard' },
@@ -54,7 +54,7 @@ export default function ClientDetailPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading client details...</p>
+          <p className="text-[#71717a]">Loading client details...</p>
         </div>
       </div>
     );
@@ -62,7 +62,7 @@ export default function ClientDetailPage() {
 
   if (error) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <Breadcrumb
           items={[
             { label: 'Dashboard', href: '/dashboard' },
@@ -71,7 +71,7 @@ export default function ClientDetailPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-[#71717a]">{error}</p>
         </div>
       </div>
     );
@@ -79,7 +79,7 @@ export default function ClientDetailPage() {
 
   if (!client) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <Breadcrumb
           items={[
             { label: 'Dashboard', href: '/dashboard' },
@@ -88,14 +88,14 @@ export default function ClientDetailPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Client not found</p>
+          <p className="text-[#71717a]">Client not found</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Breadcrumb
         items={[
           { label: 'Dashboard', href: '/dashboard' },

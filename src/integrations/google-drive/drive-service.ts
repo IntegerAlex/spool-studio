@@ -1,4 +1,5 @@
 import type { drive_v3 } from 'googleapis';
+import { Readable } from 'node:stream';
 import { authenticateDrive } from './drive-client';
 import type {
   DriveFolderAccessDiagnostics,
@@ -21,6 +22,46 @@ type DriveFolderMetadata = {
   webViewLink: string | null;
 };
 
+type DriveUploadMetadata = {
+  id: string;
+  name: string;
+  parents: string[] | null;
+  driveId: string | null;
+  owners: Array<{ emailAddress?: string | null; displayName?: string | null }>;
+  permissions: Array<{
+    emailAddress?: string | null;
+    role?: string | null;
+    type?: string | null;
+    deleted?: boolean | null;
+  }>;
+  webViewLink: string | null;
+  mimeType: string | null;
+  size: number | null;
+  thumbnailLink: string | null;
+};
+
+export interface DriveUploadInput {
+  folderId: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  file: File;
+}
+
+export interface DriveUploadResult {
+  driveFileId: string;
+  driveFileUrl: string;
+  mimeType: string;
+  fileSize: number;
+  uploadStatus: 'uploaded';
+  thumbnailLink: string | null;
+  parents: string[];
+  driveId: string | null;
+  owners: DriveUploadMetadata['owners'];
+  permissions: DriveUploadMetadata['permissions'];
+  webViewLink: string;
+}
+
 function getGoogleErrorDetails(error: unknown) {
   const maybe = error as {
     message?: string;
@@ -35,6 +76,18 @@ function getGoogleErrorDetails(error: unknown) {
     code: maybe?.code ?? maybe?.status ?? maybe?.response?.status ?? null,
     response: maybe?.response?.data ?? maybe?.errors ?? null,
   };
+}
+
+function logUploadFailure(stage: string, error: unknown, extra: Record<string, unknown> = {}) {
+  const message = error instanceof Error ? error.message : 'Unknown upload error';
+  const stack = error instanceof Error ? error.stack ?? null : null;
+
+  console.error('[upload][failure]', {
+    stage,
+    message,
+    stack,
+    ...extra,
+  });
 }
 
 function toFolderResult(file: drive_v3.Schema$File): DriveFolderResult {
@@ -91,6 +144,44 @@ async function fetchFolderMetadata(folderId: string) {
     })),
     webViewLink: file.webViewLink ?? null,
   } satisfies DriveFolderMetadata;
+}
+
+async function fetchDriveUploadMetadata(fileId: string) {
+  const drive = await authenticateDrive();
+
+  const response = await drive.files.get({
+    fileId,
+    fields:
+      'id,name,parents,driveId,owners(emailAddress,displayName),permissions(emailAddress,role,type,deleted),webViewLink,mimeType,size,thumbnailLink',
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
+  });
+
+  const file = response.data;
+  if (!file.id || !file.name) {
+    throw new Error('Google Drive upload metadata response is missing required fields');
+  }
+
+  return {
+    id: file.id,
+    name: file.name,
+    parents: file.parents ?? null,
+    driveId: file.driveId ?? null,
+    owners: (file.owners ?? []).map((owner) => ({
+      emailAddress: owner.emailAddress ?? null,
+      displayName: owner.displayName ?? null,
+    })),
+    permissions: (file.permissions ?? []).map((permission) => ({
+      emailAddress: permission.emailAddress ?? null,
+      role: permission.role ?? null,
+      type: permission.type ?? null,
+      deleted: permission.deleted ?? null,
+    })),
+    webViewLink: file.webViewLink ?? null,
+    mimeType: file.mimeType ?? null,
+    size: file.size !== undefined && file.size !== null ? Number(file.size) : null,
+    thumbnailLink: file.thumbnailLink ?? null,
+  } satisfies DriveUploadMetadata;
 }
 
 export async function createFolder(input: DriveFolderInput): Promise<DriveFolderResult> {
@@ -182,6 +273,88 @@ export async function createFolder(input: DriveFolderInput): Promise<DriveFolder
   }
 }
 
+export async function uploadFileToFolder(input: DriveUploadInput): Promise<DriveUploadResult> {
+  const drive = await authenticateDrive();
+  const mimeType = input.mimeType || 'application/octet-stream';
+  try {
+    const arrayBuffer = await input.file.arrayBuffer();
+    console.info('[upload][file-buffer]', {
+      folderId: input.folderId,
+      fileName: input.fileName,
+      mimeType,
+      arrayBufferSuccess: true,
+      bufferSize: arrayBuffer.byteLength,
+    });
+  } catch (error) {
+    logUploadFailure('file-buffer', error, {
+      folderId: input.folderId,
+      fileName: input.fileName,
+      mimeType,
+      fileSize: input.fileSize,
+    });
+    throw error;
+  }
+
+  const body = Readable.fromWeb(input.file.stream() as unknown as ReadableStream<Uint8Array>);
+
+  try {
+    const response = await drive.files.create({
+      requestBody: {
+        name: input.fileName,
+        mimeType,
+        parents: [input.folderId],
+      },
+      media: {
+        mimeType,
+        body,
+      },
+      fields:
+        'id,name,parents,driveId,owners(emailAddress,displayName),permissions(emailAddress,role,type,deleted),webViewLink,mimeType,size,thumbnailLink',
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+    });
+
+    if (!response.data?.id) {
+      throw new Error('Google Drive upload returned no file id');
+    }
+
+    const metadata = await fetchDriveUploadMetadata(response.data.id);
+
+    console.info('[upload][drive-upload]', {
+      driveFileId: metadata.id,
+      driveFileUrl: metadata.webViewLink,
+      mimeType: metadata.mimeType,
+      fileSize: metadata.size,
+      parents: metadata.parents ?? [],
+      driveId: metadata.driveId,
+    });
+
+    return {
+      driveFileId: metadata.id,
+      driveFileUrl: metadata.webViewLink ?? `https://drive.google.com/file/d/${metadata.id}/view`,
+      mimeType: metadata.mimeType ?? mimeType,
+      fileSize: metadata.size ?? input.fileSize,
+      uploadStatus: 'uploaded',
+      thumbnailLink: metadata.thumbnailLink,
+      parents: metadata.parents ?? [],
+      driveId: metadata.driveId,
+      owners: metadata.owners,
+      permissions: metadata.permissions,
+      webViewLink: metadata.webViewLink ?? `https://drive.google.com/file/d/${metadata.id}/view`,
+    };
+  } catch (error) {
+    const details = getGoogleErrorDetails(error);
+    logUploadFailure('drive-upload', error, {
+      driveFileName: input.fileName,
+      folderId: input.folderId,
+      fileSize: input.fileSize,
+      mimeType,
+      ...details,
+    });
+    throw new Error(details.message);
+  }
+}
+
 export async function findFolder(name: string, parentFolderId?: string): Promise<DriveFolderResult | null> {
   const drive = await authenticateDrive();
   const safeName = name.replace(/'/g, "\\'");
@@ -240,7 +413,8 @@ export async function getFolderAccessDiagnostics(
   try {
     const response = await drive.files.get({
       fileId: folderId,
-      fields: 'id,name,capabilities(canAddChildren,canEdit),permissions(emailAddress,role,type,deleted)',
+      fields:
+        'id,name,driveId,capabilities(canAddChildren,canEdit),permissions(emailAddress,role,type,deleted)',
       includeItemsFromAllDrives: true,
       supportsAllDrives: true,
     });
@@ -260,24 +434,56 @@ export async function getFolderAccessDiagnostics(
       })
       : undefined;
 
+    const driveType = file.driveId ? 'shared-drive' : 'my-drive';
+    const inheritedPermissions = driveType === 'shared-drive' ? !matchingPermission : null;
+    const canEdit = file.capabilities?.canEdit ?? null;
+    const canAddChildren = file.capabilities?.canAddChildren ?? null;
     const role = matchingPermission?.role ?? null;
-    const serviceAccountHasEditorAccess = role
-      ? ['owner', 'organizer', 'fileOrganizer', 'writer'].includes(role)
-      : serviceAccountEmail
-        ? false
-        : null;
+    const serviceAccountHasEditorAccess =
+      driveType === 'shared-drive'
+        ? canEdit === true && canAddChildren === true
+        : role
+          ? ['owner', 'organizer', 'fileOrganizer', 'writer'].includes(role)
+          : serviceAccountEmail
+            ? false
+            : null;
+
+    console.info('[google-drive][drive-metadata]', {
+      folderId: file.id,
+      folderName: file.name,
+      driveId: file.driveId ?? null,
+      rawMetadataKeys: Object.keys(file),
+      evaluatedDriveType: driveType,
+    });
+
+    console.info('[google-drive][permission-validation]', {
+      folderId: file.id,
+      folderName: file.name,
+      driveType,
+      inheritedPermissions,
+      capabilityFlags: {
+        canEdit,
+        canAddChildren,
+      },
+      matchingRole: role,
+      evaluatedResult: serviceAccountHasEditorAccess,
+    });
 
     const diagnostics: DriveFolderAccessDiagnostics = {
       id: file.id,
       name: file.name,
-      canAddChildren: file.capabilities?.canAddChildren ?? null,
-      canEdit: file.capabilities?.canEdit ?? null,
+      driveType,
+      inheritedPermissions,
+      canAddChildren,
+      canEdit,
       serviceAccountHasEditorAccess,
     };
 
     console.info('[google-drive][parent:access] diagnostics', {
       folderId: diagnostics.id,
       folderName: diagnostics.name,
+      driveType: diagnostics.driveType,
+      inheritedPermissions: diagnostics.inheritedPermissions,
       canAddChildren: diagnostics.canAddChildren,
       canEdit: diagnostics.canEdit,
       serviceAccountEmail: serviceAccountEmail ?? null,

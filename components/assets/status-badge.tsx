@@ -1,20 +1,9 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import { assetStatusLabels } from '@/lib/asset-workflow';
 import type { AssetStatus } from '@/types/index';
 import { cn } from '@/lib/utils';
-
-const statusClasses: Record<AssetStatus, string> = {
-  draft: 'bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300',
-  in_design: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  ready_for_review: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  revision_requested: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  scheduled: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  uploaded: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
-  archived: 'bg-neutral-100 text-neutral-800 dark:bg-neutral-900/30 dark:text-neutral-300',
-};
+import { Check } from 'lucide-react';
 
 interface StatusBadgeProps {
   status: AssetStatus;
@@ -22,15 +11,49 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const labels: Record<AssetStatus, string> = {
+    draft: 'Draft',
+    uploading: 'Uploading',
+    uploaded: 'Uploaded',
+    processing: 'Processing',
+    approved: 'Approved',
+    published: 'Published',
+    failed: 'Failed',
+    archived: 'Archived',
+    in_design: 'In Design',
+    ready_for_review: 'Review',
+    revision_requested: 'Review',
+    scheduled: 'Scheduled',
+  };
+
+  const styles: Record<AssetStatus, string> = {
+    draft: 'border-[rgba(113,113,122,0.3)] bg-[rgba(113,113,122,0.2)] text-[#a1a1aa]',
+    uploading: 'border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.15)] text-[#818cf8]',
+    uploaded: 'border-[rgba(20,184,166,0.3)] bg-[rgba(20,184,166,0.15)] text-[#2dd4bf]',
+    processing: 'border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.15)] text-[#c084fc]',
+    approved: 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-[#34d399]',
+    published: 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-[#34d399]',
+    failed: 'border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.15)] text-[#f87171]',
+    archived: 'border-[rgba(113,113,122,0.15)] bg-[rgba(113,113,122,0.1)] text-[#52525b]',
+    in_design: 'border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.15)] text-[#60a5fa]',
+    ready_for_review: 'border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.15)] text-[#fbbf24]',
+    revision_requested: 'border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.15)] text-[#fbbf24]',
+    scheduled: 'border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.15)] text-[#818cf8]',
+  };
+
   return (
     <Badge
       className={cn(
-        'border-transparent text-xs font-semibold capitalize',
-        statusClasses[status],
+        'inline-flex h-[18px] rounded-full border px-2 py-0 text-[10px] font-medium capitalize leading-none',
+        styles[status],
         className
       )}
     >
-      {assetStatusLabels[status]}
+      {(status === 'uploading' || status === 'processing') && (
+        <span className={cn('mr-1 size-[6px] rounded-full bg-current animate-status-pulse')} />
+      )}
+      {status === 'published' && <Check className="mr-1 h-3 w-3" />}
+      {labels[status]}
     </Badge>
   );
 }

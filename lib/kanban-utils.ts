@@ -1,15 +1,7 @@
-import { AssetStatus } from '@/types/index';
+import { assetStatusOrder } from '@/lib/asset-workflow';
+import type { AssetStatus } from '@/types/index';
 
-export const statusOrder: AssetStatus[] = [
-  'draft',
-  'in_design',
-  'ready_for_review',
-  'revision_requested',
-  'approved',
-  'scheduled',
-  'uploaded',
-  'archived',
-];
+export const statusOrder: AssetStatus[] = [...assetStatusOrder];
 
 export function getNextStatus(currentStatus: AssetStatus): AssetStatus | null {
   const currentIndex = statusOrder.indexOf(currentStatus);

@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { queueApi, assetsApi, clientsApi } from '@/lib/api-client';
 import { UploadQueue, Asset, Client } from '@/types/index';
-import { Download, Copy, Calendar } from 'lucide-react';
-import { ExternalLink, Folder } from 'lucide-react';
+import { Download, Copy, Calendar, ExternalLink, Folder, FileText, RotateCcw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +13,46 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { getAssetIcon } from '@/lib/asset-display';
+
+function getQueueStatusLabel(status: UploadQueue['status']): string {
+  switch (status) {
+    case 'pending':
+      return 'Pending';
+    case 'scheduled':
+      return 'Scheduled';
+    case 'uploaded':
+      return 'Uploaded';
+    case 'failed':
+      return 'Failed';
+  }
+}
+
+function getQueueStatusClass(status: UploadQueue['status']): string {
+  switch (status) {
+    case 'pending':
+    case 'scheduled':
+      return 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.12)] text-[#818cf8]';
+    case 'uploaded':
+      return 'border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] text-[#34d399]';
+    case 'failed':
+      return 'border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.12)] text-[#fca5a5]';
+  }
+}
+
+function getProgressWidth(status: UploadQueue['status']): string {
+  switch (status) {
+    case 'pending':
+      return '22%';
+    case 'scheduled':
+      return '58%';
+    case 'uploaded':
+      return '100%';
+    case 'failed':
+      return '0%';
+  }
+}
 
 export default function QueuePage() {
   const [queue, setQueue] = useState<UploadQueue[]>([]);
@@ -49,6 +87,7 @@ export default function QueuePage() {
   const scheduledQueue = queue.filter((q) => q.status === 'scheduled').sort((a, b) =>
     new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
   );
+  const queuedItems = [...queue].sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
 
   if (isLoading) {
     return (
@@ -62,151 +101,143 @@ export default function QueuePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Upload Queue' }]} />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-6 border border-border">
-          <p className="text-sm text-muted-foreground mb-1">Scheduled Uploads</p>
-          <p className="text-3xl font-bold text-foreground">{scheduledQueue.length}</p>
-          <p className="text-xs text-muted-foreground mt-2">Next 7 days</p>
-        </Card>
-        <Card className="p-6 border border-border">
-          <p className="text-sm text-muted-foreground mb-1">Pending Upload</p>
-          <p className="text-3xl font-bold text-foreground">
-            {queue.filter((q) => q.status === 'pending').length}
-          </p>
-        </Card>
-        <Card className="p-6 border border-border">
-          <p className="text-sm text-muted-foreground mb-1">Already Uploaded</p>
-          <p className="text-3xl font-bold text-foreground">
-            {queue.filter((q) => q.status === 'uploaded').length}
-          </p>
-        </Card>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-[18px] font-medium text-white">Upload Queue</h1>
+        <p className="text-[12px] text-[#71717a]">{scheduledQueue.length} scheduled next</p>
       </div>
 
-      <div className="space-y-4">
-        {scheduledQueue.map((item) => {
+      <div className="overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111]">
+        <div className="grid grid-cols-[1.6fr_0.9fr_0.8fr_0.9fr_120px] items-center gap-3 border-b border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
+          <div>File</div>
+          <div>Client</div>
+          <div>Status</div>
+          <div>Progress</div>
+          <div className="text-right">Action</div>
+        </div>
+
+        <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+          {queuedItems.map((item) => {
           const asset = assets.get(item.assetId);
           const client = asset ? clients.get(asset.clientId) : null;
+          const AssetIcon = asset ? getAssetIcon(asset) : FileText;
+          const isFailed = item.status === 'failed';
 
           return (
-            <Card key={item.id} className="p-6 border border-border space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-foreground mb-1">
-                    {asset?.title || 'Unknown Asset'}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {client?.name || 'Unknown Client'} •{' '}
-                    <span className="inline-flex items-center space-x-1">
-                      <Calendar className="w-3 h-3" />
-                      <span>{new Date(item.scheduledDate).toLocaleDateString()}</span>
-                    </span>
-                  </p>
-
-                  <div className="flex items-center space-x-2 mb-3">
-                    <span className="px-3 py-1 text-xs font-semibold bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-full">
-                      {item.platform}
-                    </span>
-                  </div>
+            <div
+              key={item.id}
+              className={cn(
+                'grid h-12 grid-cols-[1.6fr_0.9fr_0.8fr_0.9fr_120px] items-center gap-3 px-4 text-[13px] transition-colors hover:bg-[rgba(255,255,255,0.03)]',
+                isFailed && 'border-l-2 border-l-[#ef4444] bg-[rgba(239,68,68,0.04)] hover:bg-[rgba(239,68,68,0.06)]'
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-[rgba(255,255,255,0.04)] text-[#71717a]">
+                  <AssetIcon className="h-[18px] w-[18px]" />
                 </div>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-white">{asset?.title || 'Unknown Asset'}</p>
+                  <p className="truncate text-[12px] text-[#71717a]">
+                    {item.caption || 'No caption provided'}
+                  </p>
+                </div>
+              </div>
 
+              <div className="min-w-0 text-[12px] text-[#a1a1aa]">
+                <p className="truncate">{client?.name || 'Unknown Client'}</p>
+                <p className="mt-0.5 inline-flex items-center gap-1 text-[#71717a]">
+                  <Calendar className="h-3 w-3" />
+                  {new Date(item.scheduledDate).toLocaleDateString()}
+                </p>
+              </div>
+
+              <div>
+                <span className={cn('inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium', getQueueStatusClass(item.status))}>
+                  {getQueueStatusLabel(item.status)}
+                </span>
+              </div>
+
+              <div className="pr-4">
+                {item.status === 'uploaded' || item.status === 'failed' ? (
+                  <p className={cn('text-[12px] font-medium', item.status === 'failed' ? 'text-[#fca5a5]' : 'text-[#34d399]')}>
+                    {item.status === 'failed' ? 'Final state' : 'Complete'}
+                  </p>
+                ) : (
+                  <div className="h-[3px] overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
+                    <div className="h-full rounded-full bg-[var(--primary)] transition-all duration-300" style={{ width: getProgressWidth(item.status) }} />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="border-border text-foreground hover:bg-muted">
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[#a1a1aa] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
                       Actions
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-card border border-border">
-                      {asset?.driveFileUrl && (
-                        <DropdownMenuItem asChild>
-                          <a href={asset.driveFileUrl} target="_blank" rel="noreferrer" className="text-foreground cursor-pointer hover:bg-muted">
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Open in Drive
-                          </a>
-                        </DropdownMenuItem>
-                      )}
-                      {asset?.driveFolderUrl && (
-                        <DropdownMenuItem asChild>
-                          <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer" className="text-foreground cursor-pointer hover:bg-muted">
-                            <Folder className="w-4 h-4 mr-2" />
-                            Open folder
-                          </a>
-                        </DropdownMenuItem>
-                      )}
-                      {asset?.driveFileUrl && (
-                        <DropdownMenuItem
-                          className="text-foreground cursor-pointer hover:bg-muted"
-                          onSelect={(e) => {
-                            e.preventDefault();
-                            void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
-                          }}
-                        >
-                          <Copy className="w-4 h-4 mr-2" />
-                          Copy link
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-foreground cursor-pointer hover:bg-muted">
-                      <Download className="w-4 h-4 mr-2" />
+                  <DropdownMenuContent align="end" className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white">
+                    {asset?.driveFileUrl && (
+                      <DropdownMenuItem asChild>
+                        <a href={asset.driveFileUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Open in Drive
+                        </a>
+                      </DropdownMenuItem>
+                    )}
+                    {asset?.driveFolderUrl && (
+                      <DropdownMenuItem asChild>
+                        <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
+                          <Folder className="mr-2 h-4 w-4" />
+                          Open folder
+                        </a>
+                      </DropdownMenuItem>
+                    )}
+                    {asset?.driveFileUrl && (
+                      <DropdownMenuItem
+                        className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]"
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
+                        }}
+                      >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy link
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
+                    <DropdownMenuItem className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
+                      <Download className="mr-2 h-4 w-4" />
                       Download Asset
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-foreground cursor-pointer hover:bg-muted">
+                    <DropdownMenuItem className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
                       Edit Schedule
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive cursor-pointer hover:bg-destructive/10">
+                    {isFailed && (
+                      <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Retry
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
                       Cancel
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-
-              {item.caption && (
-                <div className="border-t border-border pt-4">
-                  <p className="text-xs text-muted-foreground mb-2">Caption</p>
-                  <div className="flex items-start space-x-3">
-                    <p className="flex-1 text-sm text-foreground bg-muted/50 p-3 rounded-lg">
-                      {item.caption}
-                    </p>
-                    <button
-                      onClick={() => handleCopyCaption(item.caption || '')}
-                      className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                      title="Copy caption"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {item.hashtags && item.hashtags.length > 0 && (
-                <div className="border-t border-border pt-4">
-                  <p className="text-xs text-muted-foreground mb-2">Hashtags</p>
-                  <div className="flex flex-wrap gap-2">
-                    {item.hashtags.map((tag, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleCopyCaption(tag)}
-                        className="px-3 py-1 text-sm text-primary bg-primary/10 rounded-full hover:bg-primary/20 transition-colors"
-                        title="Copy hashtag"
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Card>
+            </div>
           );
-        })}
+          })}
+        </div>
       </div>
 
       {scheduledQueue.length === 0 && (
-        <Card className="p-12 border border-border text-center">
-          <p className="text-muted-foreground mb-4">No scheduled uploads</p>
-          <p className="text-sm text-muted-foreground">Upload scheduling will appear here when assets are approved</p>
-        </Card>
+        <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#161616] p-12 text-center">
+          <p className="mb-4 text-[#a1a1aa]">No scheduled uploads</p>
+          <p className="text-sm text-[#71717a]">Upload scheduling will appear here when assets are approved</p>
+        </div>
       )}
     </div>
   );

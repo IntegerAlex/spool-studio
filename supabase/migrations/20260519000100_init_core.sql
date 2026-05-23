@@ -6,13 +6,17 @@ create type public.user_role as enum ('admin', 'designer', 'approver', 'uploader
 create type public.asset_type as enum ('reel', 'poster');
 create type public.asset_status as enum (
   'draft',
+  'uploading',
+  'uploaded',
+  'processing',
+  'approved',
+  'published',
+  'failed',
+  'archived',
   'in_design',
   'ready_for_review',
   'revision_requested',
-  'approved',
-  'scheduled',
-  'uploaded',
-  'archived'
+  'scheduled'
 );
 
 create table if not exists public.users (
