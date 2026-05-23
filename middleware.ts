@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 const DEBUG_MIDDLEWARE = process.env.DEBUG_MIDDLEWARE === 'true';
@@ -12,42 +12,26 @@ function shouldLogMiddleware(pathname: string): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const contentType = request.headers.get('content-type');
   const pathname = request.nextUrl.pathname;
 
-  if (shouldLogMiddleware(pathname)) {
-    if (isAssetUploadRoute(pathname)) {
-      console.info('[upload][content-type]', {
-        pathname,
-        method: request.method,
-        contentType,
-      });
-
-      if (!/^multipart\/form-data\b/i.test(contentType ?? '')) {
-        console.warn('[upload][unexpected-content-type]', {
-          pathname,
-          method: request.method,
-          contentType,
-        });
-      }
-
-      console.info('[middleware][upload-bypass]', {
-        pathname,
-        contentType,
-        action: 'preserve-original-request',
-      });
-    } else if (DEBUG_MIDDLEWARE) {
-      console.info('[middleware][debug]', {
-        pathname,
-        method: request.method,
-        contentType,
-      });
-    }
-
-    return updateSession(request);
+  if (shouldLogMiddleware(pathname) && DEBUG_MIDDLEWARE) {
+    console.info('[middleware][debug]', {
+      pathname,
+      method: request.method,
+      contentType: request.headers.get('content-type'),
+    });
   }
 
-  return updateSession(request);
+  try {
+    return updateSession(request);
+  } catch (error) {
+    console.error('[middleware][production-error]', {
+      pathname,
+      message: error instanceof Error ? error.message : 'unknown',
+    });
+
+    return NextResponse.next();
+  }
 }
 
 export const config = {

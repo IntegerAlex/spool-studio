@@ -12,17 +12,17 @@ function isProtectedPath(pathname: string): boolean {
 }
 
 function getSupabaseUrl(): string {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) {
-    throw new Error('Missing SUPABASE_URL');
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
   }
   return url;
 }
 
 function getSupabaseAnonKey(): string {
-  const key = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) {
-    throw new Error('Missing SUPABASE_ANON_KEY');
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
   return key;
 }
@@ -77,9 +77,8 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     console.error('[middleware][session-error]', {
       pathname,
       method: request.method,
-      error,
+      message: error instanceof Error ? error.message : 'unknown',
     });
-    throw error;
   }
 
   if (isProtectedPath(pathname) && !user) {
