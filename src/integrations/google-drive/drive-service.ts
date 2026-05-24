@@ -89,24 +89,53 @@ export async function createDriveResumableUploadSession(
   input: DriveResumableUploadSessionInput
 ): Promise<DriveResumableUploadSessionResult> {
   const authHeaders = await getDriveAuthHeaders();
-  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+  const requestUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true';
+  const requestBody = {
+    name: input.fileName,
+    parents: [input.folderId],
+    mimeType: input.mimeType,
+  };
+
+  console.info('[google-resumable-session]', {
+    step: 'create-session-request',
+    folderId: input.folderId,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    fileSize: input.fileSize,
+    requestUrl,
+    requestHeaders: {
+      authorizationPresent: Boolean((authHeaders as Record<string, string | undefined>).Authorization),
+      contentType: 'application/json',
+      uploadContentType: input.mimeType,
+      uploadContentLength: input.fileSize,
+    },
+    requestBody,
+  });
+
+  const response = await fetch(requestUrl, {
     method: 'POST',
     headers: {
       ...authHeaders,
-      'Content-Type': 'application/json; charset=UTF-8',
+      'Content-Type': 'application/json',
       'X-Upload-Content-Type': input.mimeType,
       'X-Upload-Content-Length': String(input.fileSize),
     },
-    body: JSON.stringify({
-      name: input.fileName,
-      parents: [input.folderId],
-    }),
+    body: JSON.stringify(requestBody),
   });
 
+  const responseBody = await response.text().catch(() => '');
   const uploadUrl = response.headers.get('location');
+
+  console.info('[google-resumable-session]', {
+    step: 'create-session-response',
+    status: response.status,
+    ok: response.ok,
+    hasLocationHeader: Boolean(uploadUrl),
+    responseBody: responseBody || null,
+  });
+
   if (!response.ok || !uploadUrl) {
-    const failureText = await response.text().catch(() => 'Unable to create resumable upload session');
-    throw new Error(failureText || 'Unable to create resumable upload session');
+    throw new Error(responseBody || 'Unable to create resumable upload session');
   }
 
   console.info('[drive-resumable-upload]', {
@@ -115,6 +144,12 @@ export async function createDriveResumableUploadSession(
     mimeType: input.mimeType,
     fileSize: input.fileSize,
     uploadSessionCreated: true,
+  });
+
+  console.info('[google-resumable-session]', {
+    step: 'create-session-success',
+    uploadUrl,
+    uploadType: 'resumable',
   });
 
   return { uploadUrl };

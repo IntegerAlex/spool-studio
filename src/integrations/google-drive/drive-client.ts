@@ -79,6 +79,19 @@ async function createDriveAuthClient(): Promise<InstanceType<typeof google.auth.
   });
 }
 
+async function getDriveAccessToken(auth: InstanceType<typeof google.auth.JWT>): Promise<string | null> {
+  const accessTokenResponse = await auth.getAccessToken();
+  const accessToken = typeof accessTokenResponse === 'string'
+    ? accessTokenResponse
+    : accessTokenResponse?.token ?? null;
+
+  console.info('[google-drive-token]', {
+    tokenPresent: Boolean(accessToken),
+  });
+
+  return accessToken;
+}
+
 export async function authenticateDrive(): Promise<DriveClient> {
   if (cachedDriveClient) {
     console.info('[google-drive][auth] using cached Drive client');
@@ -128,7 +141,15 @@ export async function authenticateDrive(): Promise<DriveClient> {
 export async function getDriveAuthHeaders(): Promise<HeadersInit> {
   const auth = await createDriveAuthClient();
   await auth.authorize();
-  return auth.getRequestHeaders();
+  const accessToken = await getDriveAccessToken(auth);
+
+  if (!accessToken) {
+    throw new Error('Google Drive access token could not be acquired');
+  }
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+  };
 }
 
 export function getDriveRootFolderId(): string | undefined {
