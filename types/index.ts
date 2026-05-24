@@ -23,6 +23,29 @@ export interface Client {
   driveFolderUrl?: string;
 }
 
+export type ClientReferenceType =
+  | 'instagram'
+  | 'website'
+  | 'youtube'
+  | 'pinterest'
+  | 'drive_folder'
+  | 'competitor'
+  | 'branding'
+  | 'reel_reference'
+  | 'ad_reference'
+  | 'other';
+
+export interface ClientReference {
+  id: string;
+  clientId: string;
+  title: string;
+  url: string;
+  description?: string | null;
+  type: ClientReferenceType;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export type AssetStatus =
   | 'draft'
   | 'uploading'

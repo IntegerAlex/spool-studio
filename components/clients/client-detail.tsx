@@ -1,12 +1,23 @@
 'use client';
 
-import { Client, Asset } from '@/types/index';
+import { useEffect, useMemo, useState } from 'react';
+import { Client, Asset, ClientReference, ClientReferenceType, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { usersApi } from '@/lib/api-client';
-import { useEffect, useState } from 'react';
-import { User } from '@/types/index';
-import { Copy, Edit2, ExternalLink, FolderOpen, LayoutGrid, CheckCircle2, Clock3, Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { usersApi, clientReferencesApi } from '@/lib/api-client';
+import { Copy, Edit2, ExternalLink, FolderOpen, LayoutGrid, CheckCircle2, Clock3, Users, Plus, Trash2, Link2, Instagram, Globe, Youtube, Pin, FolderOpen as DriveFolderIcon, Brush, Clapperboard, Megaphone, Shield } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -18,8 +29,245 @@ interface ClientDetailProps {
   assets: Asset[];
 }
 
+type ReferenceFormState = {
+  title: string;
+  url: string;
+  description: string;
+  type: ClientReferenceType;
+};
+
+const referenceTypes: Array<{
+  value: ClientReferenceType;
+  label: string;
+  icon: typeof Link2;
+  toneClassName: string;
+}> = [
+  { value: 'instagram', label: 'Instagram', icon: Instagram, toneClassName: 'text-pink-300' },
+  { value: 'website', label: 'Website', icon: Globe, toneClassName: 'text-sky-300' },
+  { value: 'youtube', label: 'YouTube', icon: Youtube, toneClassName: 'text-red-300' },
+  { value: 'pinterest', label: 'Pinterest', icon: Pin, toneClassName: 'text-rose-300' },
+  { value: 'drive_folder', label: 'Drive Folder', icon: DriveFolderIcon, toneClassName: 'text-amber-300' },
+  { value: 'competitor', label: 'Competitor', icon: Shield, toneClassName: 'text-orange-300' },
+  { value: 'branding', label: 'Branding', icon: Brush, toneClassName: 'text-indigo-300' },
+  { value: 'reel_reference', label: 'Reel Reference', icon: Clapperboard, toneClassName: 'text-violet-300' },
+  { value: 'ad_reference', label: 'Ad Reference', icon: Megaphone, toneClassName: 'text-emerald-300' },
+  { value: 'other', label: 'Other', icon: Link2, toneClassName: 'text-slate-300' },
+];
+
+function getReferenceTypeMeta(type: ClientReferenceType) {
+  return referenceTypes.find((item) => item.value === type) ?? referenceTypes[referenceTypes.length - 1];
+}
+
+function isValidReferenceUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function formatReferenceUrl(value: string): string {
+  try {
+    return new URL(value).toString();
+  } catch {
+    return value;
+  }
+}
+
+function getReferenceHost(reference: ClientReference): string {
+  try {
+    return new URL(reference.url).hostname.replace(/^www\./, '');
+  } catch {
+    return reference.url;
+  }
+}
+
+function ReferenceEditorDialog({
+  clientId,
+  reference,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  clientId: string;
+  reference: ClientReference | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: (reference: ClientReference) => Promise<void> | void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState<ReferenceFormState>({
+    title: '',
+    url: '',
+    description: '',
+    type: 'other',
+  });
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (reference) {
+      setForm({
+        title: reference.title,
+        url: reference.url,
+        description: reference.description ?? '',
+        type: reference.type,
+      });
+      return;
+    }
+
+    setForm({ title: '', url: '', description: '', type: 'other' });
+  }, [reference, open]);
+
+  const title = reference ? 'Edit Reference' : 'Add Reference';
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!form.title.trim()) {
+      toast({ title: 'Title is required', variant: 'destructive' });
+      return;
+    }
+
+    if (!isValidReferenceUrl(form.url)) {
+      toast({ title: 'Enter a valid http or https URL', variant: 'destructive' });
+      return;
+    }
+
+    const values = {
+      title: form.title,
+      url: form.url,
+      description: form.description,
+      type: form.type,
+    };
+
+    setIsSaving(true);
+    try {
+      console.log('[references][submit:start]', {
+        clientId,
+        payload: values,
+      });
+
+      if (reference) {
+        console.info('[references][update]', { clientId, referenceId: reference.id });
+        const savedReference = await clientReferencesApi.update(clientId, reference.id, values);
+        toast({ title: 'Reference updated' });
+        await onSaved(savedReference);
+      } else {
+        console.info('[references][create]', { clientId });
+        const savedReference = await clientReferencesApi.create(clientId, values);
+        toast({ title: 'Reference added' });
+        await onSaved(savedReference);
+      }
+
+      console.log('[references][submit:success]', {
+        clientId,
+      });
+      onOpenChange(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save reference';
+      console.error(reference ? '[references][update]' : '[references][create]', {
+        clientId,
+        message,
+        stack: error instanceof Error ? error.stack : null,
+      });
+      console.log('[references][submit:failed]');
+      toast({ title: 'Unable to save reference', description: message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-lg">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              Save inspiration, brand, social, and reference links for this client.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium text-white">Title</label>
+              <Input
+                value={form.title}
+                onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Homepage redesign inspiration"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[13px] font-medium text-white">URL</label>
+              <Input
+                value={form.url}
+                onChange={(event) => setForm((prev) => ({ ...prev, url: event.target.value }))}
+                placeholder="https://..."
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
+              <div className="space-y-2">
+                <label className="text-[13px] font-medium text-white">Notes</label>
+                <Textarea
+                  value={form.description}
+                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                  placeholder="What should the team look for here?"
+                  className="min-h-24"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[13px] font-medium text-white">Type</label>
+                <Select
+                  value={form.type}
+                  onValueChange={(value) => setForm((prev) => ({ ...prev, type: value as ClientReferenceType }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {referenceTypes.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSaving} className="bg-[var(--primary)] hover:bg-[#4f46e5]">
+              {isSaving ? 'Saving...' : 'Save Reference'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ClientDetailProps {
+  client: Client;
+  assets: Asset[];
+}
+
 export function ClientDetail({ client, assets }: ClientDetailProps) {
   const [team, setTeam] = useState<User[]>([]);
+  const [references, setReferences] = useState<ClientReference[]>([]);
+  const [referencesLoading, setReferencesLoading] = useState(true);
+  const [isReferenceDialogOpen, setIsReferenceDialogOpen] = useState(false);
+  const [editingReference, setEditingReference] = useState<ClientReference | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,11 +294,68 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
     };
   }, [client.assignedTeamMembers]);
 
+  useEffect(() => {
+    let isActive = true;
+
+    const loadReferences = async () => {
+      setReferencesLoading(true);
+      console.info('[references][fetch]', { clientId: client.id });
+      try {
+        const clientReferences = await clientReferencesApi.getByClientId(client.id);
+        console.info('[references][fetch]', { clientId: client.id, count: clientReferences.length });
+        if (isActive) {
+          setReferences(clientReferences);
+        }
+      } catch (error) {
+        console.error('[references][fetch]', { clientId: client.id, error });
+        if (isActive) {
+          setReferences([]);
+        }
+      } finally {
+        if (isActive) {
+          setReferencesLoading(false);
+        }
+      }
+    };
+
+    void loadReferences();
+
+    return () => {
+      isActive = false;
+    };
+  }, [client.id]);
+
   const progress = client.monthlyDeliverables > 0
     ? Math.round((client.completedDeliverables / client.monthlyDeliverables) * 100)
     : 0;
 
   const pendingDeliverables = Math.max(client.monthlyDeliverables - client.completedDeliverables, 0);
+
+  const sortedReferences = useMemo(
+    () => [...references].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()),
+    [references]
+  );
+
+  const handleCopyReferenceLink = async (reference: ClientReference) => {
+    try {
+      await navigator.clipboard.writeText(reference.url);
+      toast({ title: 'Link copied' });
+    } catch {
+      toast({ title: 'Unable to copy link', variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteReference = async (reference: ClientReference) => {
+    try {
+      console.info('[references][delete]', { clientId: client.id, referenceId: reference.id });
+      await clientReferencesApi.delete(client.id, reference.id);
+      toast({ title: 'Reference deleted' });
+      setReferences((prev) => prev.filter((item) => item.id !== reference.id));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete reference';
+      toast({ title: 'Unable to delete reference', description: message, variant: 'destructive' });
+    }
+  };
 
   const statCards = [
     {
@@ -152,7 +457,7 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">{card.title}</p>
-                <p className="mt-2 text-[28px] font-medium leading-none text-white">{card.value}</p>
+                <p className="mt-2 text-[24px] font-medium leading-none text-white sm:text-[28px]">{card.value}</p>
               </div>
               <div className={cn('flex h-8 w-8 items-center justify-center rounded-md', card.iconBg)}>
                 {card.icon}
@@ -191,7 +496,7 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] p-4 shadow-none">
                 <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Remaining</p>
                 <p className="mt-2 text-[24px] font-medium text-white">{pendingDeliverables}</p>
@@ -225,6 +530,147 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
         </Card>
       </div>
 
+      <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-5 shadow-none">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-[13px] font-medium text-white">References</h2>
+            <p className="mt-1 text-[12px] text-[#71717a]">Brand links, inspiration, social pages, and creative examples.</p>
+          </div>
+
+          <Button
+            onClick={() => {
+              console.log('[references][dialog-open]');
+              setEditingReference(null);
+              setIsReferenceDialogOpen(true);
+            }}
+            className="h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Reference
+          </Button>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {referencesLoading ? (
+            <div className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] px-4 py-5 text-[13px] text-[#71717a]">
+              Loading references...
+            </div>
+          ) : sortedReferences.length === 0 ? (
+            <div className="rounded-[10px] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center text-[13px] text-[#71717a]">
+              <p>No references yet. Add links to brand pages, moodboards, competitors, or inspiration.</p>
+              <Button
+                onClick={() => {
+                  console.log('[references][dialog-open]');
+                  setEditingReference(null);
+                  setIsReferenceDialogOpen(true);
+                }}
+                className="mt-4 h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Reference
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
+              {sortedReferences.map((reference) => {
+                const meta = getReferenceTypeMeta(reference.type);
+                const TypeIcon = meta.icon;
+
+                return (
+                  <Card
+                    key={reference.id}
+                    className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] p-4 shadow-none transition-colors hover:border-[rgba(255,255,255,0.12)]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
+                        <TypeIcon className={cn('h-4 w-4', meta.toneClassName)} />
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="truncate text-[14px] font-medium text-white">{reference.title}</h3>
+                            <p className="mt-1 text-[11px] text-[#71717a]">{getReferenceHost(reference)}</p>
+                          </div>
+                          <Badge variant="secondary" className="shrink-0">
+                            {meta.label}
+                          </Badge>
+                        </div>
+
+                        {reference.description && (
+                          <p className="text-[13px] leading-5 text-[#a1a1aa]">{reference.description}</p>
+                        )}
+
+                        <a
+                          href={reference.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block break-all text-[13px] text-[var(--primary)] hover:text-[#818cf8]"
+                        >
+                          {formatReferenceUrl(reference.url)}
+                        </a>
+
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                            asChild
+                          >
+                            <a href={reference.url} target="_blank" rel="noreferrer">
+                              <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                              Open
+                            </a>
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCopyReferenceLink(reference)}
+                            className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                          >
+                            <Copy className="mr-2 h-3.5 w-3.5" />
+                            Copy
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              console.log('[references][dialog-open]');
+                              setEditingReference(reference);
+                              setIsReferenceDialogOpen(true);
+                            }}
+                            className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                          >
+                            <Edit2 className="mr-2 h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeleteReference(reference)}
+                            className="h-8 border-[rgba(239,68,68,0.16)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.08)] hover:text-[#fecaca]"
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Card>
+
       <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
         <div className="flex items-center justify-between">
           <h2 className="text-[13px] font-medium text-white">Assets</h2>
@@ -254,6 +700,25 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
           </div>
         </Card>
       )}
+
+      <ReferenceEditorDialog
+        clientId={client.id}
+        reference={editingReference}
+        open={isReferenceDialogOpen}
+        onOpenChange={(open) => {
+          console.log(open ? '[references][dialog-open]' : '[references][dialog-close]');
+          setIsReferenceDialogOpen(open);
+          if (!open) {
+            setEditingReference(null);
+          }
+        }}
+        onSaved={async (savedReference) => {
+          setReferences((prev) => {
+            const next = prev.filter((item) => item.id !== savedReference.id);
+            return [savedReference, ...next].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+          });
+        }}
+      />
     </div>
   );
 }

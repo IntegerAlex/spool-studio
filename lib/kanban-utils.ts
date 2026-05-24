@@ -1,18 +1,24 @@
-import { assetStatusOrder } from '@/lib/asset-workflow';
 import type { AssetStatus } from '@/types/index';
+import {
+  type KanbanWorkflowColumnId,
+  kanbanWorkflowColumnIds,
+  getKanbanWorkflowColumnIndex,
+  getKanbanWorkflowColumnId,
+  getKanbanWorkflowStatusForColumn,
+} from '@/lib/kanban-workflow';
 
-export const statusOrder: AssetStatus[] = [...assetStatusOrder];
+export const statusOrder: KanbanWorkflowColumnId[] = [...kanbanWorkflowColumnIds];
 
 export function getNextStatus(currentStatus: AssetStatus): AssetStatus | null {
-  const currentIndex = statusOrder.indexOf(currentStatus);
+  const currentIndex = getKanbanWorkflowColumnIndex(getKanbanWorkflowColumnId(currentStatus));
   if (currentIndex === -1 || currentIndex === statusOrder.length - 1) return null;
-  return statusOrder[currentIndex + 1];
+  return getKanbanWorkflowStatusForColumn(kanbanWorkflowColumnIds[currentIndex + 1]);
 }
 
 export function getPreviousStatus(currentStatus: AssetStatus): AssetStatus | null {
-  const currentIndex = statusOrder.indexOf(currentStatus);
+  const currentIndex = getKanbanWorkflowColumnIndex(getKanbanWorkflowColumnId(currentStatus));
   if (currentIndex <= 0) return null;
-  return statusOrder[currentIndex - 1];
+  return getKanbanWorkflowStatusForColumn(kanbanWorkflowColumnIds[currentIndex - 1]);
 }
 
 export function handleKanbanKeydown(

@@ -1,10 +1,16 @@
-import { FileText, Image as ImageIcon, Video, FileUp } from 'lucide-react';
+import { FileText, Image as ImageIcon, Video, FileUp, FileAudio } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Asset } from '@/types/index';
 
-export type AssetPreviewType = 'image' | 'video' | 'document' | 'file';
+export type AssetPreviewType = 'image' | 'video' | 'audio' | 'document' | 'file';
 
-export function getAssetPreviewType(asset: Pick<Asset, 'mimeType' | 'fileExtension' | 'thumbnailUrl'>): AssetPreviewType {
+type AssetPreviewSignals = {
+  mimeType?: string | null;
+  fileExtension?: string | null;
+  thumbnailUrl?: string | null;
+};
+
+export function getAssetPreviewType(asset: AssetPreviewSignals): AssetPreviewType {
   const mimeType = asset.mimeType?.toLowerCase() ?? '';
   const extension = asset.fileExtension?.toLowerCase() ?? '';
 
@@ -16,6 +22,10 @@ export function getAssetPreviewType(asset: Pick<Asset, 'mimeType' | 'fileExtensi
     return 'video';
   }
 
+  if (mimeType.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(extension)) {
+    return 'audio';
+  }
+
   if (mimeType === 'application/pdf' || extension === 'pdf') {
     return 'document';
   }
@@ -23,7 +33,7 @@ export function getAssetPreviewType(asset: Pick<Asset, 'mimeType' | 'fileExtensi
   return 'file';
 }
 
-export function getAssetIcon(asset: Pick<Asset, 'mimeType' | 'fileExtension' | 'thumbnailUrl'>): LucideIcon {
+export function getAssetIcon(asset: AssetPreviewSignals): LucideIcon {
   const previewType = getAssetPreviewType(asset);
 
   if (previewType === 'image') {
@@ -32,6 +42,10 @@ export function getAssetIcon(asset: Pick<Asset, 'mimeType' | 'fileExtension' | '
 
   if (previewType === 'video') {
     return Video;
+  }
+
+  if (previewType === 'audio') {
+    return FileAudio;
   }
 
   if (previewType === 'document') {

@@ -375,7 +375,7 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">{card.title}</p>
-                <p className="mt-2 text-[28px] font-medium leading-none text-white">{card.value}</p>
+                <p className="mt-2 text-[24px] font-medium leading-none text-white sm:text-[28px]">{card.value}</p>
                 <div className={`mt-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${getTrendClass(card.trendDirection)}`}>
                   {card.trendDirection === 'up' ? <ArrowUpRight className="mr-1 h-3 w-3" /> : null}
                   {card.trendLabel}

@@ -165,6 +165,38 @@ export interface Database {
           revision_count?: number;
         };
       };
+      client_references: {
+        Row: {
+          id: string;
+          client_id: string;
+          title: string;
+          url: string;
+          description: string | null;
+          type: Database['public']['Enums']['client_reference_type'];
+          created_at: string;
+          updated_at: string;
+        };
+        Relationships: [];
+        Insert: {
+          id?: string;
+          client_id: string;
+          title: string;
+          url: string;
+          description?: string | null;
+          type?: Database['public']['Enums']['client_reference_type'];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          client_id?: string;
+          title?: string;
+          url?: string;
+          description?: string | null;
+          type?: Database['public']['Enums']['client_reference_type'];
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       asset_revisions: {
         Row: {
           id: string;
@@ -280,6 +312,17 @@ export interface Database {
     Enums: {
       user_role: 'admin' | 'designer' | 'approver' | 'uploader';
       asset_type: 'reel' | 'poster';
+      client_reference_type:
+        | 'instagram'
+        | 'website'
+        | 'youtube'
+        | 'pinterest'
+        | 'drive_folder'
+        | 'competitor'
+        | 'branding'
+        | 'reel_reference'
+        | 'ad_reference'
+        | 'other';
       asset_status:
         | 'draft'
         | 'uploading'

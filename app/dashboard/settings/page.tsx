@@ -103,7 +103,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
 
-      <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="rounded-[12px] border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-2">
           <div className="mb-2 flex items-center gap-2 rounded-[8px] px-3 py-2">
             <Sparkles className="size-4 text-[#818cf8]" />
@@ -140,7 +140,7 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
-        <main className="space-y-6">
+        <main className="min-w-0 space-y-6">
           <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
@@ -188,28 +188,28 @@ export default function SettingsPage() {
               </div>
 
               <div className="mt-6 space-y-3">
-                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
-                  <div>
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                  <div className="min-w-0">
                     <p className="text-[13px] font-medium text-white">Workspace name</p>
                     <p className="text-[11px] text-[#71717a]">The primary display name for the organization</p>
                   </div>
                   <Input
                     value={workspaceName}
                     onChange={(e) => setWorkspaceName(e.target.value)}
-                    className="max-w-[260px]"
+                    className="w-full max-w-full md:max-w-[260px]"
                     placeholder="Your workspace name"
                   />
                 </div>
 
-                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
-                  <div>
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                  <div className="min-w-0">
                     <p className="text-[13px] font-medium text-white">Workspace ID</p>
                     <p className="text-[11px] text-[#71717a]">Read-only identifier used by integrations</p>
                   </div>
                   <Input
                     value={workspace?.id || ''}
                     disabled
-                    className="max-w-[260px]"
+                    className="w-full max-w-full md:max-w-[260px]"
                   />
                 </div>
               </div>
@@ -227,7 +227,7 @@ export default function SettingsPage() {
                 {teamMembers.map((member) => (
                   <div
                     key={member.id}
-                    className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4"
+                    className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar className="size-9">
@@ -239,7 +239,7 @@ export default function SettingsPage() {
                         <p className="truncate text-[11px] text-[#71717a]">{member.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] capitalize text-[#cbd5e1]">
                         {member.role}
                       </span>
@@ -291,28 +291,28 @@ export default function SettingsPage() {
               </div>
 
               <div className="mt-6 space-y-3">
-                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
-                  <div>
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                  <div className="min-w-0">
                     <p className="text-[13px] font-medium text-white">Current password</p>
                     <p className="text-[11px] text-[#71717a]">Required before changing your password</p>
                   </div>
-                  <Input type="password" placeholder="Enter your current password" className="max-w-[260px]" />
+                  <Input type="password" placeholder="Enter your current password" className="w-full max-w-full md:max-w-[260px]" />
                 </div>
 
-                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
-                  <div>
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                  <div className="min-w-0">
                     <p className="text-[13px] font-medium text-white">New password</p>
                     <p className="text-[11px] text-[#71717a]">Use a long, unique password</p>
                   </div>
-                  <Input type="password" placeholder="Enter new password" className="max-w-[260px]" />
+                  <Input type="password" placeholder="Enter new password" className="w-full max-w-full md:max-w-[260px]" />
                 </div>
 
-                <div className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
-                  <div>
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                  <div className="min-w-0">
                     <p className="text-[13px] font-medium text-white">Confirm password</p>
                     <p className="text-[11px] text-[#71717a]">Re-enter the new password exactly</p>
                   </div>
-                  <Input type="password" placeholder="Confirm new password" className="max-w-[260px]" />
+                  <Input type="password" placeholder="Confirm new password" className="w-full max-w-full md:max-w-[260px]" />
                 </div>
 
                 <div className="rounded-[10px] border border-[rgba(239,68,68,0.16)] bg-[rgba(239,68,68,0.06)] px-4 py-4">

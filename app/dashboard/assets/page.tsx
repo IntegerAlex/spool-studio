@@ -446,7 +446,7 @@ export default function AssetsPage() {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-[18px] font-medium text-white sm:text-[20px]">Assets</h1>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2 sm:items-center">
           <div className="inline-flex rounded-md border border-[rgba(255,255,255,0.08)] bg-[#161616] p-0.5">
             <Button
               type="button"
@@ -505,7 +505,7 @@ export default function AssetsPage() {
                 )}
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[92vw] max-w-md overflow-y-auto border-l border-[rgba(255,255,255,0.08)] bg-[#161616] text-white">
+            <SheetContent side="right" className="w-[95vw] max-w-lg overflow-y-auto border-l border-[rgba(255,255,255,0.08)] bg-[#161616] text-white">
               <SheetHeader>
                 <SheetTitle>Asset filters</SheetTitle>
                 <SheetDescription className="text-[#71717a]">

@@ -72,7 +72,7 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
+      .map((part: string) => part[0]?.toUpperCase())
       .join('')
       .slice(0, 2) || 'CO';
   }, [displayName]);
@@ -83,7 +83,7 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
     <div className="min-h-screen overflow-x-hidden bg-[var(--background)] text-foreground">
       <Sidebar />
 
-      <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[220px]">
+      <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[220px] lg:w-[calc(100%-220px)]">
         <div className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:hidden">
           <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
             <Image
@@ -130,8 +130,10 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
 
         <Header title={routeTitle} className="hidden lg:flex" />
 
-        <main className={cn('flex-1 w-full max-w-full overflow-x-hidden px-4 pb-5 pt-4 sm:px-6 lg:px-6 lg:pt-16')}>
-          {children}
+        <main className={cn('flex-1 w-full max-w-full min-w-0 overflow-x-hidden px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:pt-16')}> 
+          <div className="mx-auto w-full max-w-[1600px] min-w-0">
+            {children}
+          </div>
         </main>
       </div>
     </div>

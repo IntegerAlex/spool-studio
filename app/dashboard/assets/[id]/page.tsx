@@ -11,12 +11,14 @@ import { Asset, AssetComment, Client, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Copy, FileText, FolderOpen, MoreHorizontal, Upload } from 'lucide-react';
+import { Copy, FolderOpen, MoreHorizontal, Upload } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { canUploadFromStatus, canUploadRevisionFromStatus, getAllowedTransitions, getRevisionEligibilityReason, getTransitionActionLabel, getUploadEligibilityReason } from '@/lib/asset-workflow';
 import { formatRelativeTime, getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
+import { AssetPreviewMedia, AssetPreviewModal } from '@/components/assets/asset-preview-modal';
+import { toAssetPreviewDescriptor, type AssetPreviewDescriptor } from '@/lib/asset-preview';
 import { formatFileSize } from '@/lib/asset-metadata';
 import {
   DropdownMenu,
@@ -55,6 +57,8 @@ export default function AssetDetailPage() {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const revisionInputRef = useRef<HTMLInputElement | null>(null);
   const [revisionsCollapsed, setRevisionsCollapsed] = useState(false);
+  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const driveFolderLabel = asset?.type === 'reel'
     ? 'Reels'
@@ -161,7 +165,7 @@ export default function AssetDetailPage() {
         },
       });
       setRevisionUploadProgress(100);
-      console.log('[asset][revision-ui] upload success — new revisionId:', result.upload?.driveFileId ?? 'unknown');
+      console.log('[asset][revision-ui] upload success — new revisionId:', result?.driveFileId ?? 'unknown');
       toast({ title: 'Revision uploaded', description: 'Revision uploaded successfully' });
       // refresh asset and revisions
       await refreshRevisions();
@@ -258,6 +262,7 @@ export default function AssetDetailPage() {
 
   const PreviewIcon = asset ? getAssetIcon(asset) : null;
   const previewType = asset ? getAssetPreviewType(asset) : null;
+  const assetPreviewItem = asset ? toAssetPreviewDescriptor(asset) : null;
   const uploadEligible = asset ? canUploadFromStatus(asset.status) : false;
   const uploadRevisionEligible = asset ? canUploadRevisionFromStatus(asset.status) : false;
   const revisionEligibilityReason = asset ? getRevisionEligibilityReason(asset.status) : 'Revision uploads are blocked only for archived or published assets.';
@@ -337,8 +342,8 @@ export default function AssetDetailPage() {
         ]}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_640px]">
-        <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_640px]">
+        <div className="min-w-0 space-y-6">
           <Card className="overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
@@ -420,20 +425,19 @@ export default function AssetDetailPage() {
             </div>
 
               <div className="mt-5 space-y-4">
-              <div className="flex h-[260px] items-center justify-center overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f]">
-                {asset.thumbnailUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" />
+                {assetPreviewItem ? (
+                  <AssetPreviewMedia item={assetPreviewItem} compact className="aspect-video min-h-0 w-full" />
                 ) : (
-                  <div className="flex flex-col items-center justify-center gap-3 px-6 text-center">
-                    <PreviewIcon className="h-14 w-14 text-[#71717a]" />
-                    <div>
-                      <p className="text-[13px] text-white">{previewType === 'image' ? 'Image preview unavailable' : 'Media preview unavailable'}</p>
-                      <p className="mt-1 text-[12px] text-[#71717a]">{asset.fileExtension ?? asset.mimeType ?? 'No preview metadata'}</p>
+                  <div className="flex h-[260px] items-center justify-center overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f]">
+                    <div className="flex flex-col items-center justify-center gap-3 px-6 text-center">
+                      {PreviewIcon ? <PreviewIcon className="h-14 w-14 text-[#71717a]" /> : null}
+                      <div>
+                        <p className="text-[13px] text-white">{previewType === 'image' ? 'Image preview unavailable' : 'Media preview unavailable'}</p>
+                        <p className="mt-1 text-[12px] text-[#71717a]">{asset.fileExtension ?? asset.mimeType ?? 'No preview metadata'}</p>
+                      </div>
                     </div>
                   </div>
                 )}
-              </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {asset.driveFileUrl && (
                   <Button
@@ -474,7 +478,9 @@ export default function AssetDetailPage() {
                 )}
                 {/* Upload revision hidden input */}
                 <input
-                  ref={(el) => (revisionInputRef.current = el)}
+                  ref={(el) => {
+                    revisionInputRef.current = el;
+                  }}
                   type="file"
                   accept="*/*"
                   className="hidden"
@@ -486,7 +492,7 @@ export default function AssetDetailPage() {
                   onClick={() => revisionInputRef.current?.click()}
                   disabled={!uploadRevisionEligible || isUploadingRevision}
                   title={!uploadRevisionEligible ? revisionEligibilityReason : undefined}
-                  className="inline-flex h-10 items-center justify-center rounded-md border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
                   style={{
                     opacity: !uploadRevisionEligible ? 0.35 : isUploadingRevision ? 0.7 : undefined,
                     cursor: !uploadRevisionEligible || isUploadingRevision ? 'not-allowed' : undefined,
@@ -622,6 +628,14 @@ export default function AssetDetailPage() {
                       const versionLabel = rev.versionNumber ?? idx + 1;
                       const uploadedAt = rev.uploadedAt ? new Date(rev.uploadedAt) : rev.createdAt ? new Date(rev.createdAt) : null;
                       const uploader = rev.uploadedBy ? (userMap.get(rev.uploadedBy)?.name ?? rev.uploadedBy) : 'Unknown';
+                      const revisionPreviewItem = toAssetPreviewDescriptor({
+                        title: `Revision v${versionLabel}`,
+                        mimeType: rev.mimeType ?? null,
+                        driveFileId: rev.driveFileId ?? null,
+                        driveFileUrl: rev.driveFileUrl ?? null,
+                        fileSize: rev.fileSize ?? null,
+                        durationSeconds: rev.durationSeconds ?? null,
+                      });
                       return (
                         <div key={rev.id} className={`relative ${isActive ? '' : ''}`}>
                           {/* dot */}
@@ -648,8 +662,23 @@ export default function AssetDetailPage() {
                                 <p className="text-[12px] text-[#a1a1aa] mt-1">Uploaded by {uploader} · {uploadedAt ? uploadedAt.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'Unknown'}</p>
                                 <p className="text-[12px] text-[#71717a] mt-1">{rev.mimeType ?? ''} {rev.fileSize ? `· ${formatFileSize(rev.fileSize)}` : ''}</p>
                                 {rev.changeNote && <p className="italic text-[12px] text-[#71717a] mt-3">{rev.changeNote}</p>}
-                                <div className="mt-3">
-                                  {rev.driveFileUrl && <a href={rev.driveFileUrl} target="_blank" rel="noreferrer" className="text-[12px]" style={{ color: '#6366f1' }}>Open</a>}
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                                    onClick={() => {
+                                      setPreviewItem(revisionPreviewItem);
+                                      setIsPreviewOpen(true);
+                                    }}
+                                  >
+                                    Preview
+                                  </Button>
+                                  {rev.driveFileUrl && (
+                                    <Button asChild size="sm" className="h-8 bg-[var(--primary)] px-3 text-[12px] text-white shadow-none hover:bg-[#4f46e5]">
+                                      <a href={rev.driveFileUrl} target="_blank" rel="noreferrer">Open</a>
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -661,6 +690,15 @@ export default function AssetDetailPage() {
                                   <p className="text-[12px] text-[#71717a] mt-1">Uploaded by {uploader} · {uploadedAt ? uploadedAt.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'Unknown'}</p>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setPreviewItem(revisionPreviewItem);
+                                      setIsPreviewOpen(true);
+                                    }}
+                                    className="text-[12px] text-[#71717a] hover:text-[#a1a1aa]"
+                                  >
+                                    Preview
+                                  </button>
                                   {rev.driveFileUrl && <a href={rev.driveFileUrl} target="_blank" rel="noreferrer" className="text-[12px] text-[#71717a] hover:text-[#a1a1aa]">Open</a>}
                                   <button
                                     onClick={() => handleSetActive(rev.id)}
@@ -776,6 +814,17 @@ export default function AssetDetailPage() {
           </Card>
         </div>
       </div>
+
+      <AssetPreviewModal
+        item={previewItem}
+        open={isPreviewOpen && Boolean(previewItem)}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open) {
+            setPreviewItem(null);
+          }
+        }}
+      />
 
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
         <AlertDialogContent>

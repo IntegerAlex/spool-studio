@@ -118,7 +118,7 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle>Create client</DialogTitle>
           <DialogDescription>Enter the core client details to get started.</DialogDescription>
@@ -188,7 +188,7 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
               )}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="monthlyReelsTarget"

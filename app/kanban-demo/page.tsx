@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus, HelpCircle, X, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { getKanbanWorkflowColumnId } from '@/lib/kanban-workflow';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,15 +88,15 @@ export default function KanbanDemoPage() {
                 <ul className="space-y-3 text-sm text-blue-800 dark:text-blue-400">
                   <li className="flex gap-3">
                     <span className="font-semibold whitespace-nowrap">Drag & Drop:</span>
-                    <span>Drag asset cards between columns to update status instantly with smooth interactions</span>
+                    <span>Move asset cards across Draft, Review, Approved, and Published without exposing system-only states</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="font-semibold whitespace-nowrap">Column Controls:</span>
-                    <span>Click the chevron icon to collapse/expand columns, perfect for focusing on specific workflows</span>
+                    <span>Use the chevron icon to collapse any of the four workflow columns for a tighter view</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="font-semibold whitespace-nowrap">Status Counters:</span>
-                    <span>Each column shows the count of assets in that status, helping track bottlenecks</span>
+                    <span>Each column shows the count of assets grouped into that business workflow stage</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="font-semibold whitespace-nowrap">Quick Actions:</span>
@@ -107,7 +108,7 @@ export default function KanbanDemoPage() {
                   </li>
                   <li className="flex gap-3">
                     <span className="font-semibold whitespace-nowrap">Smart Badges:</span>
-                    <span>Revision count, comment count, and approval status badges provide quick context</span>
+                    <span>Revision count, comment count, and hidden transport-state badges provide quick context on cards</span>
                   </li>
                   <li className="flex gap-3">
                     <span className="font-semibold whitespace-nowrap">Compact Cards:</span>
@@ -198,20 +199,20 @@ export default function KanbanDemoPage() {
             <p className="text-2xl font-bold text-foreground">{filteredAssets.length}</p>
           </Card>
           <Card className="p-3 bg-muted border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-1">In Review</p>
-            <p className="text-2xl font-bold text-purple-600">{filteredAssets.filter(a => a.status === 'ready_for_review').length}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Draft</p>
+            <p className="text-2xl font-bold text-slate-400">{filteredAssets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === 'draft').length}</p>
           </Card>
           <Card className="p-3 bg-muted border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Pending</p>
-            <p className="text-2xl font-bold text-orange-600">{filteredAssets.filter(a => a.status === 'revision_requested').length}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Review</p>
+            <p className="text-2xl font-bold text-amber-500">{filteredAssets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === 'review').length}</p>
           </Card>
           <Card className="p-3 bg-muted border-border">
             <p className="text-xs font-medium text-muted-foreground mb-1">Approved</p>
-            <p className="text-2xl font-bold text-green-600">{filteredAssets.filter(a => a.status === 'approved').length}</p>
+            <p className="text-2xl font-bold text-emerald-500">{filteredAssets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === 'approved').length}</p>
           </Card>
           <Card className="p-3 bg-muted border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-1">Scheduled</p>
-            <p className="text-2xl font-bold text-indigo-600">{filteredAssets.filter(a => a.status === 'scheduled').length}</p>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Published</p>
+            <p className="text-2xl font-bold text-sky-500">{filteredAssets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === 'published').length}</p>
           </Card>
         </div>
 

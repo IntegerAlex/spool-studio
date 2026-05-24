@@ -56,7 +56,7 @@ export function Header({ title, className }: HeaderProps) {
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
+    .map((part: string) => part[0]?.toUpperCase())
     .join('')
     .slice(0, 2) || 'CO';
 
@@ -74,15 +74,15 @@ export function Header({ title, className }: HeaderProps) {
   })();
 
   return (
-    <header className={cn('fixed left-[220px] top-0 z-40 hidden h-11 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-6 lg:flex', className)}>
+    <header className={cn('fixed left-[220px] right-0 top-0 z-40 hidden h-14 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:flex lg:w-[calc(100%-220px)] xl:px-6', className)}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-medium text-white">{routeTitle}</h2>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative hidden md:flex w-[200px]">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="relative hidden w-[200px] md:flex xl:w-[240px]">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#71717a]" />
           <Input
             placeholder="Search..."
@@ -90,7 +90,7 @@ export function Header({ title, className }: HeaderProps) {
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="size-8 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white">
+        <Button variant="ghost" size="icon" className="size-8 shrink-0 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white">
           <Bell className="h-[18px] w-[18px]" />
         </Button>
 

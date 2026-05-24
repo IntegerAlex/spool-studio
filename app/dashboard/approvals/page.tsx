@@ -51,8 +51,8 @@ export default function ApprovalsPage() {
     const AssetIcon = getAssetIcon(asset);
 
     return (
-      <div key={asset.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-[rgba(255,255,255,0.03)]">
-        <Link href={`/dashboard/assets/${asset.id}`} className="flex items-center gap-3 min-w-0 flex-1">
+      <div key={asset.id} className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center">
+        <Link href={`/dashboard/assets/${asset.id}`} className="flex min-w-0 flex-1 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[6px] border border-[rgba(255,255,255,0.06)] bg-[#0f0f0f]">
             {asset.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -68,23 +68,23 @@ export default function ApprovalsPage() {
           </div>
         </Link>
 
-        <div className="shrink-0">
+        <div className="shrink-0 self-start sm:self-auto">
           <StatusBadge status={asset.status} />
         </div>
 
         {isPending ? (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[12px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399]"
+              className="h-7 w-full border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[12px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399] sm:w-auto"
             >
               Approve
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5]"
+              className="h-7 w-full border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5] sm:w-auto"
             >
               Reject
             </Button>
@@ -122,7 +122,7 @@ export default function ApprovalsPage() {
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Approvals' }]} />
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-[18px] font-medium text-white">Approvals</h1>
         <div className="flex items-center gap-2 text-[12px] text-[#71717a]">
           <span>{readyForReview.length} pending</span>

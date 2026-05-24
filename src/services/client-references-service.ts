@@ -1,0 +1,185 @@
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import type { ClientReference, ClientReferenceType } from '@/types/index';
+import type { Database } from '@/types/database';
+import {
+  deleteClientReference as deleteClientReferenceRow,
+  getClientReferenceById,
+  insertClientReference,
+  listClientReferencesByClientId,
+  updateClientReference as updateClientReferenceRow,
+} from '@/repositories/client-references-repository';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+
+const allowedProtocols = new Set(['http:', 'https:']);
+
+export interface ClientReferenceInput {
+  clientId: string;
+  title: string;
+  url: string;
+  description?: string | null;
+  type?: ClientReferenceType;
+}
+
+function normalizeText(value: string): string {
+  return value.trim();
+}
+
+function normalizeDescription(value?: string | null): string | null {
+  if (value == null) {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function validateReferenceUrl(url: string): string {
+  const normalized = normalizeText(url);
+  if (!normalized) {
+    throw new Error('URL is required');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    throw new Error('URL is invalid');
+  }
+
+  if (!allowedProtocols.has(parsed.protocol)) {
+    throw new Error('Only http and https URLs are allowed');
+  }
+
+  return parsed.toString();
+}
+
+function mapReference(
+  reference: Awaited<ReturnType<typeof getClientReferenceById>>
+): ClientReference | null {
+  if (!reference) {
+    return null;
+  }
+
+  return {
+    id: reference.id,
+    clientId: reference.client_id,
+    title: reference.title,
+    url: reference.url,
+    description: reference.description,
+    type: reference.type,
+    createdAt: new Date(reference.created_at),
+    updatedAt: new Date(reference.updated_at),
+  };
+}
+
+export async function getClientReferences(clientId: string): Promise<ClientReference[]> {
+  try {
+    const rows = await listClientReferencesByClientId(clientId);
+    return rows.map((reference) => ({
+      id: reference.id,
+      clientId: reference.client_id,
+      title: reference.title,
+      url: reference.url,
+      description: reference.description,
+      type: reference.type,
+      createdAt: new Date(reference.created_at),
+      updatedAt: new Date(reference.updated_at),
+    }));
+  } catch (error) {
+    logProductionRuntimeError('client-references-loader', error, { clientId });
+    return [];
+  }
+}
+
+export async function createClientReference(input: ClientReferenceInput): Promise<ClientReference> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  const title = normalizeText(input.title);
+  if (!title) {
+    throw new Error('Title is required');
+  }
+
+  const url = validateReferenceUrl(input.url);
+
+  const record = await insertClientReference({
+    client_id: input.clientId,
+    title,
+    url,
+    description: normalizeDescription(input.description),
+    type: input.type ?? 'other',
+  }, supabase);
+
+  const mapped = mapReference(record);
+  if (!mapped) {
+    throw new Error('Failed to map client reference');
+  }
+
+  return mapped;
+}
+
+export async function updateClientReference(
+  referenceId: string,
+  input: Partial<Omit<ClientReferenceInput, 'clientId'>>
+): Promise<ClientReference> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  const updates: Database['public']['Tables']['client_references']['Update'] = {};
+
+  if (input.title !== undefined) {
+    const title = normalizeText(input.title);
+    if (!title) {
+      throw new Error('Title is required');
+    }
+    updates.title = title;
+  }
+
+  if (input.url !== undefined) {
+    updates.url = validateReferenceUrl(input.url);
+  }
+
+  if (input.description !== undefined) {
+    updates.description = normalizeDescription(input.description);
+  }
+
+  if (input.type !== undefined) {
+    updates.type = input.type;
+  }
+
+  const record = await updateClientReferenceRow(referenceId, updates, supabase);
+  const mapped = mapReference(record);
+  if (!mapped) {
+    throw new Error('Failed to map client reference');
+  }
+
+  return mapped;
+}
+
+export async function removeClientReference(referenceId: string): Promise<void> {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  await deleteClientReferenceRow(referenceId, supabase);
+}

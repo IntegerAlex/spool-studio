@@ -93,7 +93,7 @@ export default function CalendarPage() {
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Calendar' }]} />
 
       <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-        <div className="mb-5 flex items-center justify-between gap-4">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-[16px] font-medium text-white">{monthName}</h2>
           <div className="flex items-center gap-2">
             <Button
@@ -115,7 +115,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-2">
+        <div className="mb-2 grid grid-cols-7 gap-1 sm:gap-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
             <div key={day} className="py-2 text-center text-[11px] uppercase tracking-[0.18em] text-[#52525b]">
               {day}
@@ -123,7 +123,7 @@ export default function CalendarPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {emptyDays.map((_, i) => (
             <div key={`empty-${i}`} className="aspect-square" />
           ))}
@@ -185,14 +185,14 @@ export default function CalendarPage() {
               const client = asset ? clients.get(asset.clientId) : null;
 
               return (
-                <div key={item.id} className="flex items-center justify-between rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)]">
+                <div key={item.id} className="flex flex-col gap-2 rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-[13px] font-medium text-white">{asset?.title || 'Unknown'}</p>
                     <p className="text-[12px] text-[#71717a]">
                       {client?.name || 'Unknown'} • {new Date(item.scheduledDate).toLocaleDateString()}
                     </p>
                   </div>
-                  <span className="rounded-full border border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#34d399]">
+                  <span className="self-start rounded-full border border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#34d399] sm:self-auto">
                     {item.platform}
                   </span>
                 </div>

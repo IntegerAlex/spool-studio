@@ -6,6 +6,7 @@ import type {
   Asset,
   AssetComment,
   Client,
+  ClientReference,
   Notification,
   UploadQueue,
   User,
@@ -189,6 +190,14 @@ function hydrateComment(comment: AssetComment): AssetComment {
   };
 }
 
+function hydrateClientReference(reference: ClientReference): ClientReference {
+  return {
+    ...reference,
+    createdAt: new Date(reference.createdAt),
+    updatedAt: new Date(reference.updatedAt),
+  };
+}
+
 export const authApi = {
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
     const supabase = createBrowserSupabaseClient();
@@ -277,6 +286,50 @@ export const clientsApi = {
 
   delete: async (id: string): Promise<void> => {
     await fetchJson(`/api/clients/${id}`, { method: 'DELETE' });
+  },
+};
+
+export const clientReferencesApi = {
+  getByClientId: async (clientId: string): Promise<ClientReference[]> => {
+    const references = await fetchJsonDeduped<ClientReference[]>(`/api/clients/${clientId}/references`);
+    return references.map(hydrateClientReference);
+  },
+
+  create: async (
+    clientId: string,
+    reference: {
+      title: string;
+      url: string;
+      description?: string | null;
+      type?: ClientReference['type'];
+    }
+  ): Promise<ClientReference> => {
+    const created = await fetchJson<ClientReference>(`/api/clients/${clientId}/references`, {
+      method: 'POST',
+      body: JSON.stringify(reference),
+    });
+    return hydrateClientReference(created);
+  },
+
+  update: async (
+    clientId: string,
+    referenceId: string,
+    updates: Partial<{
+      title: string;
+      url: string;
+      description?: string | null;
+      type: ClientReference['type'];
+    }>
+  ): Promise<ClientReference> => {
+    const updated = await fetchJson<ClientReference>(`/api/clients/${clientId}/references/${referenceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
+    return hydrateClientReference(updated);
+  },
+
+  delete: async (clientId: string, referenceId: string): Promise<void> => {
+    await fetchJson(`/api/clients/${clientId}/references/${referenceId}`, { method: 'DELETE' });
   },
 };
 

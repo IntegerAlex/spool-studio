@@ -304,7 +304,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Create asset' : 'Edit asset'}</DialogTitle>
           <DialogDescription>
@@ -365,7 +365,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
               )}
             />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
                 name="type"

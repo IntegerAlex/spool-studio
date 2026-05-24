@@ -2,9 +2,12 @@
 
 import type { AssetRevision, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { usersApi } from '@/lib/api-client';
 import { useEffect, useState } from 'react';
-import { Download, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
+import { AssetPreviewModal } from '@/components/assets/asset-preview-modal';
+import { toAssetPreviewDescriptor, type AssetPreviewDescriptor } from '@/lib/asset-preview';
 
 type RevisionRecord = AssetRevision;
 
@@ -15,6 +18,8 @@ interface RevisionPanelProps {
 
 export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
   const [users, setUsers] = useState<Map<string, User>>(new Map());
+  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     let isActive = true;
@@ -71,6 +76,14 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
           const author = getUser(authorId);
           const versionLabel = revision.versionNumber ?? index + 1;
           const revisionNote = revision.changeNote ?? 'Revision upload';
+          const previewDescriptor = toAssetPreviewDescriptor({
+            title: `${assetTitle} v${versionLabel}`,
+            mimeType: revision.mimeType ?? null,
+            driveFileId: revision.driveFileId ?? null,
+            driveFileUrl: revision.driveFileUrl ?? null,
+            fileSize: revision.fileSize ?? null,
+            durationSeconds: revision.durationSeconds ?? null,
+          });
           return (
             <div
               key={revision.id}
@@ -92,16 +105,41 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
 
               <p className="text-sm text-foreground mb-3">{revisionNote}</p>
 
-              {revision.driveFileUrl && (
-                <a className="inline-flex items-center space-x-2 text-sm text-primary hover:underline" href={revision.driveFileUrl} target="_blank" rel="noreferrer">
-                  <Download className="w-4 h-4" />
-                  <span>Open Revision</span>
-                </a>
-              )}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setPreviewItem(previewDescriptor);
+                    setIsPreviewOpen(true);
+                  }}
+                >
+                  Preview
+                </Button>
+                {revision.driveFileUrl ? (
+                  <Button asChild size="sm">
+                    <a href={revision.driveFileUrl} target="_blank" rel="noreferrer">
+                      Open Revision
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
             </div>
           );
         })}
       </div>
+
+      <AssetPreviewModal
+        item={previewItem}
+        open={isPreviewOpen && Boolean(previewItem)}
+        onOpenChange={(open) => {
+          setIsPreviewOpen(open);
+          if (!open) {
+            setPreviewItem(null);
+          }
+        }}
+        description={`Preview revision history for ${assetTitle}`}
+      />
     </Card>
   );
 }

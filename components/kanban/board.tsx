@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { Asset, AssetStatus } from '@/types/index';
-import { assetStatusMeta, assetStatusOrder, canTransitionStatus } from '@/lib/asset-workflow';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { getAssetIcon } from '@/lib/asset-display';
+import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
+import { StatusBadge } from '@/components/assets/status-badge';
 import {
   GripVertical,
   ChevronDown,
@@ -19,19 +19,19 @@ import {
   Copy,
   Eye,
 } from 'lucide-react';
+import {
+  getKanbanWorkflowColumnId,
+  getKanbanWorkflowColumnIndex,
+  getKanbanWorkflowStatusForColumn,
+  isKanbanHiddenStatus,
+  kanbanWorkflowColumns,
+  type KanbanWorkflowColumnId,
+} from '@/lib/kanban-workflow';
 
 interface KanbanBoardProps {
   assets: Asset[];
   onStatusChange?: (assetId: string, newStatus: AssetStatus) => void;
 }
-
-const systemStatuses: AssetStatus[] = ['uploading', 'uploaded', 'processing', 'failed', 'published', 'archived'];
-
-const statuses = assetStatusOrder.map((status) => ({
-  id: status,
-  label: assetStatusMeta[status].label,
-  isSystem: systemStatuses.includes(status),
-}));
 
 function isOverdue(asset: Asset): boolean {
   if (
@@ -41,7 +41,8 @@ function isOverdue(asset: Asset): boolean {
     asset.status === 'approved' ||
     asset.status === 'published' ||
     asset.status === 'archived' ||
-    asset.status === 'failed'
+    asset.status === 'failed' ||
+    asset.status === 'scheduled'
   ) return false;
   const daysSinceCreation = Math.floor((Date.now() - asset.createdAt.getTime()) / (1000 * 60 * 60 * 24));
   return daysSinceCreation > 7;
@@ -53,6 +54,7 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
   const commentCount = asset.comments.length;
   const overdue = isOverdue(asset);
   const AssetIcon = getAssetIcon(asset);
+  const previewType = getAssetPreviewType(asset);
 
   return (
     <Card
@@ -68,6 +70,17 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
         </div>
 
         <Link href={`/dashboard/assets/${asset.id}`} className="min-w-0 flex-1">
+          <div className="mb-2 overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)]">
+            {previewType === 'image' && asset.thumbnailUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={asset.thumbnailUrl} alt={asset.title} className="h-14 w-full object-cover" />
+            ) : (
+              <div className="flex h-14 items-center gap-2 px-3 text-[11px] text-[#a1a1aa]">
+                <AssetIcon className="h-4 w-4 text-[#71717a]" />
+                <span className="truncate capitalize">{previewType}</span>
+              </div>
+            )}
+          </div>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
               <h4 className="truncate text-[13px] font-medium text-white">{asset.title}</h4>
@@ -103,11 +116,8 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
             {commentCount}
           </span>
         )}
-        {asset.status === 'approved' && (
-          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-[rgba(16,185,129,0.14)] px-2 text-[10px] font-medium text-[#34d399]">
-            <CheckCircle2 className="h-3 w-3" />
-            Approved
-          </span>
+        {isKanbanHiddenStatus(asset.status) && (
+          <StatusBadge status={asset.status} className="h-5 border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-[10px]" />
         )}
       </div>
 
@@ -134,10 +144,10 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
 }
 
 export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
-  const [collapsedColumns, setCollapsedColumns] = useState<Set<AssetStatus>>(new Set());
+  const [collapsedColumns, setCollapsedColumns] = useState<Set<KanbanWorkflowColumnId>>(new Set());
   const [draggedItem, setDraggedItem] = useState<{ assetId: string; fromStatus: AssetStatus } | null>(null);
 
-  const toggleColumnCollapse = useCallback((statusId: AssetStatus) => {
+  const toggleColumnCollapse = useCallback((statusId: KanbanWorkflowColumnId) => {
     setCollapsedColumns((prev) => {
       const next = new Set(prev);
       if (next.has(statusId)) {
@@ -162,44 +172,51 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
     e.currentTarget.classList.remove('ring-2', 'ring-primary');
   };
 
-  const handleDrop = (e: React.DragEvent, toStatus: AssetStatus) => {
+  const handleDrop = (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => {
     e.preventDefault();
     e.currentTarget.classList.remove('ring-2', 'ring-primary');
-    if (!draggedItem || draggedItem.fromStatus === toStatus) {
+    const targetStatus = getKanbanWorkflowStatusForColumn(toColumnId);
+
+    if (!draggedItem || draggedItem.fromStatus === targetStatus) {
       return;
     }
-    if (!canTransitionStatus(draggedItem.fromStatus, toStatus)) {
+
+    const fromColumnId = getKanbanWorkflowColumnId(draggedItem.fromStatus);
+    const fromIndex = getKanbanWorkflowColumnIndex(fromColumnId);
+    const toIndex = getKanbanWorkflowColumnIndex(toColumnId);
+
+    if (Math.abs(fromIndex - toIndex) > 1) {
       setDraggedItem(null);
       return;
     }
+
     setDraggedItem(null);
-    onStatusChange?.(draggedItem.assetId, toStatus);
+    onStatusChange?.(draggedItem.assetId, getKanbanWorkflowStatusForColumn(toColumnId));
   };
 
   const assetsByStatus = useMemo(() => {
-    const map = new Map<AssetStatus, Asset[]>();
-    statuses.forEach((status) => {
-      map.set(status.id, assets.filter((a) => a.status === status.id));
+    const map = new Map<KanbanWorkflowColumnId, Asset[]>();
+    kanbanWorkflowColumns.forEach((column) => {
+      map.set(column.id, assets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === column.id));
     });
     return map;
   }, [assets]);
 
   return (
-    <div className="overflow-x-auto pb-4 -mx-4 px-4 lg:mx-0 lg:px-0">
-      <div className="flex gap-3 min-w-max">
-        {statuses.map((status) => {
+    <div className="-mx-4 overflow-x-auto pb-4 px-4 scroll-smooth overscroll-x-contain snap-x snap-mandatory lg:mx-0 lg:px-0">
+      <div className="flex min-w-max gap-4">
+        {kanbanWorkflowColumns.map((status) => {
           const statusAssets = assetsByStatus.get(status.id) || [];
           const isCollapsed = collapsedColumns.has(status.id);
-          const isSystemStatus = status.isSystem;
 
           return (
             <div
               key={status.id}
-              className="flex min-w-[260px] flex-shrink-0 flex-col"
+              className="flex min-w-[320px] max-w-[320px] flex-shrink-0 snap-start flex-col"
             >
               <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[10px] border border-b-0 border-[rgba(255,255,255,0.06)] bg-[#111111] px-3 py-2.5">
                 <div className="flex items-center gap-2">
-                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isSystemStatus ? 'bg-[#f59e0b]' : 'bg-[var(--primary)]')} />
+                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', status.accentClassName)} />
                   <button
                     onClick={() => toggleColumnCollapse(status.id)}
                     className="rounded p-0.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
@@ -213,14 +230,13 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
                   </button>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className={cn('truncate text-[13px] font-medium', isSystemStatus ? 'text-[#a1a1aa]' : 'text-white')}>
+                      <h3 className="truncate text-[13px] font-medium text-white">
                         {status.label}
                       </h3>
-                      {isSystemStatus && <span className="text-[10px] uppercase tracking-[0.18em] text-[#52525b]">system</span>}
                     </div>
                   </div>
                 </div>
-                <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full border px-2 text-[10px] font-medium', isSystemStatus ? 'border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] text-[#71717a]' : 'border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.08)] text-[#a1a1aa]')}>
+                <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full border px-2 text-[10px] font-medium', status.counterClassName)}>
                   {statusAssets.length}
                 </span>
               </div>
@@ -245,12 +261,12 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
                   </div>
                 ) : (
                   statusAssets.map((asset) => (
-                    <div key={asset.id} draggable onDragStart={() => handleDragStart(asset.id, status.id)} className="last:mb-0">
+                    <div key={asset.id} draggable onDragStart={() => handleDragStart(asset.id, asset.status)} className="last:mb-0">
                         <KanbanCard
                           asset={asset}
                           isDragging={draggedItem?.assetId === asset.id}
                           onQuickApprove={
-                            onStatusChange && canTransitionStatus(asset.status, 'approved')
+                            onStatusChange && asset.status === 'ready_for_review'
                               ? () => onStatusChange(asset.id, 'approved')
                               : undefined
                           }

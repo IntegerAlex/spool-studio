@@ -54,7 +54,6 @@ export function AssetCard({ asset }: AssetCardProps) {
   const AssetIcon = getAssetIcon(asset);
   const durationLabel = getDurationLabel(asset);
   const detailUrl = `/dashboard/assets/${asset.id}`;
-  const previewUrl = (previewType === 'image' && asset.thumbnailUrl) || asset.driveFileUrl || detailUrl;
   const uploadEligible = canUploadFromStatus(asset.status);
 
   useEffect(() => {
@@ -76,7 +75,7 @@ export function AssetCard({ asset }: AssetCardProps) {
 
   const previewAsset = () => {
     try {
-      window.open(previewUrl, '_blank', 'noopener,noreferrer');
+      window.open(detailUrl, '_blank', 'noopener,noreferrer');
     } catch (_) {
       // ignore open errors
     }
@@ -132,7 +131,13 @@ export function AssetCard({ asset }: AssetCardProps) {
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-white">{asset.title}</p>
                   <p className="text-xs text-[#71717a] capitalize">
-                    {previewType === 'document' ? 'Document preview' : previewType === 'video' ? 'Video preview' : 'File preview'}
+                    {previewType === 'document'
+                      ? 'Document preview'
+                      : previewType === 'video'
+                        ? 'Video preview'
+                        : previewType === 'audio'
+                          ? 'Audio preview'
+                          : 'File preview'}
                   </p>
                 </div>
               </div>
