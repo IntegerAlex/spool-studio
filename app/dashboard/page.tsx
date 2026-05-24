@@ -350,9 +350,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-[18px] font-medium text-white">Dashboard</h1>
+            <h1 className="text-[18px] font-medium text-white sm:text-[20px]">Dashboard</h1>
             <p className="mt-1 text-[12px] text-[#71717a]">
               <span className="text-[#a1a1aa]">Dashboard</span>
               <span className="mx-2 text-[#52525b]">&gt;</span>
@@ -360,8 +360,8 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="hidden sm:block">
-            <Button className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-[var(--primary)] px-4 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Button className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[var(--primary)] px-4 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               New Asset
             </Button>
@@ -390,7 +390,7 @@ export default function DashboardPage() {
       </div>
 
       <Card className="rounded-[10px] border-0 bg-[#161616] p-4 shadow-none">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <AssetFormDialog
             mode="create"
             onSaved={(asset) => {
@@ -398,28 +398,28 @@ export default function DashboardPage() {
               dashboardApi.getSummary().then(setSummary).catch(() => undefined);
             }}
             trigger={
-              <Button className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[#6366f1] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
+              <Button className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[#6366f1] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 New Asset
               </Button>
             }
           />
 
-          <Button asChild variant="ghost" className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
+          <Button asChild variant="ghost" className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
             <Link href="/dashboard/assets">
               <Upload className="mr-2 h-4 w-4" />
               Upload Files
             </Link>
           </Button>
 
-          <Button asChild variant="ghost" className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
+          <Button asChild variant="ghost" className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
             <Link href="/dashboard/clients">
               <FolderPlus className="mr-2 h-4 w-4" />
               Add Client
             </Link>
           </Button>
 
-          <Button asChild variant="ghost" className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
+          <Button asChild variant="ghost" className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
             <Link href="/dashboard/kanban">
               <KanbanSquare className="mr-2 h-4 w-4" />
               View Kanban

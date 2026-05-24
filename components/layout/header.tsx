@@ -8,12 +8,14 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   title: string;
+  className?: string;
 }
 
-export function Header({ title }: HeaderProps) {
+export function Header({ title, className }: HeaderProps) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
 
@@ -72,7 +74,7 @@ export function Header({ title }: HeaderProps) {
   })();
 
   return (
-    <header className="fixed left-[220px] top-0 z-40 flex h-11 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-6">
+    <header className={cn('fixed left-[220px] top-0 z-40 hidden h-11 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-6 lg:flex', className)}>
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-medium text-white">{routeTitle}</h2>

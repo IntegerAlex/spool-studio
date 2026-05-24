@@ -63,7 +63,12 @@ const menuItems = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  variant?: 'desktop' | 'drawer';
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -114,8 +119,15 @@ export function Sidebar() {
     router.refresh();
   };
 
+  const baseAsideClassName = cn(
+    'flex h-full flex-col border-r border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-[10px] py-[12px]',
+    variant === 'desktop'
+      ? 'hidden lg:fixed lg:left-0 lg:top-0 lg:flex lg:h-screen lg:w-[220px]'
+      : 'w-full'
+  );
+
   return (
-    <aside className="fixed left-0 top-0 flex h-screen w-[220px] flex-col border-r border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-[10px] py-[12px]">
+    <aside className={baseAsideClassName}>
       <div className="flex h-16 items-center px-2">
         <Link href="/dashboard" className="flex min-w-0 items-center">
           <Image
@@ -143,6 +155,7 @@ export function Sidebar() {
                     ? 'bg-[rgba(99,102,241,0.12)] text-white before:absolute before:left-0 before:top-1 before:h-[calc(100%-0.5rem)] before:w-0.5 before:rounded-full before:bg-[var(--primary)]'
                     : 'text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#a1a1aa]'
                 )}
+                onClick={onNavigate}
               >
                 <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-white' : 'text-[#52525b] group-hover:text-[#a1a1aa]')} />
                 <span className="font-medium leading-none">{item.label}</span>
@@ -161,7 +174,10 @@ export function Sidebar() {
           </Avatar>
         </div>
         <Button
-          onClick={handleLogout}
+          onClick={async () => {
+            onNavigate?.();
+            await handleLogout();
+          }}
           variant="ghost"
           className="h-8 w-full justify-start px-1 text-[13px] font-medium text-[#71717a] hover:bg-transparent hover:text-white"
         >

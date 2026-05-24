@@ -443,10 +443,10 @@ export default function AssetsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-[18px] font-medium text-white">Assets</h1>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h1 className="text-[18px] font-medium text-white sm:text-[20px]">Assets</h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-md border border-[rgba(255,255,255,0.08)] bg-[#161616] p-0.5">
             <Button
               type="button"
@@ -477,7 +477,7 @@ export default function AssetsPage() {
           </div>
 
           <Select value={sortMode} onValueChange={(value) => setSortMode(value as AssetSortMode)}>
-            <SelectTrigger className="h-[34px] w-[11rem] border-[rgba(255,255,255,0.08)] bg-[#161616] px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.12)]">
+            <SelectTrigger className="h-[34px] w-full border-[rgba(255,255,255,0.08)] bg-[#161616] px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.12)] sm:w-[11rem]">
               <SlidersHorizontal className="h-4 w-4 text-[#71717a]" />
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
@@ -494,7 +494,7 @@ export default function AssetsPage() {
             <SheetTrigger asChild>
               <Button
                 variant="outline"
-                className="h-[34px] rounded-md border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)]"
+                className="h-[34px] w-full rounded-md border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] sm:w-auto"
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Filters
@@ -553,7 +553,7 @@ export default function AssetsPage() {
             mode="create"
             onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
             trigger={
-              <Button className="h-[34px] rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]">
+              <Button className="h-[34px] w-full rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5] sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 New Asset
               </Button>

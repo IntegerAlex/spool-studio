@@ -340,16 +340,16 @@ export default function AssetDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_640px]">
         <div className="space-y-6">
           <Card className="overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">Asset detail</p>
-                <h1 className="mt-2 truncate text-[28px] font-semibold tracking-tight text-white">{asset.title}</h1>
+                <h1 className="mt-2 truncate text-[24px] font-semibold tracking-tight text-white sm:text-[28px]">{asset.title}</h1>
                 <p className="mt-2 text-[13px] text-[#a1a1aa]">
                   {client?.name ?? 'Unknown client'} · {asset.type}
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <StatusBadge status={asset.status} />
 
                 {uploadEligible && (
@@ -361,7 +361,7 @@ export default function AssetDetailPage() {
                       clientsApi.getById(updated.clientId).then(setClient).catch(() => undefined);
                     }}
                     trigger={
-                      <Button className="h-9 bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5]">
+                      <Button className="h-10 w-full bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto">
                         <Upload className="mr-2 h-4 w-4" />
                         Upload Asset
                       </Button>
@@ -374,7 +374,7 @@ export default function AssetDetailPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-9 w-9 border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
+                      className="h-10 w-10 border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-9"
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
@@ -434,11 +434,11 @@ export default function AssetDetailPage() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {asset.driveFileUrl && (
                   <Button
                     asChild
-                    className="h-9 bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5]"
+                    className="h-10 w-full bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto"
                   >
                     <a href={asset.driveFileUrl} target="_blank" rel="noreferrer">
                       Open File
@@ -450,7 +450,7 @@ export default function AssetDetailPage() {
                   <Button
                     asChild
                     variant="outline"
-                    className="h-9 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                    className="h-10 w-full border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
                   >
                     <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer">
                       <FolderOpen className="mr-2 h-4 w-4" />
@@ -462,7 +462,7 @@ export default function AssetDetailPage() {
                 {asset.driveFileUrl && (
                   <Button
                     variant="outline"
-                    className="h-9 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                    className="h-10 w-full border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
                     onClick={() => {
                       void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
                       toast({ title: 'Link copied' });
@@ -486,7 +486,7 @@ export default function AssetDetailPage() {
                   onClick={() => revisionInputRef.current?.click()}
                   disabled={!uploadRevisionEligible || isUploadingRevision}
                   title={!uploadRevisionEligible ? revisionEligibilityReason : undefined}
-                  className="inline-flex items-center justify-center h-9 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] rounded-md"
+                  className="inline-flex h-10 items-center justify-center rounded-md border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
                   style={{
                     opacity: !uploadRevisionEligible ? 0.35 : isUploadingRevision ? 0.7 : undefined,
                     cursor: !uploadRevisionEligible || isUploadingRevision ? 'not-allowed' : undefined,
@@ -542,7 +542,7 @@ export default function AssetDetailPage() {
         <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
             <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">Asset metadata</p>
-            <div className="mt-4 grid grid-cols-2 gap-3 text-[12px]">
+            <div className="mt-4 grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
                 <p className="text-[#71717a]">Client</p>
                 <p className="mt-1 font-medium text-white">{client?.name ?? 'Unknown client'}</p>
@@ -559,7 +559,7 @@ export default function AssetDetailPage() {
                 <p className="text-[#71717a]">Preview</p>
                 <p className="mt-1 font-medium text-white capitalize">{previewType}</p>
               </div>
-              <div className="col-span-2 rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
+              <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3 sm:col-span-2">
                 <p className="text-[#71717a]">Assigned To</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {asset.assignedTo.length > 0 ? (
@@ -582,7 +582,7 @@ export default function AssetDetailPage() {
 
           {/* Revision History Panel */}
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 border-t border-t-[rgba(255,255,255,0.07)]">
-            <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-[13px] font-medium text-white">Revision History</h3>
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center px-3 h-5 rounded-full text-[10px] bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.1)] text-[#a1a1aa]">{asset.revisions?.length ?? 0} versions</span>
