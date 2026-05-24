@@ -116,31 +116,47 @@ async function uploadFileToDriveSession(
   assetId: string,
   onProgress?: (update: UploadProgressUpdate) => void
 ): Promise<void> {
-  let simulatedProgress = 12;
   let timer: ReturnType<typeof globalThis.setInterval> | null = null;
 
   if (onProgress) {
-    emitUploadProgress(onProgress, 'uploading', simulatedProgress);
+    emitUploadProgress(onProgress, 'uploading', 12);
     timer = globalThis.setInterval(() => {
-      simulatedProgress = Math.min(simulatedProgress + Math.max(1, Math.round(file.size / (8 * 1024 * 1024))) + 1, 94);
-      emitUploadProgress(onProgress, 'uploading', simulatedProgress);
+      emitUploadProgress(onProgress, 'uploading', 12);
     }, 300);
   }
 
   try {
-    await fetch(uploadUrl, {
-      method: 'PUT',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': file.type || 'application/octet-stream',
-      },
-      body: file,
-    });
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
 
-    console.info('[google-upload-success]', {
-      status: 0,
-      assetId,
-      finalized: true,
+      xhr.open('PUT', uploadUrl, true);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && onProgress) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          onProgress({ phase: 'uploading', percentage: percent });
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200 || xhr.status === 201 || xhr.status === 308) {
+          console.info('[google-upload-success]', {
+            status: xhr.status,
+            assetId,
+            finalized: true,
+          });
+          resolve();
+        } else {
+          reject(new Error(`Google upload failed with status ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Google upload transport failed'));
+      };
+
+      xhr.send(file);
     });
   } finally {
     if (timer) {
