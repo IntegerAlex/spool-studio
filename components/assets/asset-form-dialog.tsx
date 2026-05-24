@@ -344,7 +344,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
                   <FormLabel>Client</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value || undefined}
+                    value={field.value ?? ''}
                     disabled={isLoadingOptions}
                   >
                     <FormControl>
@@ -405,7 +405,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
                       <FormLabel>Status</FormLabel>
                       <Select
                         onValueChange={field.onChange}
-                        value={field.value && isUserSelectableStatus(field.value as AssetStatus) ? field.value : undefined}
+                        value={field.value && isUserSelectableStatus(field.value as AssetStatus) ? field.value : ''}
                       >
                         <FormControl>
                           <SelectTrigger className="w-full">
