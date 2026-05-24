@@ -30,6 +30,11 @@ export async function POST(request: Request, context: RouteContext) {
   const contentLengthHeader = request.headers.get('content-length');
   const contentLength = contentLengthHeader ? Number(contentLengthHeader) : null;
 
+  console.info('[upload][payload]', {
+    contentLength: request.headers.get('content-length'),
+    contentType: request.headers.get('content-type'),
+  });
+
   console.info('[upload][route-entered]', {
     assetId,
     method: request.method,
