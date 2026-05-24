@@ -113,8 +113,9 @@ function emitUploadProgress(
 async function uploadFileToDriveSession(
   uploadUrl: string,
   file: File,
+  assetId: string,
   onProgress?: (update: UploadProgressUpdate) => void
-): Promise<Record<string, unknown>> {
+): Promise<void> {
   let simulatedProgress = 12;
   let timer: ReturnType<typeof globalThis.setInterval> | null = null;
 
@@ -135,20 +136,16 @@ async function uploadFileToDriveSession(
       body: file,
     });
 
-    if (!response.ok) {
-      const responseText = await response.text().catch(() => 'Upload failed');
-      throw new Error(responseText || 'Upload failed');
+    if (!response.ok && response.status !== 308) {
+      throw new Error(`Drive upload failed with status ${response.status}`);
     }
 
-    const payloadText = await response.text();
-    if (!payloadText) {
-      return {};
-    }
-
-    try {
-      return JSON.parse(payloadText) as Record<string, unknown>;
-    } catch {
-      return {};
+    if (response.ok || response.status === 308) {
+      console.info('[google-upload-success]', {
+        status: response.status,
+        assetId,
+        finalized: true,
+      });
     }
   } finally {
     if (timer) {
@@ -311,7 +308,7 @@ export const assetsApi = {
   uploadFile: async (assetId: string, file: File, options?: UploadFileOptions): Promise<Asset> => {
     emitUploadProgress(options?.onProgress, 'requesting-session', 0);
 
-    const session = await fetchJson<{ uploadUrl: string }>(`/api/uploads/google-session`, {
+    const session = await fetchJson<{ uploadUrl: string; driveFileId: string }>(`/api/uploads/google-session`, {
       method: 'POST',
       body: JSON.stringify({
         assetId,
@@ -322,19 +319,14 @@ export const assetsApi = {
     });
 
     emitUploadProgress(options?.onProgress, 'uploading', 15);
-    const driveResponse = await uploadFileToDriveSession(session.uploadUrl, file, options?.onProgress);
+    await uploadFileToDriveSession(session.uploadUrl, file, assetId, options?.onProgress);
 
     emitUploadProgress(options?.onProgress, 'finalizing', 96);
-    const driveFileId = typeof driveResponse.id === 'string' ? driveResponse.id : null;
-
-    if (!driveFileId) {
-      throw new Error('Drive upload completed without a file id');
-    }
 
     const payload = await fetchJson<{ asset: Asset; upload: unknown }>(`/api/assets/${assetId}/upload`, {
       method: 'POST',
       body: JSON.stringify({
-        driveFileId,
+        driveFileId: session.driveFileId,
         fileName: file.name,
       }),
     });

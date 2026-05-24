@@ -58,6 +58,7 @@ export interface DriveResumableUploadSessionInput {
 
 export interface DriveResumableUploadSessionResult {
   uploadUrl: string;
+  driveFileId: string;
 }
 
 export interface DriveUploadInput {
@@ -88,9 +89,21 @@ export interface DriveUploadResult {
 export async function createDriveResumableUploadSession(
   input: DriveResumableUploadSessionInput
 ): Promise<DriveResumableUploadSessionResult> {
+  const drive = await authenticateDrive();
+  const generatedIdsResponse = await drive.files.generateIds({
+    count: 1,
+    space: 'drive',
+  });
+
+  const driveFileId = generatedIdsResponse.data.ids?.[0];
+  if (!driveFileId) {
+    throw new Error('Failed to generate Drive file id for resumable upload');
+  }
+
   const authHeaders = await getDriveAuthHeaders();
   const requestUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true';
   const requestBody = {
+    id: driveFileId,
     name: input.fileName,
     parents: [input.folderId],
     mimeType: input.mimeType,
@@ -102,6 +115,7 @@ export async function createDriveResumableUploadSession(
     fileName: input.fileName,
     mimeType: input.mimeType,
     fileSize: input.fileSize,
+    driveFileId,
     requestUrl,
     requestHeaders: {
       authorizationPresent: Boolean((authHeaders as Record<string, string | undefined>).Authorization),
@@ -150,9 +164,10 @@ export async function createDriveResumableUploadSession(
     step: 'create-session-success',
     uploadUrl,
     uploadType: 'resumable',
+    driveFileId,
   });
 
-  return { uploadUrl };
+  return { uploadUrl, driveFileId };
 }
 
 export interface DriveFileMetadataResult {

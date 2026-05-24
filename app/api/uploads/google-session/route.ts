@@ -90,6 +90,7 @@ export async function POST(request: Request) {
         success: true,
         data: {
           uploadUrl: session.uploadUrl,
+          driveFileId: session.driveFileId,
           uploadType: 'resumable',
           assetId,
           fileName,
@@ -97,6 +98,7 @@ export async function POST(request: Request) {
           fileSize,
         },
         uploadUrl: session.uploadUrl,
+        driveFileId: session.driveFileId,
         uploadType: 'resumable',
       },
       { status: 201 }
