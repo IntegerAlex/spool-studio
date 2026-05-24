@@ -415,6 +415,309 @@ export interface AssetUploadResult {
   };
 }
 
+export interface AssetUploadFinalizationInput {
+  fileName: string;
+  uploadResult: DriveUploadResult;
+}
+
+export async function finalizeAssetUpload(
+  assetId: string,
+  input: AssetUploadFinalizationInput
+): Promise<AssetUploadResult> {
+  const supabase = await createServerSupabaseClient();
+  const [userResult, sessionResult] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
+  const {
+    data: { user },
+    error,
+  } = userResult;
+
+  console.info(
+    '[upload][auth] ' +
+      JSON.stringify({
+        assetId,
+        authSource: 'service-cookie-store',
+        userExists: Boolean(user),
+        sessionExists: Boolean(sessionResult.data.session),
+        cookiesPresent: 'unknown',
+      })
+  );
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  await getOrCreateCurrentUserProfile();
+
+  const asset = await getAssetById(assetId, supabase);
+  if (!asset) {
+    throw new Error('Asset not found');
+  }
+
+  let clientName = asset.client_id;
+  try {
+    const client = await getClientById(asset.client_id, supabase);
+    clientName = client?.name ?? clientName;
+  } catch (_error) {
+    // Non-blocking: email can fall back to the client id.
+  }
+
+  const isRevisionUpload = Boolean(asset.drive_file_id || asset.uploaded_at || (asset.revision_count ?? 0) > 0);
+  let revisionNotificationVersion: number | null = null;
+
+  if (!isRevisionUpload) {
+    await transitionAssetStatus(assetId, supabase, 'uploading', 'upload-start');
+  }
+
+  const folder = await resolveAssetDriveFolder(asset.type, asset.client_id);
+  if (!folder) {
+    throw new Error('Drive folder not found for asset');
+  }
+
+  console.info('[upload][asset-check]', {
+    assetId,
+    clientId: asset.client_id,
+    assetType: asset.type,
+    fileName: input.fileName,
+    mimeType: input.uploadResult.mimeType || 'application/octet-stream',
+    fileSize: input.uploadResult.fileSize,
+  });
+
+  console.info('[upload][folder-resolved]', {
+    assetId,
+    clientId: asset.client_id,
+    assetType: asset.type,
+    folderId: folder.id,
+    folderUrl: folder.url,
+  });
+
+  console.info('[upload][drive-upload]', {
+    assetId,
+    clientId: asset.client_id,
+    folderId: folder.id,
+    fileName: input.fileName,
+    mimeType: input.uploadResult.mimeType || 'application/octet-stream',
+    fileSize: input.uploadResult.fileSize,
+    uploadPayloadSize: input.uploadResult.fileSize,
+  });
+
+  const uploadedAt = new Date().toISOString();
+  const fileExtension = input.fileName.includes('.') ? input.fileName.split('.').pop()?.toLowerCase() ?? null : null;
+
+  const updates: Parameters<typeof updateAssetRow>[1] = {
+    drive_file_id: input.uploadResult.driveFileId,
+    drive_file_url: input.uploadResult.driveFileUrl,
+    thumbnail_url: input.uploadResult.thumbnailLink ?? asset.thumbnail_url ?? null,
+    mime_type: input.uploadResult.mimeType,
+    file_size: input.uploadResult.fileSize,
+    file_extension: fileExtension,
+    uploaded_at: uploadedAt,
+    uploaded_by: user.id,
+    media_width: input.uploadResult.mediaWidth ?? null,
+    media_height: input.uploadResult.mediaHeight ?? null,
+    duration_seconds: input.uploadResult.durationSeconds ?? null,
+  };
+
+  if (!isRevisionUpload) {
+    logAssetStatusTransition(assetId, 'uploading', 'uploaded', 'upload-success');
+    updates.status = 'uploaded';
+  } else {
+    console.info('[asset][revision-upload]', {
+      assetId,
+      statusPreserved: asset.status,
+    });
+  }
+
+  const updated = await updateAssetRow(assetId, updates, supabase);
+  const persisted = await getAssetById(assetId, supabase);
+  let mapped = mapAsset(persisted ?? updated);
+
+  if (!mapped) {
+    throw new Error('Failed to map asset');
+  }
+
+  console.info('[asset][metadata-extraction]', {
+    assetId,
+    mediaType: input.uploadResult.mimeType.startsWith('video/')
+      ? 'video'
+      : input.uploadResult.mimeType.startsWith('image/')
+        ? 'image'
+        : 'other',
+    extractedFields: {
+      mimeType: updates.mime_type,
+      fileSize: updates.file_size,
+      fileExtension: updates.file_extension,
+      uploadedAt: updates.uploaded_at,
+      uploadedBy: updates.uploaded_by,
+      driveFileId: updates.drive_file_id,
+      driveFileUrl: updates.drive_file_url,
+      thumbnailUrl: updates.thumbnail_url,
+      mediaWidth: updates.media_width,
+      mediaHeight: updates.media_height,
+      durationSeconds: updates.duration_seconds,
+    },
+    extractionDurationMs: 0,
+    partialFailures: [],
+  });
+
+  try {
+    await updateAssetRow(assetId, updates, supabase);
+    const refreshed = await getAssetById(assetId, supabase);
+    const refreshedMapped = mapAsset(refreshed);
+    if (refreshedMapped) {
+      mapped = refreshedMapped;
+    }
+    // Create an immutable revision record for this upload and update the asset's revision pointers
+    try {
+      const persistedAfterUpdate = await getAssetById(assetId, supabase);
+      const currentCount = persistedAfterUpdate?.revision_count ?? 0;
+      const versionNumber = (currentCount ?? 0) + 1;
+
+      const revisionInsert = {
+        asset_id: assetId,
+        version_number: versionNumber,
+        uploaded_by: user.id,
+        uploaded_at: uploadedAt,
+        drive_file_id: input.uploadResult.driveFileId,
+        drive_file_url: input.uploadResult.driveFileUrl,
+        file_size: input.uploadResult.fileSize,
+        mime_type: input.uploadResult.mimeType,
+        media_width: input.uploadResult.mediaWidth ?? null,
+        media_height: input.uploadResult.mediaHeight ?? null,
+        duration_seconds: input.uploadResult.durationSeconds ?? null,
+        change_note: null,
+        metadata: {
+          fileName: input.fileName,
+          mimeType: input.uploadResult.mimeType,
+          fileSize: input.uploadResult.fileSize,
+          mediaWidth: input.uploadResult.mediaWidth ?? null,
+          mediaHeight: input.uploadResult.mediaHeight ?? null,
+          durationSeconds: input.uploadResult.durationSeconds ?? null,
+        },
+      } as const;
+
+      const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert).select('*').single();
+      if (revisionError) {
+        console.error('[revision][create][failed]', { assetId, error: revisionError });
+      } else if (revisionData) {
+        revisionNotificationVersion = versionNumber;
+
+        // update asset pointers to reference this new revision
+        await updateAssetRow(
+          assetId,
+          {
+            latest_revision_id: revisionData.id,
+            current_revision_id: revisionData.id,
+            revision_count: versionNumber,
+          },
+          supabase
+        );
+
+        try {
+          await logAssetActivity({
+            assetId,
+            action: 'revision_created',
+            metadata: {
+              assetId,
+              revisionId: revisionData.id,
+              revisionNumber: versionNumber,
+              driveFileId: input.uploadResult.driveFileId,
+            },
+          });
+        } catch (_err) {
+          // non-blocking
+        }
+      }
+    } catch (error) {
+      console.error('[revision][create][error]', { assetId, error });
+    }
+  } catch (error) {
+    logUploadFailure('metadata-persistence', error, assetId, {
+      clientId: asset.client_id,
+      folderId: folder.id,
+      driveFileId: input.uploadResult.driveFileId,
+      driveFileUrl: input.uploadResult.driveFileUrl,
+      mimeType: input.uploadResult.mimeType,
+      fileSize: input.uploadResult.fileSize,
+      activity: 'file_uploaded',
+    });
+  }
+
+  try {
+    await logAssetActivity({
+      assetId,
+      action: 'file_uploaded',
+      metadata: {
+        driveFileId: input.uploadResult.driveFileId,
+        driveFileUrl: input.uploadResult.driveFileUrl,
+        mimeType: input.uploadResult.mimeType,
+        fileSize: input.uploadResult.fileSize,
+        uploadStatus: input.uploadResult.uploadStatus,
+        folderId: folder.id,
+        folderUrl: folder.url,
+      },
+    });
+  } catch (error) {
+    logUploadFailure('metadata-persistence', error, assetId, {
+      clientId: asset.client_id,
+      folderId: folder.id,
+      driveFileId: input.uploadResult.driveFileId,
+      driveFileUrl: input.uploadResult.driveFileUrl,
+      mimeType: input.uploadResult.mimeType,
+      fileSize: input.uploadResult.fileSize,
+      activity: 'file_uploaded',
+    });
+  }
+
+  console.info('[upload][success]', {
+    assetId,
+    clientId: asset.client_id,
+    driveFileId: input.uploadResult.driveFileId,
+    driveFileUrl: input.uploadResult.driveFileUrl,
+    mimeType: input.uploadResult.mimeType,
+    fileSize: input.uploadResult.fileSize,
+    uploadStatus: input.uploadResult.uploadStatus,
+  });
+
+  if (isRevisionUpload) {
+    if (revisionNotificationVersion != null) {
+      void sendRevisionUploadNotification({
+        assetId,
+        assetTitle: asset.title,
+        revisionVersion: revisionNotificationVersion,
+        uploadedBy: {
+          email: user.email,
+          name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+        },
+        uploadedAt,
+      });
+    }
+  } else {
+    void sendAssetUploadNotification({
+      assetId,
+      assetTitle: asset.title,
+      clientName,
+      assetType: asset.type,
+      assetStatus: updates.status ?? asset.status,
+      uploadedBy: {
+        email: user.email,
+        name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+      },
+      uploadedAt,
+    });
+  }
+
+  return {
+    asset: mapped,
+    upload: {
+      driveFileId: input.uploadResult.driveFileId,
+      driveFileUrl: input.uploadResult.driveFileUrl,
+      mimeType: input.uploadResult.mimeType,
+      fileSize: input.uploadResult.fileSize,
+      uploadStatus: input.uploadResult.uploadStatus,
+    },
+  };
+}
+
 export async function uploadAssetFile(assetId: string, file: File): Promise<AssetUploadResult> {
   const supabase = await createServerSupabaseClient();
   const [userResult, sessionResult] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);

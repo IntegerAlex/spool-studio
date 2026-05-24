@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -117,6 +118,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'uploaded' | 'failed'>('idle');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
 
   const statusOptions = useMemo(() => {
@@ -154,6 +156,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
       setSelectedFile(null);
       setUploadState('idle');
       setUploadError(null);
+      setUploadProgress(0);
     }
   }, [selectedFile, uploadAllowed]);
 
@@ -216,6 +219,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
       setSelectedFile(null);
       setUploadState('idle');
       setUploadError(null);
+      setUploadProgress(0);
     }
   };
 
@@ -238,10 +242,17 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
       if (selectedFile && uploadAllowed) {
         setUploadState('uploading');
         setUploadError(null);
+        setUploadProgress(0);
 
         try {
-          const uploaded = await assetsApi.uploadFile(saved.id, selectedFile);
+          const uploaded = await assetsApi.uploadFile(saved.id, selectedFile, {
+            onProgress: ({ percentage }) => {
+              setUploadState('uploading');
+              setUploadProgress(percentage);
+            },
+          });
           setUploadState('uploaded');
+          setUploadProgress(100);
           toast({
             title: 'Asset uploaded',
             description: `${uploaded.title} was uploaded successfully.`,
@@ -253,6 +264,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
           const message = uploadError instanceof Error ? uploadError.message : 'Failed to upload file';
           setUploadState('failed');
           setUploadError(message);
+          setUploadProgress(0);
           toast({
             title: 'Upload failed',
             description: message,
@@ -436,6 +448,15 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
               <p className="text-xs text-muted-foreground">
                 {selectedFile ? `Selected: ${selectedFile.name}` : 'Optional: choose a file to upload after saving.'}
               </p>
+              {uploadState === 'uploading' && (
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    <span>Uploading to Drive</span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-2" />
+                </div>
+              )}
               {!uploadAllowed && (
                 <p className="text-xs text-amber-700 dark:text-amber-300">
                   {uploadBlockedReason}

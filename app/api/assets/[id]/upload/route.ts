@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { uploadAssetFile } from '@/services/assets-service';
+import { finalizeAssetUpload, uploadAssetFile } from '@/services/assets-service';
+import { fetchDriveFileMetadata } from '@/integrations/google-drive/drive-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export const runtime = 'nodejs';
@@ -73,6 +74,44 @@ export async function POST(request: Request, context: RouteContext) {
       expectsMultipartFormData: Boolean(contentType?.toLowerCase().includes('multipart/form-data')),
       expectedFieldName: 'file',
     });
+
+    if (contentType?.toLowerCase().includes('application/json')) {
+      const body = (await request.json()) as {
+        driveFileId?: string;
+        fileName?: string;
+      };
+
+      if (!body.driveFileId) {
+        return NextResponse.json({ success: false, error: 'driveFileId is required' }, { status: 400 });
+      }
+
+      if (!body.fileName) {
+        return NextResponse.json({ success: false, error: 'fileName is required' }, { status: 400 });
+      }
+
+      const driveMetadata = await fetchDriveFileMetadata(body.driveFileId);
+      const result = await finalizeAssetUpload(assetId, {
+        fileName: body.fileName,
+        uploadResult: {
+          driveFileId: driveMetadata.driveFileId,
+          driveFileUrl: driveMetadata.driveFileUrl,
+          mimeType: driveMetadata.mimeType,
+          fileSize: driveMetadata.fileSize,
+          uploadStatus: 'uploaded',
+          thumbnailLink: driveMetadata.thumbnailLink,
+          mediaWidth: driveMetadata.mediaWidth,
+          mediaHeight: driveMetadata.mediaHeight,
+          durationSeconds: driveMetadata.durationSeconds,
+          parents: driveMetadata.parents,
+          driveId: driveMetadata.driveId,
+          owners: driveMetadata.owners,
+          permissions: driveMetadata.permissions,
+          webViewLink: driveMetadata.webViewLink,
+        },
+      });
+
+      return NextResponse.json({ success: true, data: result }, { status: 201 });
+    }
 
     if (Number.isFinite(contentLength) && (contentLength ?? 0) > MAX_UPLOAD_BYTES) {
       const error = new Error(`Request body exceeded ${MAX_UPLOAD_LABEL}`);

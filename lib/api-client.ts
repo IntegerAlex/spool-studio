@@ -17,6 +17,17 @@ interface ApiEnvelope<T> {
   error?: string;
 }
 
+type UploadPhase = 'requesting-session' | 'uploading' | 'finalizing';
+
+export interface UploadProgressUpdate {
+  phase: UploadPhase;
+  percentage: number;
+}
+
+export interface UploadFileOptions {
+  onProgress?: (update: UploadProgressUpdate) => void;
+}
+
 const pendingRequests = new Map<string, Promise<unknown>>();
 
 function buildRequestKey(input: RequestInfo, init?: RequestInit): string {
@@ -89,6 +100,61 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
 
 async function fetchJsonNullableDeduped<T>(input: RequestInfo): Promise<T | null> {
   return dedupeRequest(buildRequestKey(input), () => fetchJsonNullable<T>(input));
+}
+
+function emitUploadProgress(
+  onProgress: ((update: UploadProgressUpdate) => void) | undefined,
+  phase: UploadPhase,
+  percentage: number
+) {
+  onProgress?.({ phase, percentage: Math.max(0, Math.min(100, Math.round(percentage))) });
+}
+
+async function uploadFileToDriveSession(
+  uploadUrl: string,
+  file: File,
+  onProgress?: (update: UploadProgressUpdate) => void
+): Promise<Record<string, unknown>> {
+  let simulatedProgress = 12;
+  let timer: ReturnType<typeof globalThis.setInterval> | null = null;
+
+  if (onProgress) {
+    emitUploadProgress(onProgress, 'uploading', simulatedProgress);
+    timer = globalThis.setInterval(() => {
+      simulatedProgress = Math.min(simulatedProgress + Math.max(1, Math.round(file.size / (8 * 1024 * 1024))) + 1, 94);
+      emitUploadProgress(onProgress, 'uploading', simulatedProgress);
+    }, 300);
+  }
+
+  try {
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => 'Upload failed');
+      throw new Error(responseText || 'Upload failed');
+    }
+
+    const payloadText = await response.text();
+    if (!payloadText) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(payloadText) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  } finally {
+    if (timer) {
+      globalThis.clearInterval(timer);
+    }
+  }
 }
 
 function hydrateAsset(asset: Asset): Asset {
@@ -242,23 +308,39 @@ export const assetsApi = {
     return hydrateAsset(created);
   },
 
-  uploadFile: async (assetId: string, file: File): Promise<Asset> => {
-    const formData = new FormData();
-    formData.append('file', file);
+  uploadFile: async (assetId: string, file: File, options?: UploadFileOptions): Promise<Asset> => {
+    emitUploadProgress(options?.onProgress, 'requesting-session', 0);
 
-    const response = await fetch(`/api/assets/${assetId}/upload`, {
+    const session = await fetchJson<{ uploadUrl: string }>(`/api/uploads/google-session`, {
       method: 'POST',
-      body: formData,
-      credentials: 'same-origin',
+      body: JSON.stringify({
+        assetId,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+      }),
     });
 
-    const payload = (await response.json()) as ApiEnvelope<{ asset?: Asset; error?: string }>;
+    emitUploadProgress(options?.onProgress, 'uploading', 15);
+    const driveResponse = await uploadFileToDriveSession(session.uploadUrl, file, options?.onProgress);
 
-    if (!response.ok || payload.error || !payload.data?.asset) {
-      throw new Error(payload.error ?? 'Upload failed');
+    emitUploadProgress(options?.onProgress, 'finalizing', 96);
+    const driveFileId = typeof driveResponse.id === 'string' ? driveResponse.id : null;
+
+    if (!driveFileId) {
+      throw new Error('Drive upload completed without a file id');
     }
 
-    return hydrateAsset(payload.data.asset);
+    const payload = await fetchJson<{ asset: Asset; upload: unknown }>(`/api/assets/${assetId}/upload`, {
+      method: 'POST',
+      body: JSON.stringify({
+        driveFileId,
+        fileName: file.name,
+      }),
+    });
+
+    emitUploadProgress(options?.onProgress, 'finalizing', 100);
+    return hydrateAsset(payload.asset);
   },
 
   update: async (

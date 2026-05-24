@@ -10,6 +10,7 @@ import { assetsApi, clientsApi, commentsApi, usersApi } from '@/lib/api-client';
 import { Asset, AssetComment, Client, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Copy, FileText, FolderOpen, MoreHorizontal, Upload } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +50,7 @@ export default function AssetDetailPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingRevision, setIsUploadingRevision] = useState(false);
+  const [revisionUploadProgress, setRevisionUploadProgress] = useState(0);
   const [comments, setComments] = useState<AssetComment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const revisionInputRef = useRef<HTMLInputElement | null>(null);
@@ -150,8 +152,15 @@ export default function AssetDetailPage() {
 
     console.log('[asset][revision-ui] upload start — assetId:', asset.id, 'file:', file.name);
     setIsUploadingRevision(true);
+    setRevisionUploadProgress(0);
     try {
-      const result = await assetsApi.uploadFile(asset.id, file);
+      const result = await assetsApi.uploadFile(asset.id, file, {
+        onProgress: ({ percentage }) => {
+          setIsUploadingRevision(true);
+          setRevisionUploadProgress(percentage);
+        },
+      });
+      setRevisionUploadProgress(100);
       console.log('[asset][revision-ui] upload success — new revisionId:', result.upload?.driveFileId ?? 'unknown');
       toast({ title: 'Revision uploaded', description: 'Revision uploaded successfully' });
       // refresh asset and revisions
@@ -164,6 +173,7 @@ export default function AssetDetailPage() {
       const message = err instanceof Error ? err.message : 'Upload failed';
       console.error('[asset][revision-ui] upload failed — error:', message);
       toast({ title: 'Upload failed', description: message, variant: 'destructive' });
+      setRevisionUploadProgress(0);
     } finally {
       setIsUploadingRevision(false);
       // reset input so same file can be selected again
@@ -507,6 +517,15 @@ export default function AssetDetailPage() {
                   )}
                 </button>
               </div>
+              {isUploadingRevision && (
+                <div className="mt-3 w-full max-w-sm space-y-2">
+                  <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#71717a]">
+                    <span>Uploading revision</span>
+                    <span>{revisionUploadProgress}%</span>
+                  </div>
+                  <Progress value={revisionUploadProgress} className="h-2 bg-[rgba(255,255,255,0.08)]" />
+                </div>
+              )}
             </div>
           </Card>
 

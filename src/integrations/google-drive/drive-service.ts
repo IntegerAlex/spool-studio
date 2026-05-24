@@ -1,6 +1,6 @@
 import type { drive_v3 } from 'googleapis';
 import { Readable } from 'node:stream';
-import { authenticateDrive } from './drive-client';
+import { authenticateDrive, getDriveAuthHeaders } from './drive-client';
 import type {
   DriveFolderAccessDiagnostics,
   DriveFolderInput,
@@ -38,7 +38,27 @@ type DriveUploadMetadata = {
   mimeType: string | null;
   size: number | null;
   thumbnailLink: string | null;
+  imageMediaMetadata: {
+    width: number | null;
+    height: number | null;
+  } | null;
+  videoMediaMetadata: {
+    width: number | null;
+    height: number | null;
+    durationMillis: number | null;
+  } | null;
 };
+
+export interface DriveResumableUploadSessionInput {
+  folderId: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+}
+
+export interface DriveResumableUploadSessionResult {
+  uploadUrl: string;
+}
 
 export interface DriveUploadInput {
   folderId: string;
@@ -55,6 +75,60 @@ export interface DriveUploadResult {
   fileSize: number;
   uploadStatus: 'uploaded';
   thumbnailLink: string | null;
+  mediaWidth: number | null;
+  mediaHeight: number | null;
+  durationSeconds: number | null;
+  parents: string[];
+  driveId: string | null;
+  owners: DriveUploadMetadata['owners'];
+  permissions: DriveUploadMetadata['permissions'];
+  webViewLink: string;
+}
+
+export async function createDriveResumableUploadSession(
+  input: DriveResumableUploadSessionInput
+): Promise<DriveResumableUploadSessionResult> {
+  const authHeaders = await getDriveAuthHeaders();
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+    method: 'POST',
+    headers: {
+      ...authHeaders,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': input.mimeType,
+      'X-Upload-Content-Length': String(input.fileSize),
+    },
+    body: JSON.stringify({
+      name: input.fileName,
+      parents: [input.folderId],
+    }),
+  });
+
+  const uploadUrl = response.headers.get('location');
+  if (!response.ok || !uploadUrl) {
+    const failureText = await response.text().catch(() => 'Unable to create resumable upload session');
+    throw new Error(failureText || 'Unable to create resumable upload session');
+  }
+
+  console.info('[drive-resumable-upload]', {
+    folderId: input.folderId,
+    fileName: input.fileName,
+    mimeType: input.mimeType,
+    fileSize: input.fileSize,
+    uploadSessionCreated: true,
+  });
+
+  return { uploadUrl };
+}
+
+export interface DriveFileMetadataResult {
+  driveFileId: string;
+  driveFileUrl: string;
+  mimeType: string;
+  fileSize: number;
+  thumbnailLink: string | null;
+  mediaWidth: number | null;
+  mediaHeight: number | null;
+  durationSeconds: number | null;
   parents: string[];
   driveId: string | null;
   owners: DriveUploadMetadata['owners'];
@@ -152,7 +226,7 @@ async function fetchDriveUploadMetadata(fileId: string) {
   const response = await drive.files.get({
     fileId,
     fields:
-      'id,name,parents,driveId,owners(emailAddress,displayName),permissions(emailAddress,role,type,deleted),webViewLink,mimeType,size,thumbnailLink',
+      'id,name,parents,driveId,owners(emailAddress,displayName),permissions(emailAddress,role,type,deleted),webViewLink,mimeType,size,thumbnailLink,imageMediaMetadata(width,height),videoMediaMetadata(width,height,durationMillis)',
     includeItemsFromAllDrives: true,
     supportsAllDrives: true,
   });
@@ -181,6 +255,22 @@ async function fetchDriveUploadMetadata(fileId: string) {
     mimeType: file.mimeType ?? null,
     size: file.size !== undefined && file.size !== null ? Number(file.size) : null,
     thumbnailLink: file.thumbnailLink ?? null,
+    imageMediaMetadata: file.imageMediaMetadata
+      ? {
+          width: file.imageMediaMetadata.width ?? null,
+          height: file.imageMediaMetadata.height ?? null,
+        }
+      : null,
+    videoMediaMetadata: file.videoMediaMetadata
+      ? {
+          width: file.videoMediaMetadata.width ?? null,
+          height: file.videoMediaMetadata.height ?? null,
+          durationMillis:
+            file.videoMediaMetadata.durationMillis !== undefined && file.videoMediaMetadata.durationMillis !== null
+              ? Number(file.videoMediaMetadata.durationMillis)
+              : null,
+        }
+      : null,
   } satisfies DriveUploadMetadata;
 }
 
@@ -336,6 +426,12 @@ export async function uploadFileToFolder(input: DriveUploadInput): Promise<Drive
       fileSize: metadata.size ?? input.fileSize,
       uploadStatus: 'uploaded',
       thumbnailLink: metadata.thumbnailLink,
+      mediaWidth: metadata.imageMediaMetadata?.width ?? metadata.videoMediaMetadata?.width ?? null,
+      mediaHeight: metadata.imageMediaMetadata?.height ?? metadata.videoMediaMetadata?.height ?? null,
+      durationSeconds:
+        metadata.videoMediaMetadata?.durationMillis !== null && metadata.videoMediaMetadata?.durationMillis !== undefined
+          ? metadata.videoMediaMetadata.durationMillis / 1000
+          : null,
       parents: metadata.parents ?? [],
       driveId: metadata.driveId,
       owners: metadata.owners,
@@ -353,6 +449,29 @@ export async function uploadFileToFolder(input: DriveUploadInput): Promise<Drive
     });
     throw new Error(details.message);
   }
+}
+
+export async function fetchDriveFileMetadata(fileId: string): Promise<DriveFileMetadataResult> {
+  const metadata = await fetchDriveUploadMetadata(fileId);
+
+  return {
+    driveFileId: metadata.id,
+    driveFileUrl: metadata.webViewLink ?? `https://drive.google.com/file/d/${metadata.id}/view`,
+    mimeType: metadata.mimeType ?? 'application/octet-stream',
+    fileSize: metadata.size ?? 0,
+    thumbnailLink: metadata.thumbnailLink,
+    mediaWidth: metadata.imageMediaMetadata?.width ?? metadata.videoMediaMetadata?.width ?? null,
+    mediaHeight: metadata.imageMediaMetadata?.height ?? metadata.videoMediaMetadata?.height ?? null,
+    durationSeconds:
+      metadata.videoMediaMetadata?.durationMillis !== null && metadata.videoMediaMetadata?.durationMillis !== undefined
+        ? metadata.videoMediaMetadata.durationMillis / 1000
+        : null,
+    parents: metadata.parents ?? [],
+    driveId: metadata.driveId,
+    owners: metadata.owners,
+    permissions: metadata.permissions,
+    webViewLink: metadata.webViewLink ?? `https://drive.google.com/file/d/${metadata.id}/view`,
+  };
 }
 
 export async function findFolder(name: string, parentFolderId?: string): Promise<DriveFolderResult | null> {

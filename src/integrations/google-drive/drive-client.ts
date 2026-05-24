@@ -68,6 +68,17 @@ function getDriveAuthConfig(): DriveAuthConfig {
 
 let cachedDriveClient: DriveClient | null = null;
 
+async function createDriveAuthClient(): Promise<InstanceType<typeof google.auth.JWT>> {
+  const config = getDriveAuthConfig();
+
+  return new google.auth.JWT({
+    email: config.clientEmail,
+    key: config.privateKey,
+    scopes: [...DRIVE_SCOPES],
+    subject: config.delegatedUser,
+  });
+}
+
 export async function authenticateDrive(): Promise<DriveClient> {
   if (cachedDriveClient) {
     console.info('[google-drive][auth] using cached Drive client');
@@ -83,12 +94,7 @@ export async function authenticateDrive(): Promise<DriveClient> {
       delegatedUserPresent: Boolean(config.delegatedUser),
     });
 
-    const auth = new google.auth.JWT({
-      email: config.clientEmail,
-      key: config.privateKey,
-      scopes: [...DRIVE_SCOPES],
-      subject: config.delegatedUser,
-    });
+    const auth = await createDriveAuthClient();
 
     await auth.authorize();
     console.info('[google-drive][auth] service account authorization succeeded', {
@@ -117,6 +123,12 @@ export async function authenticateDrive(): Promise<DriveClient> {
     });
     throw new Error(message);
   }
+}
+
+export async function getDriveAuthHeaders(): Promise<HeadersInit> {
+  const auth = await createDriveAuthClient();
+  await auth.authorize();
+  return auth.getRequestHeaders();
 }
 
 export function getDriveRootFolderId(): string | undefined {
