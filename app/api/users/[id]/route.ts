@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getUsers } from '@/services/users-service';
+import { getUserDetail } from '@/services/users-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 interface RouteContext {
@@ -13,8 +13,7 @@ export async function GET(_request: Request, context: RouteContext) {
     if (!userId) {
       return NextResponse.json({ error: 'User id is required' }, { status: 400 });
     }
-    const users = await getUsers();
-    const user = users.find((item) => item.id === userId);
+    const user = await getUserDetail(userId);
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

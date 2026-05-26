@@ -4,6 +4,8 @@ import type { Database } from '@/types/database';
 
 export type DbUser = Database['public']['Tables']['users']['Row'];
 
+const userSelect = 'id,email,full_name,role,avatar_url,created_at,updated_at';
+
 async function getClient(client?: SupabaseClient<Database>) {
   return client ?? (await createServerSupabaseClient());
 }
@@ -12,8 +14,29 @@ export async function listUsers(client?: SupabaseClient<Database>): Promise<DbUs
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select(userSelect)
     .order('full_name', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function listUsersByIds(
+  userIds: string[],
+  client?: SupabaseClient<Database>
+): Promise<DbUser[]> {
+  if (userIds.length === 0) {
+    return [];
+  }
+
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('users')
+    .select(userSelect)
+    .in('id', userIds);
 
   if (error) {
     throw new Error(error.message);
@@ -29,7 +52,7 @@ export async function getUserById(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select(userSelect)
     .eq('id', userId)
     .maybeSingle();
 
@@ -48,7 +71,7 @@ export async function insertUser(
   const { data, error } = await supabase
     .from('users')
     .insert(payload)
-    .select('*')
+    .select(userSelect)
     .single();
 
   if (error) {

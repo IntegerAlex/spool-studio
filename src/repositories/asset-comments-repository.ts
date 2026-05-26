@@ -4,20 +4,30 @@ import type { Database } from '@/types/database';
 
 export type DbAssetComment = Database['public']['Tables']['asset_comments']['Row'];
 
+const commentSelect = 'id,asset_id,user_id,type,message,revision_status,created_at,updated_at';
+
 async function getClient(client?: SupabaseClient<Database>) {
   return client ?? (await createServerSupabaseClient());
 }
 
 export async function listCommentsByAssetId(
   assetId: string,
-  client?: SupabaseClient<Database>
+  client?: SupabaseClient<Database>,
+  options?: { limit?: number; offset?: number }
 ): Promise<DbAssetComment[]> {
   const supabase = await getClient(client);
-  const { data, error } = await supabase
+  let query = supabase
     .from('asset_comments')
-    .select('*')
+    .select(commentSelect)
     .eq('asset_id', assetId)
     .order('created_at', { ascending: true });
+
+  if (options?.limit !== undefined) {
+    const offset = options.offset ?? 0;
+    query = query.range(offset, offset + Math.max(options.limit, 1) - 1);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(error.message);
@@ -33,7 +43,7 @@ export async function getCommentById(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('asset_comments')
-    .select('*')
+    .select(commentSelect)
     .eq('id', commentId)
     .maybeSingle();
 
@@ -52,7 +62,7 @@ export async function insertComment(
   const { data, error } = await supabase
     .from('asset_comments')
     .insert(payload)
-    .select('*')
+    .select(commentSelect)
     .single();
 
   if (error) {
@@ -72,7 +82,7 @@ export async function updateComment(
     .from('asset_comments')
     .update(updates)
     .eq('id', commentId)
-    .select('*')
+    .select(commentSelect)
     .single();
 
   if (error) {

@@ -3,23 +3,23 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { CommentsThread } from '@/components/assets/comments-thread';
+import { AssetCommentsSection } from '@/components/assets/asset-comments-section';
+import { AssetRevisionsSection } from '@/components/assets/asset-revisions-section';
+import { AssetActivitySection } from '@/components/assets/asset-activity-section';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import { StatusBadge } from '@/components/assets/status-badge';
-import { assetsApi, clientsApi, commentsApi, usersApi } from '@/lib/api-client';
-import { Asset, AssetComment, Client, User } from '@/types/index';
+import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
+import { Asset, Client, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Copy, FolderOpen, MoreHorizontal, Upload } from 'lucide-react';
-import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { canUploadFromStatus, canUploadRevisionFromStatus, getAllowedTransitions, getRevisionEligibilityReason, getTransitionActionLabel, getUploadEligibilityReason } from '@/lib/asset-workflow';
-import { formatRelativeTime, getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
-import { AssetPreviewMedia, AssetPreviewModal } from '@/components/assets/asset-preview-modal';
-import { toAssetPreviewDescriptor, type AssetPreviewDescriptor } from '@/lib/asset-preview';
-import { formatFileSize } from '@/lib/asset-metadata';
+import { canUploadFromStatus, canUploadRevisionFromStatus, getRevisionEligibilityReason, getUploadEligibilityReason } from '@/lib/asset-workflow';
+import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
+import { AssetPreviewMedia } from '@/components/assets/asset-preview-modal';
+import { toAssetPreviewDescriptor } from '@/lib/asset-preview';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,18 +53,25 @@ export default function AssetDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingRevision, setIsUploadingRevision] = useState(false);
   const [revisionUploadProgress, setRevisionUploadProgress] = useState(0);
-  const [comments, setComments] = useState<AssetComment[]>([]);
-  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
+  const [workflowAction, setWorkflowAction] = useState<'process' | 'move_to_draft' | null>(null);
+  const [revisionRefreshKey, setRevisionRefreshKey] = useState(0);
   const revisionInputRef = useRef<HTMLInputElement | null>(null);
-  const [revisionsCollapsed, setRevisionsCollapsed] = useState(false);
-  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const driveFolderLabel = asset?.type === 'reel'
     ? 'Reels'
     : asset?.type === 'poster'
       ? 'Posters'
       : 'Exports';
+
+  const canSyncToCalendar = asset?.status === 'approved' && Boolean(asset?.publishDate);
+  const isAlreadySynced = Boolean(asset?.googleCalendarEventId);
+  const canApproveDraft = asset?.status === 'draft';
+  const canRequestRevision = asset?.status === 'draft';
+  const canApproveRevision = asset?.status === 'revision_requested';
+  const canProcessUpload = asset?.status === 'uploaded';
+  const canMoveToDraft = asset?.status === 'uploaded';
 
   useEffect(() => {
     const loadData = async () => {
@@ -75,17 +82,11 @@ export default function AssetDetailPage() {
           return;
         }
         setError(null);
-        const assetData = await assetsApi.getById(assetId);
+        const assetData = await assetsApi.getSummaryById(assetId);
         if (assetData) {
           setAsset(assetData);
-          const [clientData, usersData] = await Promise.all([
-            clientsApi.getById(assetData.clientId),
-            usersApi.getAll(),
-          ]);
+          const clientData = await clientsApi.getById(assetData.clientId);
           setClient(clientData);
-          setUserMap(new Map(usersData.map((user) => [user.id, user])));
-        } else {
-          setComments([]);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load asset';
@@ -99,50 +100,43 @@ export default function AssetDetailPage() {
   }, [assetId]);
 
   useEffect(() => {
-    if (!asset?.id) {
+    if (!asset?.assignedTo?.length) {
+      return;
+    }
+
+    const missing = asset.assignedTo.filter((userId) => !userMap.has(userId));
+    if (missing.length === 0) {
       return;
     }
 
     let isActive = true;
 
-    const loadComments = async () => {
-      console.info('[asset][comments] fetch start', { assetId: asset.id });
-      setIsLoadingComments(true);
-      try {
-        const fetched = await commentsApi.getByAssetId(asset.id);
-        if (!isActive) {
-          return;
-        }
-        setComments(fetched);
-        console.info('[asset][comments] fetch success', { assetId: asset.id, count: fetched.length });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load comments';
-        console.error('[asset][comments] api failure', { assetId: asset.id, stage: 'fetch', error: message });
-      } finally {
-        if (isActive) {
-          setIsLoadingComments(false);
-        }
+    const loadUsers = async () => {
+      const fetched = await Promise.all(missing.map((userId) => usersApi.getById(userId)));
+      if (!isActive) {
+        return;
       }
+
+      setUserMap((prev) => {
+        const next = new Map(prev);
+        fetched.forEach((user) => {
+          if (user) {
+            next.set(user.id, user);
+          }
+        });
+        return next;
+      });
     };
 
-    void loadComments();
+    void loadUsers();
 
     return () => {
       isActive = false;
     };
-  }, [asset?.id]);
+  }, [asset?.assignedTo?.join('|'), userMap.size]);
 
-  async function refreshRevisions() {
-    if (!asset?.id) return;
-    try {
-      const refreshed = await assetsApi.getById(asset.id);
-      if (refreshed) {
-        setAsset(refreshed);
-        console.log(`[asset][revision-ui] timeline refreshed — ${refreshed.revisions?.length ?? 0} revisions loaded`);
-      }
-    } catch (err) {
-      console.error('[asset][revision-ui] timeline refresh failed', { assetId: asset.id, error: err });
-    }
+  function refreshRevisions() {
+    setRevisionRefreshKey((prev) => prev + 1);
   }
 
   const handleRevisionSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,7 +148,6 @@ export default function AssetDetailPage() {
       return;
     }
 
-    console.log('[asset][revision-ui] upload start — assetId:', asset.id, 'file:', file.name);
     setIsUploadingRevision(true);
     setRevisionUploadProgress(0);
     try {
@@ -165,17 +158,14 @@ export default function AssetDetailPage() {
         },
       });
       setRevisionUploadProgress(100);
-      console.log('[asset][revision-ui] upload success — new revisionId:', result?.driveFileId ?? 'unknown');
       toast({ title: 'Revision uploaded', description: 'Revision uploaded successfully' });
-      // refresh asset and revisions
-      await refreshRevisions();
+      refreshRevisions();
       // also update local asset state from result if returned
       if (result) {
         setAsset(result as unknown as Asset);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
-      console.error('[asset][revision-ui] upload failed — error:', message);
       toast({ title: 'Upload failed', description: message, variant: 'destructive' });
       setRevisionUploadProgress(0);
     } finally {
@@ -185,78 +175,108 @@ export default function AssetDetailPage() {
     }
   };
 
-  const handleSetActive = async (revisionId: string) => {
-    if (!asset) return;
-    console.log('[asset][revision-ui] set active — revisionId:', revisionId);
-    try {
-      const res = await fetch(`/api/assets/${asset.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentRevisionId: revisionId }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? 'Failed to set active revision');
-      await refreshRevisions();
-      console.log('[asset][revision-ui] active updated — assetId:', asset.id, 'now active:', revisionId);
-      toast({ title: 'Active revision updated' });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to set active revision';
-      console.error('[asset][revision-ui] set active failed — error:', message);
-      toast({ title: 'Set active failed', description: message, variant: 'destructive' });
-    }
-  };
-
-  const handleAddComment = async (content: string, isInternal: boolean) => {
+  const handleCalendarSync = async () => {
     if (!asset) {
       return;
     }
 
-    const message = content.trim();
-    if (!message) {
+    if (!canSyncToCalendar || isAlreadySynced) {
       return;
     }
 
-    const optimisticId = `optimistic-${Date.now()}`;
-    const optimisticComment: AssetComment = {
-      id: optimisticId,
-      assetId: asset.id,
-      userId: 'me',
-      type: isInternal ? 'internal_note' : 'comment',
-      message,
-      isInternal,
-      revisionStatus: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    try {
+      setIsSyncingCalendar(true);
+      const response = await fetch('/api/calendar/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId: asset.id }),
+      });
 
-    console.info('[asset][comments] optimistic update', {
-      assetId: asset.id,
-      optimisticId,
-      isInternal,
-    });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Calendar sync failed');
+      }
 
-    setComments((prev) => [...prev, optimisticComment]);
+      if (payload.status === 'already_synced') {
+        setAsset((prev) => (prev ? {
+          ...prev,
+          googleCalendarEventId: payload.eventId ?? prev.googleCalendarEventId,
+          googleCalendarEventUrl: payload.eventUrl ?? prev.googleCalendarEventUrl,
+        } : prev));
+        toast({ title: 'Already synced', description: 'This asset is already linked to Google Calendar.' });
+        return;
+      }
+
+      setAsset((prev) => (prev ? {
+        ...prev,
+        googleCalendarEventId: payload.eventId ?? prev.googleCalendarEventId,
+        googleCalendarEventUrl: payload.eventUrl ?? prev.googleCalendarEventUrl,
+        calendarSyncedAt: payload.syncedAt ? new Date(payload.syncedAt) : new Date(),
+      } : prev));
+
+      toast({ title: 'Calendar synced', description: 'Google Calendar event created.' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Calendar sync failed';
+      toast({ title: 'Calendar sync failed', description: message, variant: 'destructive' });
+    } finally {
+      setIsSyncingCalendar(false);
+    }
+  };
+
+  const handleApprovalAction = async (action: 'approve' | 'reject') => {
+    if (!asset) {
+      return;
+    }
 
     try {
-      console.info('[asset][comments] comment create', { assetId: asset.id, isInternal });
-      const created = await commentsApi.create(asset.id, { message, isInternal });
-
-      setComments((prev) => prev.map((entry) => (entry.id === optimisticId ? created : entry)));
-
-      console.info('[asset][comments] refetch start', { assetId: asset.id });
-      const refreshed = await commentsApi.getByAssetId(asset.id);
-      setComments(refreshed);
-      console.info('[asset][comments] refetch success', { assetId: asset.id, count: refreshed.length });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add comment';
-      setComments((prev) => prev.filter((entry) => entry.id !== optimisticId));
-      console.error('[asset][comments] api failure', {
-        assetId: asset.id,
-        stage: 'create',
-        error: errorMessage,
+      setApprovalAction(action);
+      const response = await fetch(`/api/assets/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId: asset.id }),
       });
-      toast({ title: 'Failed to add comment', description: errorMessage, variant: 'destructive' });
-      throw err;
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Request failed');
+      }
+
+      const updated = payload.data as Asset;
+      setAsset(updated);
+      toast({
+        title: action === 'approve' ? 'Asset approved' : 'Revision requested',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Approval failed';
+      toast({
+        title: action === 'approve' ? 'Approval failed' : 'Rejection failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setApprovalAction(null);
+    }
+  };
+
+  const handleWorkflowStatus = async (nextStatus: Asset['status'], action: 'process' | 'move_to_draft') => {
+    if (!asset) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setWorkflowAction(action);
+      const updated = await assetsApi.update(asset.id, { status: nextStatus });
+      setAsset(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      toast({
+        title: 'Status update failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+      setWorkflowAction(null);
     }
   };
 
@@ -266,20 +286,6 @@ export default function AssetDetailPage() {
   const uploadEligible = asset ? canUploadFromStatus(asset.status) : false;
   const uploadRevisionEligible = asset ? canUploadRevisionFromStatus(asset.status) : false;
   const revisionEligibilityReason = asset ? getRevisionEligibilityReason(asset.status) : 'Revision uploads are blocked only for archived or published assets.';
-
-  useEffect(() => {
-    if (!asset) {
-      return;
-    }
-
-    console.info('[asset][revision-eligibility]', {
-      assetId: asset.id,
-      assetStatus: asset.status,
-      evaluatedEligibility: uploadRevisionEligible,
-      reason: revisionEligibilityReason,
-    });
-  }, [asset, uploadRevisionEligible, revisionEligibilityReason]);
-
 
   if (isLoading) {
     return (
@@ -373,6 +379,8 @@ export default function AssetDetailPage() {
                     }
                   />
                 )}
+
+
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -542,7 +550,7 @@ export default function AssetDetailPage() {
             </Card>
           )}
 
-          <CommentsThread comments={comments} onAddComment={handleAddComment} isLoading={isLoadingComments} />
+          <AssetCommentsSection assetId={asset.id} />
         </div>
 
         <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
@@ -586,144 +594,13 @@ export default function AssetDetailPage() {
             </div>
           </Card>
 
-          {/* Revision History Panel */}
-          <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 border-t border-t-[rgba(255,255,255,0.07)]">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-[13px] font-medium text-white">Revision History</h3>
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center px-3 h-5 rounded-full text-[10px] bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.1)] text-[#a1a1aa]">{asset.revisions?.length ?? 0} versions</span>
-                <button
-                  aria-expanded={!revisionsCollapsed}
-                  onClick={() => setRevisionsCollapsed((s) => !s)}
-                  className="text-[#71717a] hover:text-white transition-colors duration-150"
-                >
-                  <svg className={`h-4 w-4 transform transition-transform duration-150 ${revisionsCollapsed ? 'rotate-180' : 'rotate-0'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" /></svg>
-                </button>
-              </div>
-            </div>
+          <AssetRevisionsSection
+            assetId={asset.id}
+            currentRevisionId={asset.currentRevisionId}
+            refreshKey={revisionRefreshKey}
+          />
 
-            <div
-              className="mt-4"
-              style={{
-                maxHeight: revisionsCollapsed ? 0 : 1000,
-                overflow: 'hidden',
-                transition: 'max-height 200ms ease',
-              }}
-            >
-              {/* timeline wrapper */}
-              {(asset.revisions ?? []).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-15">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" className="mb-3" style={{ color: '#252525' }}>
-                    <path d="M3 7h18M3 12h18M3 17h18" stroke="#252525" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <p className="text-[14px] text-[#71717a]">No revisions yet</p>
-                  <p className="text-[12px] text-[#52525b]">Upload a revision to start tracking history</p>
-                </div>
-              ) : (
-                <div className="relative pl-8">
-                  <div className="absolute left-3 top-3 bottom-3 w-[2px] bg-[rgba(255,255,255,0.06)]" />
-                  <div className="space-y-2">
-                    {(asset.revisions ?? []).map((rev, idx) => {
-                      const isActive = asset.currentRevisionId === rev.id;
-                      const versionLabel = rev.versionNumber ?? idx + 1;
-                      const uploadedAt = rev.uploadedAt ? new Date(rev.uploadedAt) : rev.createdAt ? new Date(rev.createdAt) : null;
-                      const uploader = rev.uploadedBy ? (userMap.get(rev.uploadedBy)?.name ?? rev.uploadedBy) : 'Unknown';
-                      const revisionPreviewItem = toAssetPreviewDescriptor({
-                        title: `Revision v${versionLabel}`,
-                        mimeType: rev.mimeType ?? null,
-                        driveFileId: rev.driveFileId ?? null,
-                        driveFileUrl: rev.driveFileUrl ?? null,
-                        fileSize: rev.fileSize ?? null,
-                        durationSeconds: rev.durationSeconds ?? null,
-                      });
-                      return (
-                        <div key={rev.id} className={`relative ${isActive ? '' : ''}`}>
-                          {/* dot */}
-                          <span
-                            className={`absolute left-0 top-3 rounded-full ${isActive ? 'w-2 h-2' : 'w-1.5 h-1.5'}`}
-                            style={{
-                              background: isActive ? '#6366f1' : 'rgba(255,255,255,0.06)',
-                              display: 'inline-block',
-                            }}
-                          />
-
-                          {isActive ? (
-                            <div
-                              className="ml-4 bg-[#1c1c1c] border rounded-[10px]"
-                              style={{ border: '1px solid rgba(99,102,241,0.35)' }}
-                            >
-                              <div style={{ borderLeft: '3px solid #6366f1' }} className="px-4 py-3.5">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-[14px] font-medium text-white">v{versionLabel}</p>
-                                  <span className="inline-flex items-center px-3 rounded-full" style={{ height: 18, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', fontSize: 10 }}>
-                                    Active
-                                  </span>
-                                </div>
-                                <p className="text-[12px] text-[#a1a1aa] mt-1">Uploaded by {uploader} · {uploadedAt ? uploadedAt.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'Unknown'}</p>
-                                <p className="text-[12px] text-[#71717a] mt-1">{rev.mimeType ?? ''} {rev.fileSize ? `· ${formatFileSize(rev.fileSize)}` : ''}</p>
-                                {rev.changeNote && <p className="italic text-[12px] text-[#71717a] mt-3">{rev.changeNote}</p>}
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
-                                    onClick={() => {
-                                      setPreviewItem(revisionPreviewItem);
-                                      setIsPreviewOpen(true);
-                                    }}
-                                  >
-                                    Preview
-                                  </Button>
-                                  {rev.driveFileUrl && (
-                                    <Button asChild size="sm" className="h-8 bg-[var(--primary)] px-3 text-[12px] text-white shadow-none hover:bg-[#4f46e5]">
-                                      <a href={rev.driveFileUrl} target="_blank" rel="noreferrer">Open</a>
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="ml-4 bg-[#161616] border border-[rgba(255,255,255,0.07)] rounded-[8px] py-2.5 px-3.5 hover:bg-[#191919] hover:border-[rgba(255,255,255,0.12)] transition-colors duration-150">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <p className="text-[13px] font-normal text-[#a1a1aa]">v{versionLabel}</p>
-                                  <p className="text-[12px] text-[#71717a] mt-1">Uploaded by {uploader} · {uploadedAt ? uploadedAt.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric' }) : 'Unknown'}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setPreviewItem(revisionPreviewItem);
-                                      setIsPreviewOpen(true);
-                                    }}
-                                    className="text-[12px] text-[#71717a] hover:text-[#a1a1aa]"
-                                  >
-                                    Preview
-                                  </button>
-                                  {rev.driveFileUrl && <a href={rev.driveFileUrl} target="_blank" rel="noreferrer" className="text-[12px] text-[#71717a] hover:text-[#a1a1aa]">Open</a>}
-                                  <button
-                                    onClick={() => handleSetActive(rev.id)}
-                                    className="h-7 text-[12px] inline-flex items-center px-3 border border-[rgba(255,255,255,0.08)] rounded-md text-[#a1a1aa] hover:border-[rgba(99,102,241,0.3)] hover:text-[#818cf8] hover:bg-[rgba(99,102,241,0.08)] transition-colors duration-150"
-                                  >
-                                    Set Active
-                                  </button>
-                                </div>
-                              </div>
-                              {rev.changeNote && <p className="text-[12px] text-[#71717a] mt-2 italic">{rev.changeNote}</p>}
-                              <div className="mt-2 text-[12px] text-[#71717a] flex gap-3">
-                                {rev.fileSize && <span>{formatFileSize ? formatFileSize(rev.fileSize) : `${rev.fileSize} bytes`}</span>}
-                                {rev.mimeType && <span>{rev.mimeType}</span>}
-                                {rev.durationSeconds && <span>{Math.round(rev.durationSeconds)}s</span>}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
+          <AssetActivitySection assetId={asset.id} />
 
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5">
             <div className="flex items-center justify-between gap-3">
@@ -734,41 +611,96 @@ export default function AssetDetailPage() {
               <StatusBadge status={asset.status} />
             </div>
             <div className="mt-4 space-y-2">
-              {getAllowedTransitions(asset.status).map((nextStatus) => (
+              {canProcessUpload && (
                 <Button
-                  key={nextStatus}
                   className="h-9 w-full justify-between border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
-                  variant={nextStatus === 'revision_requested' ? 'outline' : 'default'}
+                  variant="default"
                   disabled={isSaving}
-                  onClick={async () => {
-                    if (nextStatus === 'scheduled' && !asset.scheduledAt) {
-                      toast({
-                        title: 'Missing schedule',
-                        description: 'Add a scheduled date before moving to Scheduled.',
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-                    try {
-                      setIsSaving(true);
-                      const updated = await assetsApi.update(asset.id, { status: nextStatus });
-                      setAsset(updated);
-                    } catch (err) {
-                      const message = err instanceof Error ? err.message : 'Failed to update status';
-                      toast({
-                        title: 'Status update failed',
-                        description: message,
-                        variant: 'destructive',
-                      });
-                    } finally {
-                      setIsSaving(false);
-                    }
-                  }}
+                  aria-busy={workflowAction === 'process'}
+                  onClick={() => handleWorkflowStatus('processing', 'process')}
                 >
-                  <span>{getTransitionActionLabel(asset.status, nextStatus)}</span>
+                  <span>{workflowAction === 'process' ? 'Processing…' : 'Process'}</span>
                   <span className="text-[#71717a]">→</span>
                 </Button>
-              ))}
+              )}
+
+              {canMoveToDraft && (
+                <Button
+                  className="h-9 w-full justify-between border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                  variant="outline"
+                  disabled={isSaving}
+                  aria-busy={workflowAction === 'move_to_draft'}
+                  onClick={() => handleWorkflowStatus('draft', 'move_to_draft')}
+                >
+                  <span>{workflowAction === 'move_to_draft' ? 'Moving…' : 'Move to Draft'}</span>
+                  <span className="text-[#71717a]">→</span>
+                </Button>
+              )}
+
+              {canApproveDraft && (
+                <Button
+                  className="h-9 w-full justify-between border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[13px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399]"
+                  variant="outline"
+                  disabled={approvalAction !== null}
+                  aria-busy={approvalAction === 'approve'}
+                  onClick={() => handleApprovalAction('approve')}
+                >
+                  <span>{approvalAction === 'approve' ? 'Approving…' : 'Approve'}</span>
+                  <span className="text-[#71717a]">→</span>
+                </Button>
+              )}
+
+              {canRequestRevision && (
+                <Button
+                  className="h-9 w-full justify-between border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[13px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5]"
+                  variant="outline"
+                  disabled={approvalAction !== null}
+                  aria-busy={approvalAction === 'reject'}
+                  onClick={() => handleApprovalAction('reject')}
+                >
+                  <span>{approvalAction === 'reject' ? 'Requesting…' : 'Request Revision'}</span>
+                  <span className="text-[#71717a]">→</span>
+                </Button>
+              )}
+
+              {canApproveRevision && (
+                <Button
+                  className="h-9 w-full justify-between border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[13px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399]"
+                  variant="outline"
+                  disabled={approvalAction !== null}
+                  aria-busy={approvalAction === 'approve'}
+                  onClick={() => handleApprovalAction('approve')}
+                >
+                  <span>{approvalAction === 'approve' ? 'Approving…' : 'Approve'}</span>
+                  <span className="text-[#71717a]">→</span>
+                </Button>
+              )}
+
+              {canSyncToCalendar && (
+                <Button
+                  variant={isAlreadySynced ? 'outline' : 'default'}
+                  className="h-9 w-full justify-between px-3 text-[13px]"
+                  disabled={isAlreadySynced || isSyncingCalendar}
+                  onClick={handleCalendarSync}
+                  aria-busy={isSyncingCalendar}
+                >
+                  <span>{isAlreadySynced ? 'Already Synced' : 'Sync to Google Calendar'}</span>
+                  <span className="text-[#71717a]">→</span>
+                </Button>
+              )}
+
+              {asset.googleCalendarEventUrl && (
+                <Button
+                  variant="outline"
+                  className="h-9 w-full justify-between px-3 text-[13px]"
+                  onClick={() => {
+                    window.open(asset.googleCalendarEventUrl ?? '', '_blank', 'noopener,noreferrer');
+                  }}
+                >
+                  <span>View in Google Calendar</span>
+                  <span className="text-[#71717a]">→</span>
+                </Button>
+              )}
             </div>
 
             {!uploadEligible && (
@@ -814,17 +746,6 @@ export default function AssetDetailPage() {
           </Card>
         </div>
       </div>
-
-      <AssetPreviewModal
-        item={previewItem}
-        open={isPreviewOpen && Boolean(previewItem)}
-        onOpenChange={(open) => {
-          setIsPreviewOpen(open);
-          if (!open) {
-            setPreviewItem(null);
-          }
-        }}
-      />
 
       <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
         <AlertDialogContent>

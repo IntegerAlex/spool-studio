@@ -20,9 +20,9 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     published: 'Published',
     failed: 'Failed',
     archived: 'Archived',
-    in_design: 'In Design',
-    ready_for_review: 'Review',
-    revision_requested: 'Review',
+    in_design: 'Draft',
+    ready_for_review: 'Draft',
+    revision_requested: 'Revision',
     scheduled: 'Scheduled',
   };
 

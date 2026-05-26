@@ -1,6 +1,6 @@
 import type { AssetStatus } from '@/types/index';
 
-export type KanbanWorkflowColumnId = 'draft' | 'review' | 'approved' | 'published';
+export type KanbanWorkflowColumnId = 'draft' | 'revision' | 'approved' | 'published';
 
 export interface KanbanWorkflowColumn {
   id: KanbanWorkflowColumnId;
@@ -17,8 +17,8 @@ export const kanbanWorkflowColumns: KanbanWorkflowColumn[] = [
     counterClassName: 'border-[rgba(148,163,184,0.2)] bg-[rgba(148,163,184,0.12)] text-slate-200',
   },
   {
-    id: 'review',
-    label: 'Review',
+    id: 'revision',
+    label: 'Revision',
     accentClassName: 'bg-amber-400',
     counterClassName: 'border-[rgba(245,158,11,0.2)] bg-[rgba(245,158,11,0.14)] text-amber-200',
   },
@@ -41,6 +41,7 @@ export const kanbanWorkflowColumnIds = kanbanWorkflowColumns.map((column) => col
 export const kanbanVisibleWorkflowStatuses: AssetStatus[] = [
   'draft',
   'ready_for_review',
+  'revision_requested',
   'approved',
   'published',
 ];
@@ -49,12 +50,12 @@ const columnByStatus: Record<AssetStatus, KanbanWorkflowColumnId> = {
   draft: 'draft',
   uploading: 'draft',
   uploaded: 'draft',
-  processing: 'review',
-  failed: 'review',
-  in_design: 'review',
-  ready_for_review: 'review',
-  revision_requested: 'review',
-  scheduled: 'published',
+  processing: 'draft',
+  failed: 'draft',
+  in_design: 'draft',
+  ready_for_review: 'draft',
+  revision_requested: 'revision',
+  scheduled: 'approved',
   approved: 'approved',
   published: 'published',
   archived: 'published',
@@ -62,7 +63,7 @@ const columnByStatus: Record<AssetStatus, KanbanWorkflowColumnId> = {
 
 const statusByColumn: Record<KanbanWorkflowColumnId, AssetStatus> = {
   draft: 'draft',
-  review: 'ready_for_review',
+  revision: 'revision_requested',
   approved: 'approved',
   published: 'published',
 };

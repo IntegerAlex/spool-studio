@@ -1,8 +1,15 @@
 type RuntimeLogContext = Record<string, unknown>;
 
-let supabaseEnvLogged = false;
-let googleEnvLogged = false;
-let mailgunEnvLogged = false;
+const envCheckState = globalThis as typeof globalThis & {
+  __cmsEnvChecks?: { supabase: boolean; google: boolean; mailgun: boolean };
+};
+// Persist across module reloads in dev to avoid repeated env-check logs.
+const envChecks = envCheckState.__cmsEnvChecks ?? {
+  supabase: false,
+  google: false,
+  mailgun: false,
+};
+envCheckState.__cmsEnvChecks = envChecks;
 
 function logEnvironmentCheck(prefix: string, payload: RuntimeLogContext): void {
   console.info(prefix, payload);
@@ -17,11 +24,11 @@ export function logProductionRuntimeError(source: string, error: unknown, extra:
 }
 
 export function logSupabaseEnvCheck(): void {
-  if (supabaseEnvLogged) {
+  if (envChecks.supabase) {
     return;
   }
 
-  supabaseEnvLogged = true;
+  envChecks.supabase = true;
   logEnvironmentCheck('[env-check]', {
     supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnon: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -29,11 +36,11 @@ export function logSupabaseEnvCheck(): void {
 }
 
 export function logGoogleEnvCheck(): void {
-  if (googleEnvLogged) {
+  if (envChecks.google) {
     return;
   }
 
-  googleEnvLogged = true;
+  envChecks.google = true;
   logEnvironmentCheck('[env-check]', {
     googleEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
     googleKey: !!process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
@@ -41,11 +48,11 @@ export function logGoogleEnvCheck(): void {
 }
 
 export function logMailgunEnvCheck(): void {
-  if (mailgunEnvLogged) {
+  if (envChecks.mailgun) {
     return;
   }
 
-  mailgunEnvLogged = true;
+  envChecks.mailgun = true;
   logEnvironmentCheck('[env-check]', {
     mailgunApiKey: !!process.env.MAILGUN_API_KEY,
     mailgunDomain: !!process.env.MAILGUN_DOMAIN,

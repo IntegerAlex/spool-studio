@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { KanbanBoard } from '@/components/kanban/board';
-import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
-import { assetsApi, clientsApi } from '@/lib/api-client';
-import { Asset, Client } from '@/types/index';
+import { assetsApi, kanbanApi } from '@/lib/api-client';
+import type { Asset, KanbanClientOption } from '@/types/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, Plus } from 'lucide-react';
@@ -18,9 +18,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 
+const AssetFormDialog = dynamic(
+  () => import('@/components/assets/asset-form-dialog').then((mod) => mod.AssetFormDialog),
+  { ssr: false }
+);
+
 export default function KanbanPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<KanbanClientOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,10 +36,7 @@ export default function KanbanPage() {
     const loadData = async () => {
       try {
         setError(null);
-        const [assetsData, clientsData] = await Promise.all([
-          assetsApi.getAll(),
-          clientsApi.getAll(),
-        ]);
+        const { assets: assetsData, clients: clientsData } = await kanbanApi.getBoard();
         setAssets(assetsData);
         setClients(clientsData);
       } catch (err) {
@@ -48,30 +50,33 @@ export default function KanbanPage() {
     loadData();
   }, []);
 
-  const filteredAssets = assets.filter((asset) => {
-    const matchesSearch = asset.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClient = selectedClient === 'all' || asset.clientId === selectedClient;
-    return matchesSearch && matchesClient;
-  });
+  const filteredAssets = useMemo(() => {
+    return assets.filter((asset) => {
+      const matchesSearch = asset.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesClient = selectedClient === 'all' || asset.clientId === selectedClient;
+      return matchesSearch && matchesClient;
+    });
+  }, [assets, searchQuery, selectedClient]);
 
   const handleStatusChange = async (assetId: string, newStatus: Asset['status']) => {
-    const target = assets.find((asset) => asset.id === assetId);
-    if (!target) {
-      return;
-    }
-    if (newStatus === 'scheduled' && !target.scheduledAt) {
-      toast({
-        title: 'Missing schedule',
-        description: 'Add a scheduled date before moving to Scheduled.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    let previousAssets: Asset[] = [];
+    setAssets((prev) => {
+      previousAssets = prev;
+      return prev.map((item) =>
+        item.id === assetId
+          ? {
+              ...item,
+              status: newStatus,
+            }
+          : item
+      );
+    });
 
     try {
       const updated = await assetsApi.update(assetId, { status: newStatus });
       setAssets((prev) => prev.map((item) => (item.id === assetId ? updated : item)));
     } catch (err) {
+      setAssets(previousAssets);
       const message = err instanceof Error ? err.message : 'Failed to update status';
       toast({
         title: 'Status update failed',

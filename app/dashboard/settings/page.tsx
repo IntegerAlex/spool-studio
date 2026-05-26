@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { workspaceApi, usersApi } from '@/lib/api-client';
 import { Workspace, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Bell, Lock, Palette, Save, Users, Sparkles } from 'lucide-react';
+import { Bell, CalendarCheck, Lock, Palette, Save, Users, Sparkles } from 'lucide-react';
 
 const sections = [
   {
@@ -17,6 +17,12 @@ const sections = [
     label: 'Workspace',
     description: 'Branding and identity',
     icon: Palette,
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    description: 'Connected services',
+    icon: CalendarCheck,
   },
   {
     id: 'team',
@@ -44,6 +50,16 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [workspaceName, setWorkspaceName] = useState('');
   const [activeSection, setActiveSection] = useState<(typeof sections)[number]['id']>('workspace');
+  const [integrationStatus, setIntegrationStatus] = useState<{
+    connected: boolean;
+    userId: string | null;
+    googleEmail: string | null;
+  }>({
+    connected: false,
+    userId: null,
+    googleEmail: null,
+  });
+  const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,6 +77,27 @@ export default function SettingsPage() {
     };
 
     loadData();
+  }, []);
+
+  useEffect(() => {
+    const loadIntegrations = async () => {
+      try {
+        const response = await fetch('/api/google/integration', {
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error ?? 'Failed to load integration');
+        }
+        setIntegrationStatus(payload.data);
+      } catch {
+        setIntegrationStatus({ connected: false, userId: null, googleEmail: null });
+      } finally {
+        setIsLoadingIntegrations(false);
+      }
+    };
+
+    loadIntegrations();
   }, []);
 
   const handleSaveWorkspace = async () => {
@@ -147,6 +184,7 @@ export default function SettingsPage() {
                 <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">{activeMeta.label}</p>
                 <h3 className="text-[18px] font-medium text-white">
                   {activeSection === 'workspace' && 'Workspace identity'}
+                  {activeSection === 'integrations' && 'Connected services'}
                   {activeSection === 'team' && 'Team access'}
                   {activeSection === 'notifications' && 'Notification routing'}
                   {activeSection === 'security' && 'Security controls'}
@@ -157,6 +195,19 @@ export default function SettingsPage() {
                 <Button onClick={handleSaveWorkspace}>
                   <Save className="mr-2 size-4" />
                   Save changes
+                </Button>
+              )}
+
+              {activeSection === 'integrations' && (
+                <Button
+                  variant="outline"
+                  disabled={isLoadingIntegrations || !integrationStatus.userId}
+                  onClick={() => {
+                    if (!integrationStatus.userId) return;
+                    window.location.href = `/api/google/auth?userId=${integrationStatus.userId}`;
+                  }}
+                >
+                  {integrationStatus.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
                 </Button>
               )}
 
@@ -212,6 +263,41 @@ export default function SettingsPage() {
                     className="w-full max-w-full md:max-w-[260px]"
                   />
                 </div>
+              </div>
+            </Card>
+          )}
+
+          {activeSection === 'integrations' && (
+            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
+              <div className="space-y-1">
+                <h4 className="text-[15px] font-medium text-white">Google Calendar</h4>
+                <p className="text-[13px] text-[#71717a]">Connect your Google Calendar to sync approved publishing schedules.</p>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-[13px] font-medium text-white">
+                    {integrationStatus.connected ? 'Google Calendar Connected ✅' : 'Google Calendar Not Connected'}
+                  </p>
+                  <p className="text-[11px] text-[#71717a]">
+                    {integrationStatus.connected
+                      ? integrationStatus.googleEmail
+                        ? `Connected as ${integrationStatus.googleEmail}`
+                        : 'Connection active'
+                      : 'Connect to enable manual calendar sync.'}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="md:self-center"
+                  disabled={isLoadingIntegrations || !integrationStatus.userId}
+                  onClick={() => {
+                    if (!integrationStatus.userId) return;
+                    window.location.href = `/api/google/auth?userId=${integrationStatus.userId}`;
+                  }}
+                >
+                  {integrationStatus.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+                </Button>
               </div>
             </Card>
           )}

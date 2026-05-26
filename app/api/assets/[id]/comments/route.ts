@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createComment, getCommentsByAssetId } from '@/services/comments-service';
+import { createComment, getCommentsByAssetId, getCommentsWithUsers } from '@/services/comments-service';
 import { logAssetActivity } from '@/services/activity-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
@@ -17,7 +17,19 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Asset id is required' }, { status: 400 });
     }
 
-    const comments = await getCommentsByAssetId(assetId);
+    const { searchParams } = new URL(_request.url);
+    const includeUsers = searchParams.get('includeUsers') === '1';
+    const limitParam = searchParams.get('limit');
+    const offsetParam = searchParams.get('offset');
+    const limit = limitParam ? Number(limitParam) : undefined;
+    const offset = offsetParam ? Number(offsetParam) : undefined;
+
+    if (includeUsers) {
+      const payload = await getCommentsWithUsers(assetId, { limit, offset });
+      return NextResponse.json({ data: payload });
+    }
+
+    const comments = await getCommentsByAssetId(assetId, { limit, offset });
     return NextResponse.json({ data: comments });
   } catch (error) {
     logProductionRuntimeError('api-assets-comments-get', error);

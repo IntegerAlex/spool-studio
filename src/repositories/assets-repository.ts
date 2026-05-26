@@ -5,8 +5,47 @@ import type { Database } from '@/types/database';
 export type DbAsset = Database['public']['Tables']['content_assets']['Row'];
 export type DbAssetSummary = Pick<
   DbAsset,
-  'client_id' | 'status' | 'assigned_to' | 'scheduled_at' | 'created_at'
+  | 'client_id'
+  | 'status'
+  | 'assigned_to'
+  | 'scheduled_at'
+  | 'publish_date'
+  | 'publish_time'
+  | 'published_at'
+  | 'approved_at'
+  | 'created_at'
 >;
+
+export type DbDashboardAssetSummary = Pick<
+  DbAsset,
+  | 'status'
+  | 'publish_date'
+  | 'publish_time'
+  | 'published_at'
+>;
+
+export type DbKanbanAsset = Pick<
+  DbAsset,
+  | 'id'
+  | 'client_id'
+  | 'title'
+  | 'type'
+  | 'status'
+  | 'mime_type'
+  | 'file_extension'
+  | 'thumbnail_url'
+  | 'assigned_to'
+  | 'publish_date'
+  | 'created_at'
+  | 'updated_at'
+>;
+
+const assetSelect =
+  'id,client_id,title,type,status,mime_type,file_size,file_extension,uploaded_at,uploaded_by,drive_file_id,drive_file_url,drive_folder_id,drive_folder_url,thumbnail_url,media_width,media_height,duration_seconds,created_by,created_at,updated_at,scheduled_at,publish_date,publish_time,scheduled_by,published_at,approved_at,approved_by,google_calendar_event_id,google_calendar_event_url,calendar_synced_at,assigned_to,current_revision_id,latest_revision_id,revision_count';
+
+const dashboardSummarySelect = 'status,publish_date,publish_time,published_at';
+const kanbanAssetSelect =
+  'id,client_id,title,type,status,mime_type,file_extension,thumbnail_url,assigned_to,publish_date,created_at,updated_at';
 
 async function getClient(client?: SupabaseClient<Database>) {
   return client ?? (await createServerSupabaseClient());
@@ -16,7 +55,7 @@ export async function listAssets(client?: SupabaseClient<Database>): Promise<DbA
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
-    .select('*')
+    .select(assetSelect)
     .order('updated_at', { ascending: false });
 
   if (error) {
@@ -32,7 +71,38 @@ export async function listAssetSummaries(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
-    .select('client_id,status,assigned_to,scheduled_at,created_at');
+    .select('client_id,status,assigned_to,scheduled_at,publish_date,publish_time,published_at,approved_at,created_at');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function listDashboardAssetSummaries(
+  client?: SupabaseClient<Database>
+): Promise<DbDashboardAssetSummary[]> {
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('content_assets')
+    .select(dashboardSummarySelect);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function listKanbanAssets(
+  client?: SupabaseClient<Database>
+): Promise<DbKanbanAsset[]> {
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('content_assets')
+    .select(kanbanAssetSelect)
+    .order('updated_at', { ascending: false });
 
   if (error) {
     throw new Error(error.message);
@@ -48,7 +118,7 @@ export async function listAssetsByClientId(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
-    .select('*')
+    .select(assetSelect)
     .eq('client_id', clientId)
     .order('updated_at', { ascending: false });
 
@@ -66,7 +136,7 @@ export async function getAssetById(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
-    .select('*')
+    .select(assetSelect)
     .eq('id', assetId)
     .maybeSingle();
 
@@ -85,7 +155,7 @@ export async function insertAsset(
   const { data, error } = await supabase
     .from('content_assets')
     .insert(payload)
-    .select('*')
+    .select(assetSelect)
     .single();
 
   if (error) {
@@ -105,7 +175,7 @@ export async function updateAsset(
     .from('content_assets')
     .update(updates)
     .eq('id', assetId)
-    .select('*')
+    .select(assetSelect)
     .single();
 
   if (error) {
@@ -133,7 +203,9 @@ export async function listRevisionsByAssetId(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('asset_revisions')
-    .select('*')
+    .select(
+      'id,asset_id,version_number,uploaded_by,uploaded_at,drive_file_id,drive_file_url,file_size,mime_type,media_width,media_height,duration_seconds,change_note,metadata,created_at'
+    )
     .eq('asset_id', assetId)
     .order('version_number', { ascending: false });
 

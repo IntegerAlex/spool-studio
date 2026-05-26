@@ -47,6 +47,12 @@ export async function POST(request: Request) {
       thumbnailUrl: body.thumbnailUrl,
       assignedTo: body.assignedTo ?? null,
       scheduledAt: body.scheduledAt ?? null,
+      publishDate: body.publishDate ?? null,
+      publishTime: body.publishTime ?? null,
+      scheduledBy: body.scheduledBy ?? null,
+      publishedAt: body.publishedAt ?? null,
+      approvedAt: body.approvedAt ?? null,
+      approvedBy: body.approvedBy ?? null,
     };
     console.info('[api/assets] parsed payload', payload);
     const asset = await createAsset({
@@ -58,6 +64,12 @@ export async function POST(request: Request) {
       thumbnailUrl: payload.thumbnailUrl,
       assignedTo: payload.assignedTo,
       scheduledAt: payload.scheduledAt,
+      publishDate: payload.publishDate,
+      publishTime: payload.publishTime,
+      scheduledBy: payload.scheduledBy,
+      publishedAt: payload.publishedAt,
+      approvedAt: payload.approvedAt,
+      approvedBy: payload.approvedBy,
     });
     console.info('[api/assets] insert result', asset);
     return NextResponse.json({ success: true, data: asset }, { status: 201 });

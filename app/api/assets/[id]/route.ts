@@ -45,6 +45,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       thumbnailUrl: body.thumbnailUrl,
       assignedTo: body.assignedTo,
       scheduledAt: body.scheduledAt,
+      publishDate: body.publishDate,
+      publishTime: body.publishTime,
+      scheduledBy: body.scheduledBy,
+      publishedAt: body.publishedAt,
+      approvedAt: body.approvedAt,
+      approvedBy: body.approvedBy,
     });
     return NextResponse.json({ data: asset });
   } catch (error) {

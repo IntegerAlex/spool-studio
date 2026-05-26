@@ -33,12 +33,56 @@ export interface AssetInput {
   thumbnailUrl?: string;
   assignedTo?: string | null;
   scheduledAt?: string | null;
+  publishDate?: string | null;
+  publishTime?: string | null;
+  scheduledBy?: string | null;
+  publishedAt?: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+}
+
+function splitScheduledAt(value?: string | null): { publishDate: string | null; publishTime: string | null } {
+  if (!value) {
+    return { publishDate: null, publishTime: null };
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return { publishDate: null, publishTime: null };
+  }
+
+  return {
+    publishDate: parsed.toISOString().slice(0, 10),
+    publishTime: parsed.toISOString().slice(11, 19),
+  };
+}
+
+function combinePublishDateTime(
+  publishDate?: string | null,
+  publishTime?: string | null,
+  scheduledAt?: string | null
+): Date | null {
+  if (scheduledAt) {
+    const fallback = new Date(scheduledAt);
+    if (!Number.isNaN(fallback.getTime())) {
+      return fallback;
+    }
+  }
+
+  if (!publishDate) {
+    return null;
+  }
+
+  const parsed = new Date(`${publishDate}T${publishTime ?? '00:00:00'}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function mapAsset(asset: Awaited<ReturnType<typeof getAssetById>>): Asset | null {
   if (!asset) {
     return null;
   }
+
+  const scheduledAt = combinePublishDateTime(asset.publish_date, asset.publish_time, asset.scheduled_at);
 
   return {
     id: asset.id,
@@ -64,11 +108,45 @@ function mapAsset(asset: Awaited<ReturnType<typeof getAssetById>>): Asset | null
     createdBy: asset.created_by,
     createdAt: new Date(asset.created_at),
     updatedAt: new Date(asset.updated_at),
-    scheduledAt: asset.scheduled_at ? new Date(asset.scheduled_at) : null,
+    scheduledAt,
+    publishDate: asset.publish_date ?? null,
+    publishTime: asset.publish_time ?? null,
+    scheduledBy: asset.scheduled_by ?? null,
+    publishedAt: asset.published_at ? new Date(asset.published_at) : null,
+    approvedAt: asset.approved_at ? new Date(asset.approved_at) : null,
+    approvedBy: asset.approved_by ?? null,
+    googleCalendarEventId: asset.google_calendar_event_id ?? null,
+    googleCalendarEventUrl: asset.google_calendar_event_url ?? null,
+    calendarSyncedAt: asset.calendar_synced_at ? new Date(asset.calendar_synced_at) : null,
     assignedTo: asset.assigned_to ? [asset.assigned_to] : [],
     revisions: [],
+    currentRevisionId: asset.current_revision_id ?? undefined,
+    latestRevision: undefined,
+    revisionCount: asset.revision_count ?? undefined,
     comments: [],
   };
+}
+
+function mapAssetRevisions(
+  revisions: Awaited<ReturnType<typeof listRevisionsByAssetId>>
+): Asset['revisions'] {
+  return revisions.map((rev) => ({
+    id: rev.id,
+    assetId: rev.asset_id,
+    versionNumber: rev.version_number,
+    uploadedBy: rev.uploaded_by ?? undefined,
+    uploadedAt: new Date(rev.uploaded_at),
+    driveFileId: rev.drive_file_id,
+    driveFileUrl: rev.drive_file_url ?? undefined,
+    fileSize: rev.file_size ?? undefined,
+    mimeType: rev.mime_type ?? undefined,
+    mediaWidth: rev.media_width ?? undefined,
+    mediaHeight: rev.media_height ?? undefined,
+    durationSeconds: rev.duration_seconds ?? undefined,
+    changeNote: rev.change_note ?? undefined,
+    metadata: rev.metadata ?? undefined,
+    createdAt: new Date(rev.created_at),
+  }));
 }
 
 function logUploadFailure(stage: string, error: unknown, assetId: string, extra: Record<string, unknown> = {}) {
@@ -114,7 +192,6 @@ async function transitionAssetStatus(
   }
 
   if (currentAsset.status !== nextStatus) {
-    logAssetStatusTransition(assetId, currentAsset.status, nextStatus, triggerSource);
   }
 
   await updateAssetRow(assetId, { status: nextStatus }, supabase);
@@ -227,23 +304,7 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
     if (!mapped) return null;
     try {
       const revisions = await listRevisionsByAssetId(assetId);
-      mapped.revisions = revisions.map((r) => ({
-        id: r.id,
-        assetId: r.asset_id,
-        versionNumber: r.version_number,
-        uploadedBy: r.uploaded_by ?? undefined,
-        uploadedAt: new Date(r.uploaded_at),
-        driveFileId: r.drive_file_id,
-        driveFileUrl: r.drive_file_url ?? undefined,
-        fileSize: r.file_size ?? undefined,
-        mimeType: r.mime_type ?? undefined,
-        mediaWidth: r.media_width ?? undefined,
-        mediaHeight: r.media_height ?? undefined,
-        durationSeconds: r.duration_seconds ?? undefined,
-        changeNote: r.change_note ?? undefined,
-        metadata: r.metadata ?? undefined,
-        createdAt: new Date(r.created_at),
-      }));
+      mapped.revisions = mapAssetRevisions(revisions);
       // populate revision pointers/count from asset row
       mapped.currentRevisionId = row?.current_revision_id ?? undefined;
       mapped.revisionCount = row?.revision_count ?? mapped.revisions.length;
@@ -278,6 +339,26 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
   } catch (error) {
     logProductionRuntimeError('asset-detail-loader', error, { assetId });
     return null;
+  }
+}
+
+export async function getAssetSummary(assetId: string): Promise<Asset | null> {
+  try {
+    const row = await getAssetById(assetId);
+    return mapAsset(row);
+  } catch (error) {
+    logProductionRuntimeError('asset-summary-loader', error, { assetId });
+    return null;
+  }
+}
+
+export async function getAssetRevisions(assetId: string): Promise<Asset['revisions']> {
+  try {
+    const revisions = await listRevisionsByAssetId(assetId);
+    return mapAssetRevisions(revisions);
+  } catch (error) {
+    logProductionRuntimeError('asset-revisions-loader', error, { assetId });
+    return [];
   }
 }
 
@@ -332,6 +413,8 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     }
   }
 
+  const scheduledFields = splitScheduledAt(input.scheduledAt);
+
   const record = await insertAsset(
     {
       client_id: input.clientId,
@@ -345,6 +428,12 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
       assigned_to: input.assignedTo ?? null,
       created_by: user.id,
       scheduled_at: input.scheduledAt ?? null,
+      publish_date: input.publishDate ?? scheduledFields.publishDate,
+      publish_time: input.publishTime ?? scheduledFields.publishTime,
+      scheduled_by: input.scheduledBy ?? (input.scheduledAt ? user.id : null),
+      published_at: input.publishedAt ?? null,
+      approved_at: input.approvedAt ?? null,
+      approved_by: input.approvedBy ?? null,
     },
     supabase
   );
@@ -1041,6 +1130,9 @@ export async function updateAsset(
   input: Partial<AssetInput>
 ): Promise<Asset> {
   const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const existing = await getAssetById(assetId);
   if (!existing) {
     throw new Error('Asset not found');
@@ -1070,7 +1162,28 @@ export async function updateAsset(
   }
   if (input.thumbnailUrl !== undefined) updates.thumbnail_url = input.thumbnailUrl;
   if (input.assignedTo !== undefined) updates.assigned_to = input.assignedTo;
-  if (input.scheduledAt !== undefined) updates.scheduled_at = input.scheduledAt;
+  if (input.scheduledAt !== undefined) {
+    const scheduledFields = splitScheduledAt(input.scheduledAt);
+    updates.scheduled_at = input.scheduledAt;
+    updates.publish_date = scheduledFields.publishDate;
+    updates.publish_time = scheduledFields.publishTime;
+    updates.scheduled_by = input.scheduledBy ?? user?.id ?? existing.scheduled_by ?? null;
+  }
+  if (input.publishDate !== undefined) updates.publish_date = input.publishDate;
+  if (input.publishTime !== undefined) updates.publish_time = input.publishTime;
+  if (input.scheduledBy !== undefined) updates.scheduled_by = input.scheduledBy;
+  if (input.publishedAt !== undefined) updates.published_at = input.publishedAt;
+  if (input.approvedAt !== undefined) updates.approved_at = input.approvedAt;
+  if (input.approvedBy !== undefined) updates.approved_by = input.approvedBy;
+
+  if (input.status === 'approved') {
+    updates.approved_at = input.approvedAt ?? new Date().toISOString();
+    updates.approved_by = input.approvedBy ?? user?.id ?? existing.approved_by ?? null;
+  }
+
+  if (input.status === 'published') {
+    updates.published_at = input.publishedAt ?? new Date().toISOString();
+  }
 
   let record = await updateAssetRow(assetId, updates as Parameters<typeof updateAssetRow>[1], supabase);
 
@@ -1149,6 +1262,83 @@ export async function updateAsset(
     } catch (_error) {
       // Activity logging should not block updates.
     }
+  }
+
+  return mapped;
+}
+
+const approvalEligibleStatuses = new Set<AssetStatus>(['draft', 'ready_for_review']);
+
+export async function approveAsset(assetId: string, userId: string): Promise<Asset> {
+  const supabase = await createServerSupabaseClient();
+  const existing = await getAssetById(assetId, supabase);
+  if (!existing) {
+    throw new Error('Asset not found');
+  }
+
+  if (existing.status === 'approved') {
+    const mapped = mapAsset(existing);
+    if (!mapped) {
+      throw new Error('Failed to map asset');
+    }
+    return mapped;
+  }
+
+  if (!approvalEligibleStatuses.has(existing.status)) {
+    throw new Error('Asset is not eligible for approval');
+  }
+
+  const approvedAt = new Date().toISOString();
+  const updated = await updateAssetRow(
+    assetId,
+    {
+      status: 'approved',
+      approved_at: approvedAt,
+      approved_by: userId,
+    },
+    supabase
+  );
+
+  const mapped = mapAsset(updated);
+  if (!mapped) {
+    throw new Error('Failed to map asset');
+  }
+
+  return mapped;
+}
+
+export async function rejectAsset(assetId: string, userId: string): Promise<Asset> {
+  const supabase = await createServerSupabaseClient();
+  const existing = await getAssetById(assetId, supabase);
+  if (!existing) {
+    throw new Error('Asset not found');
+  }
+
+  if (existing.status === 'revision_requested') {
+    const mapped = mapAsset(existing);
+    if (!mapped) {
+      throw new Error('Failed to map asset');
+    }
+    return mapped;
+  }
+
+  if (!approvalEligibleStatuses.has(existing.status)) {
+    throw new Error('Asset is not eligible for rejection');
+  }
+
+  const updated = await updateAssetRow(
+    assetId,
+    {
+      status: 'revision_requested',
+      approved_at: null,
+      approved_by: null,
+    },
+    supabase
+  );
+
+  const mapped = mapAsset(updated);
+  if (!mapped) {
+    throw new Error('Failed to map asset');
   }
 
   return mapped;

@@ -23,6 +23,11 @@ export interface Client {
   driveFolderUrl?: string;
 }
 
+export interface KanbanClientOption {
+  id: string;
+  name: string;
+}
+
 export type ClientReferenceType =
   | 'instagram'
   | 'website'
@@ -88,6 +93,15 @@ export interface Asset {
   createdAt: Date;
   updatedAt: Date;
   scheduledAt?: Date | null;
+  publishDate?: string | null;
+  publishTime?: string | null;
+  scheduledBy?: string | null;
+  publishedAt?: Date | null;
+  approvedAt?: Date | null;
+  approvedBy?: string | null;
+  googleCalendarEventId?: string | null;
+  googleCalendarEventUrl?: string | null;
+  calendarSyncedAt?: Date | null;
   assignedTo: string[];
   revisions: AssetRevision[];
   // Revision/versioning fields

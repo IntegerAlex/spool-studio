@@ -19,9 +19,10 @@ export const assetStatusValues = [
 
 export const userSelectableStatusValues = [
   'draft',
-  'in_design',
   'ready_for_review',
+  'revision_requested',
   'approved',
+  'published',
 ] as const satisfies readonly AssetStatus[];
 
 export const systemControlledStatusValues = [
@@ -38,14 +39,14 @@ export const assetStatusOrder: AssetStatus[] = [
   'uploading',
   'uploaded',
   'processing',
-  'approved',
-  'published',
-  'failed',
-  'archived',
   'in_design',
   'ready_for_review',
   'revision_requested',
+  'approved',
   'scheduled',
+  'published',
+  'failed',
+  'archived',
 ];
 
 export interface AssetStatusMeta {
@@ -101,12 +102,12 @@ export const assetStatusMeta: Record<AssetStatus, AssetStatusMeta> = {
     icon: PenTool,
   },
   ready_for_review: {
-    label: 'Ready for Review',
+    label: 'Draft',
     badgeClassName: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
     icon: Eye,
   },
   revision_requested: {
-    label: 'Revision Requested',
+    label: 'Revision',
     badgeClassName: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
     icon: MessageSquareWarning,
   },
@@ -136,7 +137,9 @@ export const assetEditorStatusLabels: Partial<Record<AssetStatus, string>> = {
   draft: 'Draft',
   in_design: 'In Design',
   ready_for_review: 'Review',
+  revision_requested: 'Revision',
   approved: 'Approved',
+  published: 'Published',
 };
 
 export function isUserSelectableStatus(status: AssetStatus): boolean {
@@ -155,7 +158,7 @@ export function getSystemControlledStatuses(): AssetStatus[] {
   return [...systemControlledStatusValues];
 }
 
-const uploadEligibleStatuses: AssetStatus[] = ['draft', 'in_design', 'ready_for_review'];
+const uploadEligibleStatuses: AssetStatus[] = ['draft', 'in_design', 'ready_for_review', 'revision_requested'];
 
 const uploadBlockedReasons: Partial<Record<AssetStatus, string>> = {
   approved: 'Approved assets cannot replace media files.',
@@ -194,9 +197,9 @@ export function getUploadEligibilityReason(status: AssetStatus): string {
 const statusTransitions: Record<AssetStatus, AssetStatus[]> = {
   draft: ['uploading', 'in_design'],
   uploading: ['uploaded', 'failed'],
-  uploaded: ['processing', 'archived'],
-  processing: ['approved', 'failed'],
-  approved: ['scheduled', 'published'],
+  uploaded: ['processing', 'archived', 'draft'],
+  processing: ['ready_for_review', 'failed'],
+  approved: ['scheduled', 'published', 'revision_requested'],
   published: ['archived'],
   failed: ['uploading', 'in_design'],
   archived: [],
@@ -233,6 +236,9 @@ export function getTransitionActionLabel(
   if (to === 'processing') {
     return 'Process';
   }
+  if (to === 'ready_for_review') {
+    return 'Send for Review';
+  }
   if (to === 'published') {
     return 'Publish';
   }
@@ -247,6 +253,9 @@ export function getTransitionActionLabel(
   }
   if (from === 'revision_requested' && to === 'approved') {
     return 'Approve';
+  }
+  if (from === 'approved' && to === 'revision_requested') {
+    return 'Send to Revision';
   }
   if (to === 'archived') {
     return 'Archive';

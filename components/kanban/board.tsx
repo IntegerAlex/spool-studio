@@ -196,9 +196,19 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
 
   const assetsByStatus = useMemo(() => {
     const map = new Map<KanbanWorkflowColumnId, Asset[]>();
-    kanbanWorkflowColumns.forEach((column) => {
-      map.set(column.id, assets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === column.id));
-    });
+    kanbanWorkflowColumns.forEach((column) => map.set(column.id, []));
+
+    for (const asset of assets) {
+      if (isKanbanHiddenStatus(asset.status)) {
+        continue;
+      }
+      const columnId = getKanbanWorkflowColumnId(asset.status);
+      const bucket = map.get(columnId);
+      if (bucket) {
+        bucket.push(asset);
+      }
+    }
+
     return map;
   }, [assets]);
 
@@ -266,7 +276,7 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
                           asset={asset}
                           isDragging={draggedItem?.assetId === asset.id}
                           onQuickApprove={
-                            onStatusChange && asset.status === 'ready_for_review'
+                            onStatusChange && (asset.status === 'ready_for_review' || asset.status === 'revision_requested')
                               ? () => onStatusChange(asset.id, 'approved')
                               : undefined
                           }

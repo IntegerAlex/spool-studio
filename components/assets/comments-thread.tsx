@@ -3,9 +3,7 @@
 import type { AssetComment, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { usersApi } from '@/lib/api-client';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 
 type CommentRecord = AssetComment & {
@@ -20,37 +18,25 @@ interface CommentsThreadProps {
   onAddComment?: (content: string, isInternal: boolean) => void;
   isLoading?: boolean;
   readOnly?: boolean;
+  users?: Map<string, User> | User[];
 }
 
-export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: CommentsThreadProps) {
+export function CommentsThread({ comments, onAddComment, isLoading, readOnly, users }: CommentsThreadProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
-  const [users, setUsers] = useState<Map<string, User>>(new Map());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    let isActive = true;
+  const userMap = useMemo(() => {
+    if (!users) {
+      return new Map<string, User>();
+    }
 
-    const loadUsers = async () => {
-      try {
-        const allUsers = await usersApi.getAll();
-        const userMap = new Map(allUsers.map((u) => [u.id, u]));
-        if (isActive) {
-          setUsers(userMap);
-        }
-      } catch {
-        if (isActive) {
-          setUsers(new Map());
-        }
-      }
-    };
+    if (users instanceof Map) {
+      return users;
+    }
 
-    void loadUsers();
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
+    return new Map(users.map((user) => [user.id, user]));
+  }, [users]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +53,7 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: 
   };
 
   const getUser = (userId: string) => {
-    return users.get(userId) || {
+    return userMap.get(userId) || {
       id: userId,
       name: 'Unknown',
       email: 'unknown@example.com',
@@ -84,6 +70,11 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly }: 
       </div>
 
       <div className="space-y-4">
+        {isLoading && comments.length === 0 ? (
+          <div className="rounded-lg border border-border bg-muted p-4 text-sm text-muted-foreground">
+            Loading comments...
+          </div>
+        ) : null}
         {comments.map((comment) => {
           const authorId = comment.userId ?? comment.authorId ?? 'unknown';
           const author = getUser(authorId);

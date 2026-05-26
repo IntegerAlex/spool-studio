@@ -4,7 +4,7 @@ import {
   insertActivity,
   listActivityByAssetId,
 } from '@/repositories/asset-activity-repository';
-import { getOrCreateCurrentUserProfile } from '@/services/users-service';
+import { getOrCreateCurrentUserProfile, getUsersByIds } from '@/services/users-service';
 import type { Json } from '@/types/database';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
@@ -51,14 +51,27 @@ function mapActivity(row: Awaited<ReturnType<typeof insertActivity>>): AssetActi
   };
 }
 
-export async function getAssetActivity(assetId: string): Promise<AssetActivityLog[]> {
+export async function getAssetActivity(
+  assetId: string,
+  options?: { limit?: number }
+): Promise<AssetActivityLog[]> {
   try {
-    const rows = await listActivityByAssetId(assetId);
+    const rows = await listActivityByAssetId(assetId, undefined, options);
     return rows.map((row) => mapActivity(row));
   } catch (error) {
     logProductionRuntimeError('activity-loader', error, { assetId });
     return [];
   }
+}
+
+export async function getAssetActivityWithUsers(
+  assetId: string,
+  options?: { limit?: number }
+): Promise<{ activity: AssetActivityLog[]; users: Awaited<ReturnType<typeof getUsersByIds>> }> {
+  const activity = await getAssetActivity(assetId, options);
+  const userIds = Array.from(new Set(activity.map((entry) => entry.userId).filter(Boolean))) as string[];
+  const users = await getUsersByIds(userIds);
+  return { activity, users };
 }
 
 export async function logAssetActivity(input: ActivityInput): Promise<AssetActivityLog> {

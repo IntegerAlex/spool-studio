@@ -16,6 +16,7 @@ import {
   FolderPlus,
   KanbanSquare,
   Upload,
+  CheckCircle2,
   Users,
   FileWarning,
   LayoutGrid,
@@ -46,28 +47,40 @@ type ActivityRow = {
 };
 
 function getActivityAction(asset: Asset): string {
-  if (asset.status === 'failed') {
-    return 'failed upload';
-  }
   if (asset.status === 'revision_requested') {
-    return 'needs review';
+    return 'revision requested';
+  }
+  if (asset.status === 'ready_for_review') {
+    return 'awaiting approval';
   }
   if (asset.status === 'approved') {
-    return 'approved';
+    return 'approved for publish';
   }
-  if (asset.status === 'scheduled') {
-    return 'scheduled';
+  if (asset.status === 'published') {
+    return 'published';
+  }
+  if (asset.status === 'failed') {
+    return 'upload failed';
   }
 
   return 'updated';
 }
 
 function getActivityIcon(asset: Asset): React.ReactNode {
-  if (asset.status === 'failed') {
-    return <AlertCircle className="h-4 w-4 text-[#ef4444]" />;
-  }
   if (asset.status === 'revision_requested') {
     return <FileWarning className="h-4 w-4 text-[#f59e0b]" />;
+  }
+  if (asset.status === 'ready_for_review') {
+    return <Clock3 className="h-4 w-4 text-[#f59e0b]" />;
+  }
+  if (asset.status === 'approved') {
+    return <Upload className="h-4 w-4 text-[#10b981]" />;
+  }
+  if (asset.status === 'published') {
+    return <CheckCircle2 className="h-4 w-4 text-[#10b981]" />;
+  }
+  if (asset.status === 'failed') {
+    return <AlertCircle className="h-4 w-4 text-[#ef4444]" />;
   }
   if (asset.type === 'reel') {
     return <Film className="h-4 w-4 text-[#6366f1]" />;
@@ -80,11 +93,20 @@ function getActivityIcon(asset: Asset): React.ReactNode {
 }
 
 function getActivityBg(asset: Asset): string {
-  if (asset.status === 'failed') {
-    return 'bg-[rgba(239,68,68,0.14)]';
-  }
   if (asset.status === 'revision_requested') {
     return 'bg-[rgba(245,158,11,0.14)]';
+  }
+  if (asset.status === 'ready_for_review') {
+    return 'bg-[rgba(245,158,11,0.14)]';
+  }
+  if (asset.status === 'approved') {
+    return 'bg-[rgba(16,185,129,0.14)]';
+  }
+  if (asset.status === 'published') {
+    return 'bg-[rgba(16,185,129,0.14)]';
+  }
+  if (asset.status === 'failed') {
+    return 'bg-[rgba(239,68,68,0.14)]';
   }
   if (asset.type === 'reel') {
     return 'bg-[rgba(99,102,241,0.14)]';
@@ -312,9 +334,9 @@ export default function DashboardPage() {
   const assetStatusBreakdown = useMemo(
     () => [
       { label: 'Draft', count: assets.filter((a) => a.status === 'draft').length },
-      { label: 'In Review', count: assets.filter((a) => a.status === 'ready_for_review').length },
+      { label: 'Revision', count: assets.filter((a) => a.status === 'revision_requested').length },
       { label: 'Approved', count: assets.filter((a) => a.status === 'approved').length },
-      { label: 'Scheduled', count: assets.filter((a) => a.status === 'scheduled').length },
+      { label: 'Published', count: assets.filter((a) => a.status === 'published').length },
     ],
     [assets]
   );

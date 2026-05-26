@@ -10,12 +10,15 @@ import { CheckCircle, XCircle, Clock, Image as ImageIcon } from 'lucide-react';
 import { StatusBadge } from '@/components/assets/status-badge';
 import { getAssetIcon } from '@/lib/asset-display';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ApprovalsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [clients, setClients] = useState<Map<string, Client>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<Record<string, 'approve' | 'reject' | null>>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadData = async () => {
@@ -30,7 +33,7 @@ export default function ApprovalsPage() {
         setClients(clientMap);
 
         const approvalsAssets = assetsData.filter(
-          (a) => a.status === 'ready_for_review' || a.status === 'revision_requested'
+          (a) => a.status === 'draft' || a.status === 'ready_for_review' || a.status === 'revision_requested'
         );
         setAssets(approvalsAssets);
       } catch (err) {
@@ -44,11 +47,44 @@ export default function ApprovalsPage() {
     loadData();
   }, []);
 
-  const readyForReview = assets.filter((a) => a.status === 'ready_for_review');
+  const readyForReview = assets.filter((a) => a.status === 'draft' || a.status === 'ready_for_review');
   const revisionRequested = assets.filter((a) => a.status === 'revision_requested');
+
+  const handleApprovalAction = async (assetId: string, action: 'approve' | 'reject') => {
+    try {
+      setPendingAction((prev) => ({ ...prev, [assetId]: action }));
+      const response = await fetch(`/api/assets/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? 'Request failed');
+      }
+
+      const updated = payload.data as Asset;
+      setAssets((prev) => prev.map((asset) => (asset.id === updated.id ? updated : asset)));
+      toast({
+        title: action === 'approve' ? 'Asset approved' : 'Revision requested',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Approval failed';
+      toast({
+        title: action === 'approve' ? 'Approval failed' : 'Rejection failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setPendingAction((prev) => ({ ...prev, [assetId]: null }));
+    }
+  };
 
   const renderAssetRow = (asset: Asset, clientName: string, isPending: boolean) => {
     const AssetIcon = getAssetIcon(asset);
+    const isApproving = pendingAction[asset.id] === 'approve';
+    const isRejecting = pendingAction[asset.id] === 'reject';
+    const isBusy = isApproving || isRejecting;
 
     return (
       <div key={asset.id} className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center">
@@ -78,15 +114,21 @@ export default function ApprovalsPage() {
               variant="ghost"
               size="sm"
               className="h-7 w-full border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[12px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399] sm:w-auto"
+              disabled={isBusy}
+              aria-busy={isApproving}
+              onClick={() => handleApprovalAction(asset.id, 'approve')}
             >
-              Approve
+              {isApproving ? 'Approving…' : 'Approve'}
             </Button>
             <Button
               variant="ghost"
               size="sm"
               className="h-7 w-full border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5] sm:w-auto"
+              disabled={isBusy}
+              aria-busy={isRejecting}
+              onClick={() => handleApprovalAction(asset.id, 'reject')}
             >
-              Reject
+              {isRejecting ? 'Rejecting…' : 'Reject'}
             </Button>
           </div>
         ) : (
@@ -133,7 +175,7 @@ export default function ApprovalsPage() {
 
       <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111]">
         <div className="border-b border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
-          Pending
+          Drafts Pending Approval
         </div>
         <div className="divide-y divide-[rgba(255,255,255,0.05)]">
           {readyForReview.length > 0 ? (
@@ -147,7 +189,7 @@ export default function ApprovalsPage() {
         </div>
 
         <div className="border-t border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
-          Resolved
+          Revision Requested
         </div>
         <div className="divide-y divide-[rgba(255,255,255,0.05)]">
           {revisionRequested.length > 0 ? (

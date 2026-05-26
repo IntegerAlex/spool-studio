@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { User } from '@/types/index';
-import { getUserById, insertUser, listUsers } from '@/repositories/users-repository';
+import { getUserById, insertUser, listUsers, listUsersByIds } from '@/repositories/users-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 function mapUser(user: Awaited<ReturnType<typeof getUserById>>): User | null {
@@ -82,6 +82,28 @@ export async function getUsers(): Promise<User[]> {
       .filter((user): user is User => Boolean(user));
   } catch (error) {
     logProductionRuntimeError('users-loader', error);
+    return [];
+  }
+}
+
+export async function getUserDetail(userId: string): Promise<User | null> {
+  try {
+    const row = await getUserById(userId);
+    return mapUser(row);
+  } catch (error) {
+    logProductionRuntimeError('user-detail-loader', error, { userId });
+    return null;
+  }
+}
+
+export async function getUsersByIds(userIds: string[]): Promise<User[]> {
+  try {
+    const rows = await listUsersByIds(userIds);
+    return rows
+      .map((user) => mapUser(user))
+      .filter((user): user is User => Boolean(user));
+  } catch (error) {
+    logProductionRuntimeError('users-by-ids-loader', error, { count: userIds.length });
     return [];
   }
 }

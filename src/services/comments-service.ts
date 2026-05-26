@@ -8,6 +8,7 @@ import {
   updateComment as updateCommentRow,
 } from '@/repositories/asset-comments-repository';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
+import { getUsersByIds } from '@/services/users-service';
 import type { Database } from '@/types/database';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
@@ -38,9 +39,12 @@ function mapComment(
   };
 }
 
-export async function getCommentsByAssetId(assetId: string): Promise<AssetComment[]> {
+export async function getCommentsByAssetId(
+  assetId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<AssetComment[]> {
   try {
-    const rows = await listCommentsByAssetId(assetId);
+    const rows = await listCommentsByAssetId(assetId, undefined, options);
     return rows
       .map((row) => mapComment(row))
       .filter((comment): comment is AssetComment => Boolean(comment));
@@ -48,6 +52,16 @@ export async function getCommentsByAssetId(assetId: string): Promise<AssetCommen
     logProductionRuntimeError('comments-loader', error, { assetId });
     return [];
   }
+}
+
+export async function getCommentsWithUsers(
+  assetId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<{ comments: AssetComment[]; users: Awaited<ReturnType<typeof getUsersByIds>> }> {
+  const comments = await getCommentsByAssetId(assetId, options);
+  const userIds = Array.from(new Set(comments.map((comment) => comment.userId).filter(Boolean)));
+  const users = await getUsersByIds(userIds);
+  return { comments, users };
 }
 
 export async function createComment(input: CommentInput): Promise<AssetComment> {

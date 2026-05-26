@@ -2,15 +2,52 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { queueApi, assetsApi, clientsApi } from '@/lib/api-client';
-import { UploadQueue, Asset, Client } from '@/types/index';
+import { assetsApi, clientsApi } from '@/lib/api-client';
+import { Asset, Client } from '@/types/index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+function getAssetPublishDate(asset: Asset): Date | null {
+  if (asset.publishDate) {
+    const timePart = asset.publishTime ? asset.publishTime : '00:00:00';
+    const candidate = new Date(`${asset.publishDate}T${timePart}`);
+    if (!Number.isNaN(candidate.getTime())) {
+      return candidate;
+    }
+  }
+
+  if (asset.scheduledAt) {
+    return asset.scheduledAt;
+  }
+
+  if (asset.publishedAt) {
+    return asset.publishedAt;
+  }
+
+  return null;
+}
+
+function formatDateKey(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function getEventColorClasses(asset: Asset): string {
+  const publishDate = getAssetPublishDate(asset);
+
+  if (asset.status === 'published') {
+    return 'bg-[rgba(16,185,129,0.14)] text-[#a7f3d0] border-[rgba(16,185,129,0.16)]';
+  }
+
+  if (publishDate && publishDate.getTime() < new Date().setHours(0, 0, 0, 0) && asset.status === 'approved') {
+    return 'bg-[rgba(239,68,68,0.14)] text-[#fecaca] border-[rgba(239,68,68,0.18)]';
+  }
+
+  return 'bg-[rgba(59,130,246,0.14)] text-[#bfdbfe] border-[rgba(59,130,246,0.16)]';
+}
+
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 4)); // May 2024
-  const [queue, setQueue] = useState<UploadQueue[]>([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [assets, setAssets] = useState<Map<string, Asset>>(new Map());
   const [clients, setClients] = useState<Map<string, Client>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -18,13 +55,11 @@ export default function CalendarPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [queueData, assetsData, clientsData] = await Promise.all([
-          queueApi.getAll(),
+        const [assetsData, clientsData] = await Promise.all([
           assetsApi.getAll(),
           clientsApi.getAll(),
         ]);
 
-        setQueue(queueData);
         setAssets(new Map(assetsData.map((a) => [a.id, a])));
         setClients(new Map(clientsData.map((c) => [c.id, c])));
       } finally {
@@ -43,13 +78,22 @@ export default function CalendarPage() {
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
-  const getUploadsForDate = (date: number) => {
-    const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), date)
-      .toISOString()
-      .split('T')[0];
-    return queue.filter(
-      (q) => new Date(q.scheduledDate).toISOString().split('T')[0] === dateStr
-    );
+  const getAssetsForDate = (date: number) => {
+    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), date);
+    const dateStr = formatDateKey(targetDate);
+
+    return [...assets.values()].filter((asset) => {
+      if (asset.status !== 'approved' && asset.status !== 'published') {
+        return false;
+      }
+
+      const publishDate = getAssetPublishDate(asset);
+      if (!publishDate) {
+        return false;
+      }
+
+      return formatDateKey(publishDate) === dateStr;
+    });
   };
 
   const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -66,16 +110,27 @@ export default function CalendarPage() {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1));
   };
 
-  const getEventColorClasses = (assetType: Asset['type']) => {
-    switch (assetType) {
-      case 'reel':
-        return 'bg-[rgba(99,102,241,0.14)] text-[#c7d2fe] border-[rgba(99,102,241,0.16)]';
-      case 'poster':
-        return 'bg-[rgba(16,185,129,0.14)] text-[#a7f3d0] border-[rgba(16,185,129,0.16)]';
-      default:
-        return 'bg-[rgba(245,158,11,0.14)] text-[#fde68a] border-[rgba(245,158,11,0.16)]';
-    }
-  };
+  const publishingAssets = [...assets.values()].filter(
+    (asset) => asset.status === 'approved' || asset.status === 'published'
+  );
+
+  const publishedHistory = publishingAssets
+    .filter((asset) => asset.status === 'published')
+    .sort((left, right) => {
+      const leftDate = getAssetPublishDate(left)?.getTime() ?? left.updatedAt.getTime();
+      const rightDate = getAssetPublishDate(right)?.getTime() ?? right.updatedAt.getTime();
+      return rightDate - leftDate;
+    })
+    .slice(0, 5);
+
+  const upcomingApproved = publishingAssets
+    .filter((asset) => asset.status === 'approved')
+    .sort((left, right) => {
+      const leftDate = getAssetPublishDate(left)?.getTime() ?? left.updatedAt.getTime();
+      const rightDate = getAssetPublishDate(right)?.getTime() ?? right.updatedAt.getTime();
+      return leftDate - rightDate;
+    })
+    .slice(0, 5);
 
   if (isLoading) {
     return (
@@ -129,7 +184,7 @@ export default function CalendarPage() {
           ))}
 
           {days.map((day) => {
-            const uploads = getUploadsForDate(day);
+            const assetsForDay = getAssetsForDate(day);
             const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
 
             return (
@@ -144,24 +199,27 @@ export default function CalendarPage() {
                   <p className={cn('text-[12px] font-medium', isToday ? 'text-[var(--primary)]' : 'text-white')}>
                     {day}
                   </p>
-                  {uploads.length > 0 && (
+                  {assetsForDay.length > 0 && (
                     <div className="mt-auto space-y-1.5 pb-0.5">
                       <div className="space-y-1">
-                        {uploads.slice(0, 2).map((upload) => {
-                          const asset = assets.get(upload.assetId);
+                        {assetsForDay.slice(0, 2).map((asset) => {
+                          const publishDate = getAssetPublishDate(asset);
                           return (
                             <div
-                              key={upload.id}
-                              className={cn('flex h-[18px] items-center gap-1 rounded-full border px-2 text-[10px] font-medium', getEventColorClasses(asset?.type ?? 'poster'))}
-                              title={asset?.title}
+                              key={asset.id}
+                              className={cn(
+                                'flex h-[18px] items-center gap-1 rounded-full border px-2 text-[10px] font-medium',
+                                getEventColorClasses(asset)
+                              )}
+                              title={asset.title}
                             >
-                              <span className="min-w-0 truncate">{asset?.title || 'Unknown asset'}</span>
+                              <span className="min-w-0 truncate">{asset.title}</span>
                             </div>
                           );
                         })}
                       </div>
-                      {uploads.length > 2 && (
-                        <p className="text-[10px] text-[#71717a]">+{uploads.length - 2} more</p>
+                      {assetsForDay.length > 2 && (
+                        <p className="text-[10px] text-[#71717a]">+{assetsForDay.length - 2} more</p>
                       )}
                     </div>
                   )}
@@ -174,30 +232,50 @@ export default function CalendarPage() {
       </div>
 
       <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4">
-        <h3 className="mb-4 text-[13px] font-medium text-white">Upcoming Scheduled Uploads</h3>
+        <h3 className="mb-4 text-[13px] font-medium text-white">Upcoming Approved Posts</h3>
         <div className="space-y-2">
-          {queue
-            .filter((q) => q.status === 'scheduled')
-            .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
-            .slice(0, 5)
-            .map((item) => {
-              const asset = assets.get(item.assetId);
-              const client = asset ? clients.get(asset.clientId) : null;
+          {upcomingApproved.map((asset) => {
+            const client = clients.get(asset.clientId);
+            const publishDate = getAssetPublishDate(asset);
 
-              return (
-                <div key={item.id} className="flex flex-col gap-2 rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-[13px] font-medium text-white">{asset?.title || 'Unknown'}</p>
-                    <p className="text-[12px] text-[#71717a]">
-                      {client?.name || 'Unknown'} • {new Date(item.scheduledDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className="self-start rounded-full border border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#34d399] sm:self-auto">
-                    {item.platform}
-                  </span>
+            return (
+              <div key={asset.id} className="flex flex-col gap-2 rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[13px] font-medium text-white">{asset.title}</p>
+                  <p className="text-[12px] text-[#71717a]">
+                    {client?.name || 'Unknown'} • {publishDate ? publishDate.toLocaleString() : 'No publish date'}
+                  </p>
                 </div>
-              );
-            })}
+                <span className="self-start rounded-full border border-[rgba(59,130,246,0.18)] bg-[rgba(59,130,246,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#93c5fd] sm:self-auto">
+                  Approved
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4">
+        <h3 className="mb-4 text-[13px] font-medium text-white">Published History</h3>
+        <div className="space-y-2">
+          {publishedHistory.map((asset) => {
+            const client = clients.get(asset.clientId);
+            const publishedAt = asset.publishedAt ?? getAssetPublishDate(asset);
+
+            return (
+              <div key={asset.id} className="flex flex-col gap-2 rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[13px] font-medium text-white">{asset.title}</p>
+                  <p className="text-[12px] text-[#71717a]">
+                    {client?.name || 'Unknown'} • {publishedAt ? publishedAt.toLocaleString() : 'No publish date'}
+                  </p>
+                </div>
+                <span className="self-start rounded-full border border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#34d399] sm:self-auto">
+                  Published
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

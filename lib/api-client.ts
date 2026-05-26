@@ -4,6 +4,7 @@ import { mockUploadQueue } from './mock-data/upload-queue';
 import { mockWorkspace } from './mock-data/workspace';
 import type {
   Asset,
+  AssetActivityLog,
   AssetComment,
   Client,
   ClientReference,
@@ -30,6 +31,18 @@ export interface UploadFileOptions {
 }
 
 const pendingRequests = new Map<string, Promise<unknown>>();
+let dashboardSummaryCache: {
+  value: {
+    pendingApprovals: number;
+    upcomingUploads: number;
+    totalClients: number;
+    uploadedThisMonth: number;
+  } | null;
+  expiresAt: number;
+} = {
+  value: null,
+  expiresAt: 0,
+};
 
 function buildRequestKey(input: RequestInfo, init?: RequestInit): string {
   const requestUrl = typeof input === 'string' ? input : String(input);
@@ -172,6 +185,9 @@ function hydrateAsset(asset: Asset): Asset {
     updatedAt: new Date(asset.updatedAt),
     uploadedAt: asset.uploadedAt ? new Date(asset.uploadedAt) : null,
     scheduledAt: asset.scheduledAt ? new Date(asset.scheduledAt) : null,
+    publishedAt: asset.publishedAt ? new Date(asset.publishedAt) : null,
+    approvedAt: asset.approvedAt ? new Date(asset.approvedAt) : null,
+    calendarSyncedAt: asset.calendarSyncedAt ? new Date(asset.calendarSyncedAt) : null,
   };
 }
 
@@ -351,6 +367,11 @@ export const assetsApi = {
     return asset ? hydrateAsset(asset) : null;
   },
 
+  getSummaryById: async (id: string): Promise<Asset | null> => {
+    const asset = await fetchJsonNullableDeduped<Asset>(`/api/assets/${id}/summary`);
+    return asset ? hydrateAsset(asset) : null;
+  },
+
   create: async (asset: {
     clientId: string;
     title: string;
@@ -360,6 +381,12 @@ export const assetsApi = {
     thumbnailUrl?: string;
     assignedTo?: string | null;
     scheduledAt?: string | null;
+    publishDate?: string | null;
+    publishTime?: string | null;
+    scheduledBy?: string | null;
+    publishedAt?: string | null;
+    approvedAt?: string | null;
+    approvedBy?: string | null;
   }): Promise<Asset> => {
     const created = await fetchJson<Asset>('/api/assets', {
       method: 'POST',
@@ -409,6 +436,12 @@ export const assetsApi = {
       thumbnailUrl?: string;
       assignedTo?: string | null;
       scheduledAt?: string | null;
+      publishDate?: string | null;
+      publishTime?: string | null;
+      scheduledBy?: string | null;
+      publishedAt?: string | null;
+      approvedAt?: string | null;
+      approvedBy?: string | null;
     }>
   ): Promise<Asset> => {
     const updated = await fetchJson<Asset>(`/api/assets/${id}`, {
@@ -441,6 +474,28 @@ export const commentsApi = {
     return comments.map(hydrateComment);
   },
 
+  getThread: async (
+    assetId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<{ comments: AssetComment[]; users: User[] }> => {
+    const params = new URLSearchParams({ includeUsers: '1' });
+    if (options?.limit !== undefined) {
+      params.set('limit', options.limit.toString());
+    }
+    if (options?.offset !== undefined) {
+      params.set('offset', options.offset.toString());
+    }
+
+    const payload = await fetchJson<{ comments: AssetComment[]; users: User[] }>(
+      `/api/assets/${assetId}/comments?${params.toString()}`
+    );
+
+    return {
+      comments: payload.comments.map(hydrateComment),
+      users: payload.users.map(hydrateUser),
+    };
+  },
+
   create: async (
     assetId: string,
     input: {
@@ -459,6 +514,43 @@ export const commentsApi = {
   },
 };
 
+export const revisionsApi = {
+  getByAssetId: async (assetId: string): Promise<{ revisions: Asset['revisions']; users: User[] }> => {
+    const payload = await fetchJson<{ revisions: Asset['revisions']; users: User[] }>(
+      `/api/assets/${assetId}/revisions?includeUsers=1`
+    );
+    return {
+      revisions: payload.revisions.map((rev) => ({
+        ...rev,
+        uploadedAt: new Date(rev.uploadedAt),
+        createdAt: new Date(rev.createdAt),
+      })),
+      users: payload.users.map(hydrateUser),
+    };
+  },
+};
+
+export const activityApi = {
+  getByAssetId: async (assetId: string, options?: { limit?: number }): Promise<{ activity: AssetActivityLog[]; users: User[] }> => {
+    const params = new URLSearchParams({ includeUsers: '1' });
+    if (options?.limit !== undefined) {
+      params.set('limit', options.limit.toString());
+    }
+
+    const payload = await fetchJson<{ activity: AssetActivityLog[]; users: User[] }>(
+      `/api/assets/${assetId}/activity?${params.toString()}`
+    );
+
+    return {
+      activity: payload.activity.map((entry) => ({
+        ...entry,
+        createdAt: new Date(entry.createdAt),
+      })),
+      users: payload.users.map(hydrateUser),
+    };
+  },
+};
+
 export const dashboardApi = {
   getSummary: async (): Promise<{
     pendingApprovals: number;
@@ -466,7 +558,30 @@ export const dashboardApi = {
     totalClients: number;
     uploadedThisMonth: number;
   }> => {
-    return fetchJsonDeduped('/api/dashboard/summary');
+    const now = Date.now();
+    if (dashboardSummaryCache.value && dashboardSummaryCache.expiresAt > now) {
+      return dashboardSummaryCache.value;
+    }
+
+    const summary = await fetchJsonDeduped('/api/dashboard/summary');
+    dashboardSummaryCache = {
+      value: summary,
+      expiresAt: now + 30_000,
+    };
+    return summary;
+  },
+};
+
+export const kanbanApi = {
+  getBoard: async (): Promise<{
+    assets: Asset[];
+    clients: { id: string; name: string }[];
+  }> => {
+    const payload = await fetchJsonDeduped('/api/kanban/board');
+    return {
+      assets: payload.assets.map(hydrateAsset),
+      clients: payload.clients,
+    };
   },
 };
 

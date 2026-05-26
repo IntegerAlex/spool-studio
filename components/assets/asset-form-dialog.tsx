@@ -517,7 +517,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
                 name="scheduledAt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Scheduled For</FormLabel>
+                    <FormLabel>Publish Date</FormLabel>
                     <FormControl>
                       <Input type="datetime-local" {...field} />
                     </FormControl>

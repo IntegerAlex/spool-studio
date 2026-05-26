@@ -5,10 +5,12 @@ import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 export async function GET() {
   try {
     const summary = await getDashboardSummary();
-    return NextResponse.json({ data: summary });
+    const response = NextResponse.json({ data: summary });
+    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    return response;
   } catch (error) {
     logProductionRuntimeError('api-dashboard-summary', error);
-    return NextResponse.json({
+    const response = NextResponse.json({
       data: {
         pendingApprovals: 0,
         upcomingUploads: 0,
@@ -16,5 +18,7 @@ export async function GET() {
         uploadedThisMonth: 0,
       },
     });
+    response.headers.set('Cache-Control', 'public, max-age=15, stale-while-revalidate=30');
+    return response;
   }
 }

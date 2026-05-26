@@ -4,6 +4,10 @@ import type { Database } from '@/types/database';
 
 export type DbClient = Database['public']['Tables']['clients']['Row'];
 
+const clientSelect =
+  'id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,drive_folder_id,drive_folder_url';
+const clientOptionSelect = 'id,name';
+
 async function getClient(client?: SupabaseClient<Database>) {
   return client ?? (await createServerSupabaseClient());
 }
@@ -12,7 +16,7 @@ export async function listClients(client?: SupabaseClient<Database>): Promise<Db
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('clients')
-    .select('*')
+    .select(clientSelect)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -22,6 +26,35 @@ export async function listClients(client?: SupabaseClient<Database>): Promise<Db
   return data ?? [];
 }
 
+export async function listClientOptions(
+  client?: SupabaseClient<Database>
+): Promise<Pick<DbClient, 'id' | 'name'>[]> {
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('clients')
+    .select(clientOptionSelect)
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function countClients(client?: SupabaseClient<Database>): Promise<number> {
+  const supabase = await getClient(client);
+  const { count, error } = await supabase
+    .from('clients')
+    .select('id', { count: 'exact', head: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return count ?? 0;
+}
+
 export async function getClientById(
   clientId: string,
   client?: SupabaseClient<Database>
@@ -29,7 +62,7 @@ export async function getClientById(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('clients')
-    .select('*')
+    .select(clientSelect)
     .eq('id', clientId)
     .maybeSingle();
 
@@ -48,7 +81,7 @@ export async function insertClient(
   const { data, error } = await supabase
     .from('clients')
     .insert(payload)
-    .select('*')
+    .select(clientSelect)
     .single();
 
   if (error) {
@@ -68,7 +101,7 @@ export async function updateClient(
     .from('clients')
     .update(updates)
     .eq('id', clientId)
-    .select('*')
+    .select(clientSelect)
     .single();
 
   if (error) {
