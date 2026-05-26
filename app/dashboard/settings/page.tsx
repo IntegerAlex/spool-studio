@@ -10,6 +10,7 @@ import { workspaceApi, usersApi } from '@/lib/api-client';
 import { Workspace, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Bell, CalendarCheck, Lock, Palette, Save, Users, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const sections = [
   {
@@ -112,7 +113,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
-        <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
+        <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <Card className="space-y-2 p-2">
             {sections.map((section) => (
               <div key={section.id} className="flex h-11 items-center gap-3 rounded-[8px] px-3">
@@ -137,16 +138,218 @@ export default function SettingsPage() {
   const activeMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 settings-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <style>{`
+        .settings-page-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        .settings-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+          line-height: 1.25 !important;
+        }
+        .settings-subtitle {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 3px !important;
+        }
+        .settings-nav-card {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          padding: 8px !important;
+          box-shadow: none !important;
+        }
+        .settings-nav-item {
+          display: flex;
+          height: auto !important;
+          width: 100%;
+          align-items: center;
+          gap: 12px;
+          border-radius: var(--radius-sm) !important;
+          padding: 10px 12px !important;
+          text-align: left;
+          transition: all 120ms ease !important;
+          cursor: pointer;
+        }
+        .settings-nav-item.active {
+          background-color: var(--color-bg-active) !important;
+          color: var(--color-text-primary) !important;
+        }
+        .settings-nav-item:not(.active) {
+          color: var(--color-text-secondary) !important;
+        }
+        .settings-nav-item:not(.active):hover {
+          background-color: var(--color-bg-hover) !important;
+          color: var(--color-text-primary) !important;
+        }
+        .content-card {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          overflow: hidden;
+          margin-bottom: 16px;
+          box-shadow: none !important;
+          padding: 0 !important;
+        }
+        .content-card-header {
+          padding: 16px 20px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        .content-card-title {
+          font-size: 13.5px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .content-card-description {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 2px !important;
+        }
+        .content-card-body {
+          padding: 20px !important;
+        }
+        .field-label {
+          font-size: 12.5px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-secondary) !important;
+          display: block;
+          margin-bottom: 6px;
+        }
+        .field-input {
+          background-color: var(--color-bg-overlay) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 12px !important;
+          font-size: 13px !important;
+          color: var(--color-text-primary) !important;
+          width: 100% !important;
+          max-width: 360px !important;
+          height: auto !important;
+          transition: all 120ms ease !important;
+        }
+        .field-input::placeholder {
+          color: var(--color-text-faint) !important;
+        }
+        .field-input:focus {
+          border-color: var(--color-border-strong) !important;
+          box-shadow: 0 0 0 2px rgba(255,255,255,0.04) !important;
+          outline: none !important;
+        }
+        .field-input:disabled {
+          opacity: 0.5 !important;
+          cursor: not-allowed !important;
+        }
+        .submit-btn {
+          background: #3ecf8e !important;
+          color: #000000 !important;
+          font-size: 12.5px !important;
+          font-weight: 600 !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 16px !important;
+          border: none !important;
+          cursor: pointer !important;
+          box-shadow: none !important;
+          transition: all 120ms ease !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: auto !important;
+        }
+        .submit-btn:hover {
+          opacity: 0.88 !important;
+        }
+        .submit-btn:disabled {
+          opacity: 0.5 !important;
+          cursor: not-allowed !important;
+        }
+        .toggle-switch {
+          position: relative;
+          display: inline-block;
+          width: 36px;
+          height: 20px;
+          cursor: pointer;
+        }
+        .toggle-input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+          position: absolute;
+        }
+        .toggle-track {
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background-color: var(--color-bg-overlay);
+          border: 1px solid var(--color-border);
+          border-radius: 999px;
+          transition: 150ms ease;
+        }
+        .toggle-thumb {
+          position: absolute;
+          content: "";
+          height: 14px;
+          width: 14px;
+          left: 2px;
+          bottom: 2px;
+          background-color: var(--color-text-muted);
+          border-radius: 50%;
+          transition: 150ms ease;
+        }
+        .toggle-input:checked + .toggle-track {
+          background-color: rgba(62,207,142,0.25);
+          border-color: rgba(62,207,142,0.4);
+        }
+        .toggle-input:checked + .toggle-track .toggle-thumb {
+          background-color: #3ecf8e;
+          transform: translateX(16px);
+        }
+        .danger-zone {
+          border: 1px solid rgba(248,113,113,0.2) !important;
+          border-radius: var(--radius-lg) !important;
+          overflow: hidden;
+          margin-top: 16px;
+          background-color: transparent !important;
+        }
+        .danger-zone-header {
+          background-color: rgba(248,113,113,0.04) !important;
+          padding: 16px 20px !important;
+          border-bottom: 1px solid rgba(248,113,113,0.15) !important;
+        }
+        .danger-btn {
+          background-color: transparent !important;
+          border: 1px solid rgba(248,113,113,0.3) !important;
+          color: #f87171 !important;
+          font-size: 12.5px !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 7px 16px !important;
+          transition: all 120ms ease !important;
+          box-shadow: none !important;
+          cursor: pointer;
+          height: auto !important;
+        }
+        .danger-btn:hover {
+          background-color: rgba(248,113,113,0.08) !important;
+        }
+      `}</style>
+
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
 
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside className="rounded-[12px] border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-2">
+        {/* Navigation Sidebar */}
+        <aside className="settings-nav-card">
           <div className="mb-2 flex items-center gap-2 rounded-[8px] px-3 py-2">
-            <Sparkles className="size-4 text-[#818cf8]" />
+            <Sparkles className="size-4 text-[#3ecf8e]" />
             <div>
-              <p className="text-[12px] font-medium text-white">Settings</p>
-              <p className="text-[10px] text-[#71717a]">Workspace controls</p>
+              <p className="text-[12.5px] font-semibold text-white">Settings</p>
+              <p className="text-[10px] text-[var(--color-text-muted)]">Workspace controls</p>
             </div>
           </div>
 
@@ -160,16 +363,12 @@ export default function SettingsPage() {
                   key={section.id}
                   type="button"
                   onClick={() => setActiveSection(section.id)}
-                  className={`flex h-11 w-full items-center gap-3 rounded-[8px] px-3 text-left transition-colors ${
-                    isActive
-                      ? 'bg-[rgba(99,102,241,0.12)] text-white'
-                      : 'text-[#a1a1aa] hover:bg-[rgba(255,255,255,0.04)] hover:text-white'
-                  }`}
+                  className={cn("settings-nav-item", isActive && "active")}
                 >
-                  <Icon className={`size-4 ${isActive ? 'text-[#c7d2fe]' : 'text-[#71717a]'}`} />
+                  <Icon className={cn("size-4 shrink-0", isActive ? 'text-[#3ecf8e]' : 'text-[var(--color-text-muted)]')} />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-medium">{section.label}</span>
-                    <span className="block text-[10px] text-inherit/70">{section.description}</span>
+                    <span className="block text-[13px] font-semibold leading-none">{section.label}</span>
+                    <span className="block text-[10px] text-inherit/70 mt-1">{section.description}</span>
                   </span>
                 </button>
               );
@@ -177,12 +376,13 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
+        {/* Content Section */}
         <main className="min-w-0 space-y-6">
-          <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">{activeMeta.label}</p>
-                <h3 className="text-[18px] font-medium text-white">
+          <Card className="content-card">
+            <div className="content-card-header">
+              <div>
+                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-faint)]">{activeMeta.label}</p>
+                <h3 className="content-card-title mt-1">
                   {activeSection === 'workspace' && 'Workspace identity'}
                   {activeSection === 'integrations' && 'Connected services'}
                   {activeSection === 'team' && 'Team access'}
@@ -192,7 +392,7 @@ export default function SettingsPage() {
               </div>
 
               {activeSection === 'workspace' && (
-                <Button onClick={handleSaveWorkspace}>
+                <Button className="submit-btn" onClick={handleSaveWorkspace}>
                   <Save className="mr-2 size-4" />
                   Save changes
                 </Button>
@@ -200,7 +400,7 @@ export default function SettingsPage() {
 
               {activeSection === 'integrations' && (
                 <Button
-                  variant="outline"
+                  className="submit-btn"
                   disabled={isLoadingIntegrations || !integrationStatus.userId}
                   onClick={() => {
                     if (!integrationStatus.userId) return;
@@ -212,55 +412,58 @@ export default function SettingsPage() {
               )}
 
               {activeSection === 'team' && (
-                <Button>
+                <Button className="submit-btn">
                   Invite member
                 </Button>
               )}
 
               {activeSection === 'notifications' && (
-                <Button>
+                <Button className="submit-btn">
                   Save preferences
                 </Button>
               )}
 
               {activeSection === 'security' && (
-                <Button>
+                <Button className="submit-btn">
                   Update password
                 </Button>
               )}
             </div>
           </Card>
 
+          {/* Section Body Contents */}
           {activeSection === 'workspace' && (
-            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
-              <div className="space-y-1">
-                <h4 className="text-[15px] font-medium text-white">Workspace details</h4>
-                <p className="text-[13px] text-[#71717a]">These values shape the workspace identity everywhere in the app.</p>
+            <Card className="content-card">
+              <div className="content-card-header">
+                <div>
+                  <h4 className="content-card-title">Workspace details</h4>
+                  <p className="content-card-description">These values shape the workspace identity everywhere in the app.</p>
+                </div>
               </div>
 
-              <div className="mt-6 space-y-3">
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+              <div className="content-card-body space-y-4">
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-white">Workspace name</p>
-                    <p className="text-[11px] text-[#71717a]">The primary display name for the organization</p>
+                    <p className="text-[13px] font-semibold text-white">Workspace name</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">The primary organization name</p>
                   </div>
                   <Input
                     value={workspaceName}
                     onChange={(e) => setWorkspaceName(e.target.value)}
-                    className="w-full max-w-full md:max-w-[260px]"
+                    className="field-input w-full max-w-full md:max-w-[260px]"
                     placeholder="Your workspace name"
                   />
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-white">Workspace ID</p>
-                    <p className="text-[11px] text-[#71717a]">Read-only identifier used by integrations</p>
+                    <p className="text-[13px] font-semibold text-white">Workspace ID</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">Read-only organization token identifier</p>
                   </div>
                   <Input
                     value={workspace?.id || ''}
                     disabled
-                    className="w-full max-w-full md:max-w-[260px]"
+                    className="field-input w-full max-w-full md:max-w-[260px]"
                   />
                 </div>
               </div>
@@ -268,68 +471,73 @@ export default function SettingsPage() {
           )}
 
           {activeSection === 'integrations' && (
-            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
-              <div className="space-y-1">
-                <h4 className="text-[15px] font-medium text-white">Google Calendar</h4>
-                <p className="text-[13px] text-[#71717a]">Connect your Google Calendar to sync approved publishing schedules.</p>
+            <Card className="content-card">
+              <div className="content-card-header">
+                <div>
+                  <h4 className="content-card-title">Google Calendar</h4>
+                  <p className="content-card-description">Connect your Google Calendar to sync approved publishing schedules.</p>
+                </div>
               </div>
 
-              <div className="mt-6 flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-[13px] font-medium text-white">
-                    {integrationStatus.connected ? 'Google Calendar Connected ✅' : 'Google Calendar Not Connected'}
-                  </p>
-                  <p className="text-[11px] text-[#71717a]">
-                    {integrationStatus.connected
-                      ? integrationStatus.googleEmail
-                        ? `Connected as ${integrationStatus.googleEmail}`
-                        : 'Connection active'
-                      : 'Connect to enable manual calendar sync.'}
-                  </p>
+              <div className="content-card-body">
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-[13px] font-semibold text-white">
+                      {integrationStatus.connected ? 'Google Calendar Connected ✅' : 'Google Calendar Not Connected'}
+                    </p>
+                    <p className="text-[11.5px] text-[var(--color-text-muted)] mt-1">
+                      {integrationStatus.connected
+                        ? integrationStatus.googleEmail
+                          ? `Connected as ${integrationStatus.googleEmail}`
+                          : 'Connection active'
+                        : 'Connect to enable manual calendar sync.'}
+                    </p>
+                  </div>
+                  <Button
+                    className="submit-btn md:self-center"
+                    disabled={isLoadingIntegrations || !integrationStatus.userId}
+                    onClick={() => {
+                      if (!integrationStatus.userId) return;
+                      window.location.href = `/api/google/auth?userId=${integrationStatus.userId}`;
+                    }}
+                  >
+                    {integrationStatus.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
+                  </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  className="md:self-center"
-                  disabled={isLoadingIntegrations || !integrationStatus.userId}
-                  onClick={() => {
-                    if (!integrationStatus.userId) return;
-                    window.location.href = `/api/google/auth?userId=${integrationStatus.userId}`;
-                  }}
-                >
-                  {integrationStatus.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-                </Button>
               </div>
             </Card>
           )}
 
           {activeSection === 'team' && (
-            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
-              <div className="space-y-1">
-                <h4 className="text-[15px] font-medium text-white">Team members</h4>
-                <p className="text-[13px] text-[#71717a]">Review access and keep workspace collaborators aligned.</p>
+            <Card className="content-card">
+              <div className="content-card-header">
+                <div>
+                  <h4 className="content-card-title">Team members</h4>
+                  <p className="content-card-description">Review access and keep workspace collaborators aligned.</p>
+                </div>
               </div>
 
-              <div className="mt-6 space-y-2">
+              <div className="content-card-body space-y-3">
                 {teamMembers.map((member) => (
                   <div
                     key={member.id}
-                    className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0"
+                    className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-3 md:min-h-11 md:flex-row md:items-center md:justify-between"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <Avatar className="size-9">
+                      <Avatar className="size-9 border border-[var(--color-border)]">
                         <AvatarImage src={member.avatar} alt={member.name} />
-                        <AvatarFallback>{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="bg-[var(--color-bg-overlay)] text-white text-[12px]">{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="truncate text-[13px] font-medium text-white">{member.name}</p>
-                        <p className="truncate text-[11px] text-[#71717a]">{member.email}</p>
+                        <p className="truncate text-[13.5px] font-semibold text-white">{member.name}</p>
+                        <p className="truncate text-[11.5px] text-[var(--color-text-muted)] mt-0.5">{member.email}</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-2.5 py-1 text-[11px] capitalize text-[#cbd5e1]">
+                      <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-overlay)] px-2.5 py-0.5 text-[11px] capitalize text-[var(--color-text-secondary)]">
                         {member.role}
                       </span>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" className="h-7 text-[12px] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]">
                         Manage
                       </Button>
                     </div>
@@ -340,29 +548,37 @@ export default function SettingsPage() {
           )}
 
           {activeSection === 'notifications' && (
-            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
-              <div className="space-y-1">
-                <h4 className="text-[15px] font-medium text-white">Notification preferences</h4>
-                <p className="text-[13px] text-[#71717a]">Choose which lifecycle events surface in your inbox and workspace alerts.</p>
+            <Card className="content-card">
+              <div className="content-card-header">
+                <div>
+                  <h4 className="content-card-title">Notification preferences</h4>
+                  <p className="content-card-description">Choose which lifecycle events surface in your inbox and workspace alerts.</p>
+                </div>
               </div>
 
-              <div className="mt-6 space-y-2">
+              <div className="content-card-body space-y-3">
                 {[
                   { id: 'approvals', label: 'Asset approvals', description: 'Get notified when assets are ready for review' },
                   { id: 'revisions', label: 'Revision requests', description: 'Get notified when revisions are requested' },
                   { id: 'uploads', label: 'Upload confirmations', description: 'Get notified when assets are uploaded' },
                   { id: 'comments', label: 'New comments', description: 'Get notified about comments on your assets' },
                 ].map((pref) => (
-                  <div key={pref.id} className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4">
+                  <div key={pref.id} className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[var(--color-border)] px-4 py-3">
                     <div>
-                      <p className="text-[13px] font-medium text-white">{pref.label}</p>
-                      <p className="text-[11px] text-[#71717a]">{pref.description}</p>
+                      <p className="text-[13px] font-semibold text-white">{pref.label}</p>
+                      <p className="text-[11.5px] text-[var(--color-text-muted)] mt-0.5">{pref.description}</p>
                     </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="size-4 rounded border-[rgba(255,255,255,0.14)] bg-[#161616] accent-[#818cf8]"
-                    />
+                    
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        defaultChecked
+                        className="toggle-input"
+                      />
+                      <span className="toggle-track">
+                        <span className="toggle-thumb" />
+                      </span>
+                    </label>
                   </div>
                 ))}
               </div>
@@ -370,44 +586,46 @@ export default function SettingsPage() {
           )}
 
           {activeSection === 'security' && (
-            <Card className="border border-[rgba(255,255,255,0.07)] bg-[var(--surface-card)] p-6">
-              <div className="space-y-1">
-                <h4 className="text-[15px] font-medium text-white">Password management</h4>
-                <p className="text-[13px] text-[#71717a]">Update your credentials and keep the workspace locked down.</p>
+            <Card className="content-card">
+              <div className="content-card-header">
+                <div>
+                  <h4 className="content-card-title">Password management</h4>
+                  <p className="content-card-description">Update your credentials and keep the workspace locked down.</p>
+                </div>
               </div>
 
-              <div className="mt-6 space-y-3">
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+              <div className="content-card-body space-y-4">
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-white">Current password</p>
-                    <p className="text-[11px] text-[#71717a]">Required before changing your password</p>
+                    <p className="text-[13px] font-semibold text-white">Current password</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">Required before changing password</p>
                   </div>
-                  <Input type="password" placeholder="Enter your current password" className="w-full max-w-full md:max-w-[260px]" />
+                  <Input type="password" placeholder="Enter current password" className="field-input w-full max-w-full md:max-w-[260px]" />
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-white">New password</p>
-                    <p className="text-[11px] text-[#71717a]">Use a long, unique password</p>
+                    <p className="text-[13px] font-semibold text-white">New password</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">Use a long, unique password</p>
                   </div>
-                  <Input type="password" placeholder="Enter new password" className="w-full max-w-full md:max-w-[260px]" />
+                  <Input type="password" placeholder="Enter new password" className="field-input w-full max-w-full md:max-w-[260px]" />
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[rgba(255,255,255,0.06)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                   <div className="min-w-0">
-                    <p className="text-[13px] font-medium text-white">Confirm password</p>
-                    <p className="text-[11px] text-[#71717a]">Re-enter the new password exactly</p>
+                    <p className="text-[13px] font-semibold text-white">Confirm password</p>
+                    <p className="text-[11px] text-[var(--color-text-muted)]">Re-enter new password exactly</p>
                   </div>
-                  <Input type="password" placeholder="Confirm new password" className="w-full max-w-full md:max-w-[260px]" />
+                  <Input type="password" placeholder="Confirm new password" className="field-input w-full max-w-full md:max-w-[260px]" />
                 </div>
 
-                <div className="rounded-[10px] border border-[rgba(239,68,68,0.16)] bg-[rgba(239,68,68,0.06)] px-4 py-4">
-                  <div className="flex items-center justify-between gap-4">
+                <div className="danger-zone">
+                  <div className="danger-zone-header flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-[13px] font-medium text-[#fca5a5]">Danger zone</p>
-                      <p className="text-[11px] text-[#f87171]/80">Deleting the account removes the workspace history.</p>
+                      <p className="text-[13px] font-semibold text-[#fca5a5]">Danger zone</p>
+                      <p className="text-[11px] text-[#f87171]/80 mt-0.5">Deleting the account removes organization history.</p>
                     </div>
-                    <Button variant="outline" className="border-[#ef4444]/30 text-[#fca5a5] hover:bg-[rgba(239,68,68,0.08)] hover:text-white">
+                    <Button className="danger-btn">
                       Delete account
                     </Button>
                   </div>

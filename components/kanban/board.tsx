@@ -59,14 +59,14 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
   return (
     <Card
       className={cn(
-        'group relative mb-1 overflow-hidden border border-[rgba(255,255,255,0.07)] bg-[#161616] px-3 py-[10px] shadow-none transition-transform transition-colors duration-150 hover:border-[rgba(255,255,255,0.12)] hover:bg-[#1a1a1a]',
+        'group relative mb-2 overflow-hidden kanban-card shadow-none',
         overdue && 'border-[rgba(239,68,68,0.4)]',
-        isDragging && 'scale-[1.02] border-[var(--primary)]'
+        isDragging && 'scale-[1.02] border-[var(--color-border-strong)]'
       )}
     >
       <div className="flex items-start gap-2">
         <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <GripVertical className="h-3.5 w-3.5 text-[#52525b]" />
+          <GripVertical className="h-3.5 w-3.5 text-[var(--color-text-faint)]" />
         </div>
 
         <Link href={`/dashboard/assets/${asset.id}`} className="min-w-0 flex-1">
@@ -75,21 +75,21 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
               // eslint-disable-next-line @next/next/no-img-element
               <img src={asset.thumbnailUrl} alt={asset.title} className="h-14 w-full object-cover" />
             ) : (
-              <div className="flex h-14 items-center gap-2 px-3 text-[11px] text-[#a1a1aa]">
-                <AssetIcon className="h-4 w-4 text-[#71717a]" />
+              <div className="flex h-14 items-center gap-2 px-3 text-[11px] text-[var(--color-text-secondary)]">
+                <AssetIcon className="h-4 w-4 text-[var(--color-text-faint)]" />
                 <span className="truncate capitalize">{previewType}</span>
               </div>
             )}
           </div>
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <h4 className="truncate text-[13px] font-medium text-white">{asset.title}</h4>
-              <div className="mt-1 flex items-center gap-1 text-[11px] text-[#71717a]">
-                <AssetIcon className="h-3.5 w-3.5 text-[#52525b]" />
+              <h4 className="truncate kanban-card-title">{asset.title}</h4>
+              <div className="mt-1 flex items-center gap-1 kanban-card-meta">
+                <AssetIcon className="h-3.5 w-3.5 text-[var(--color-text-faint)]" />
                 <span className="truncate">{asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type}</span>
               </div>
             </div>
-            {overdue && <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#f59e0b]" />}
+            {overdue && <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#ca8a04]" />}
           </div>
         </Link>
 
@@ -99,41 +99,39 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
           className="mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
           aria-label="Quick actions"
         >
-          <MoreHorizontal className="h-4 w-4 text-[#71717a] hover:text-white" />
+          <MoreHorizontal className="h-4 w-4 text-[var(--color-text-faint)] hover:text-white" />
         </button>
       </div>
 
-      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+        <StatusBadge status={asset.status} />
         {revisionCount > 0 && (
-          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-[rgba(255,255,255,0.06)] px-2 text-[10px] font-medium text-[#a1a1aa]">
+          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-[rgba(255,255,255,0.04)] px-2 text-[10px] font-medium text-[var(--color-text-secondary)]">
             <Clock className="h-3 w-3" />
             {revisionCount}
           </span>
         )}
         {commentCount > 0 && (
-          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-[rgba(255,255,255,0.06)] px-2 text-[10px] font-medium text-[#a1a1aa]">
+          <span className="inline-flex h-5 items-center gap-0.5 rounded-full bg-[rgba(255,255,255,0.04)] px-2 text-[10px] font-medium text-[var(--color-text-secondary)]">
             <MessageSquare className="h-3 w-3" />
             {commentCount}
           </span>
         )}
-        {isKanbanHiddenStatus(asset.status) && (
-          <StatusBadge status={asset.status} className="h-5 border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] text-[10px]" />
-        )}
       </div>
 
       {showActions && (
-        <div className="absolute right-2 top-2 z-50 rounded-md border border-[rgba(255,255,255,0.08)] bg-[#161616] p-1 text-xs shadow-lg">
-          <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]">
+        <div className="absolute right-2 top-2 z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-surface)] p-1 text-xs shadow-lg">
+          <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[var(--color-bg-hover)]">
             <Eye className="h-3 w-3" />
             View
           </button>
-          {asset.status === 'ready_for_review' && (
-            <button onClick={onQuickApprove} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)]">
+          {asset.status === 'revision_requested' && (
+            <button onClick={onQuickApprove} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-[#16a34a] hover:bg-[rgba(22,163,74,0.1)]">
               <CheckCircle2 className="h-3 w-3" />
               Approve
             </button>
           )}
-          <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]">
+          <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[var(--color-bg-hover)]">
             <Copy className="h-3 w-3" />
             Copy link
           </button>
@@ -165,16 +163,16 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.currentTarget.classList.add('ring-2', 'ring-primary');
+    e.currentTarget.classList.add('ring-1', 'ring-[var(--color-border-strong)]');
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.currentTarget.classList.remove('ring-2', 'ring-primary');
+    e.currentTarget.classList.remove('ring-1', 'ring-[var(--color-border-strong)]');
   };
 
   const handleDrop = (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('ring-2', 'ring-primary');
+    e.currentTarget.classList.remove('ring-1', 'ring-[var(--color-border-strong)]');
     const targetStatus = getKanbanWorkflowStatusForColumn(toColumnId);
 
     if (!draggedItem || draggedItem.fromStatus === targetStatus) {
@@ -213,40 +211,137 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
   }, [assets]);
 
   return (
-    <div className="-mx-4 overflow-x-auto pb-4 px-4 scroll-smooth overscroll-x-contain snap-x snap-mandatory lg:mx-0 lg:px-0">
+    <div className="kanban-board-wrapper">
+      <style>{`
+        .kanban-board-wrapper {
+          overflow-x: auto;
+          padding-bottom: 16px;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.07) transparent;
+          margin-left: -16px;
+          margin-right: -16px;
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .kanban-board-wrapper::-webkit-scrollbar {
+          height: 6px;
+        }
+        .kanban-board-wrapper::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .kanban-board-wrapper::-webkit-scrollbar-thumb {
+          background-color: rgba(255,255,255,0.07);
+          border-radius: 99px;
+        }
+        .kanban-column-container {
+          display: flex;
+          flex-direction: column;
+          width: 260px;
+          min-width: 260px;
+          max-width: 260px;
+          flex-shrink: 0;
+          background-color: transparent !important;
+          border: none !important;
+          padding: 0 !important;
+          min-height: 400px !important;
+        }
+        .kanban-column-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 0 12px 0 !important;
+          margin-bottom: 12px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+        }
+        .kanban-column-title {
+          font-size: 12px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.05em !important;
+          color: var(--color-text-muted) !important;
+          text-transform: uppercase;
+        }
+        .kanban-column-counter {
+          background-color: var(--color-bg-overlay) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: 20px !important;
+          padding: 1px 8px !important;
+          font-size: 11px !important;
+          font-weight: normal !important;
+          color: var(--color-text-faint) !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: auto !important;
+        }
+        .kanban-column-body {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          gap: 8px;
+          overflow-y: auto;
+          background-color: transparent !important;
+        }
+        .kanban-card {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-md) !important;
+          padding: 14px !important;
+          margin-bottom: 8px !important;
+          cursor: grab !important;
+          transition: all 120ms ease !important;
+          box-shadow: none !important;
+        }
+        .kanban-card:hover {
+          border-color: var(--color-border-strong) !important;
+          transform: translateY(-1px) !important;
+          background-color: var(--color-bg-surface) !important;
+        }
+        .kanban-card-title {
+          font-size: 13px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .kanban-card-meta {
+          font-size: 11.5px !important;
+          color: var(--color-text-faint) !important;
+        }
+      `}</style>
+
       <div className="flex min-w-max gap-4">
         {kanbanWorkflowColumns.map((status) => {
           const statusAssets = assetsByStatus.get(status.id) || [];
           const isCollapsed = collapsedColumns.has(status.id);
+          
+          let dotColor = '#52525b';
+          if (status.id === 'draft') {
+            dotColor = '#525252';
+          } else if (status.id === 'revision') {
+            dotColor = '#ca8a04';
+          } else if (status.id === 'approved') {
+            dotColor = '#16a34a';
+          } else if (status.id === 'published') {
+            dotColor = '#3b82f6';
+          }
 
           return (
-            <div
-              key={status.id}
-              className="flex min-w-[320px] max-w-[320px] flex-shrink-0 snap-start flex-col"
-            >
-              <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[10px] border border-b-0 border-[rgba(255,255,255,0.06)] bg-[#111111] px-3 py-2.5">
+            <div key={status.id} className="kanban-column-container">
+              <div className="kanban-column-header">
                 <div className="flex items-center gap-2">
-                  <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', status.accentClassName)} />
+                  <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
                   <button
                     onClick={() => toggleColumnCollapse(status.id)}
                     className="rounded p-0.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
                     aria-label={isCollapsed ? 'Expand column' : 'Collapse column'}
                   >
                     {isCollapsed ? (
-                      <ChevronUp className="h-4 w-4 text-[#52525b]" />
+                      <ChevronUp className="h-4 w-4 text-[var(--color-text-muted)]" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-[#52525b]" />
+                      <ChevronDown className="h-4 w-4 text-[var(--color-text-muted)]" />
                     )}
                   </button>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate text-[13px] font-medium text-white">
-                        {status.label}
-                      </h3>
-                    </div>
-                  </div>
+                  <h3 className="kanban-column-title truncate">{status.label}</h3>
                 </div>
-                <span className={cn('inline-flex h-5 min-w-5 items-center justify-center rounded-full border px-2 text-[10px] font-medium', status.counterClassName)}>
+                <span className="kanban-column-counter">
                   {statusAssets.length}
                 </span>
               </div>
@@ -256,31 +351,35 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, status.id)}
                 className={cn(
-                  'flex min-h-[400px] flex-1 flex-col overflow-y-auto rounded-b-[10px] border border-t-0 border-[rgba(255,255,255,0.06)] bg-[#0f0f0f] p-2 pr-1 transition-all [scrollbar-color:rgba(255,255,255,0.2)_rgba(255,255,255,0.08)] [scrollbar-width:thin]',
-                  draggedItem ? 'bg-[rgba(255,255,255,0.02)]' : ''
+                  'kanban-column-body transition-all',
+                  draggedItem ? 'bg-[rgba(255,255,255,0.01)]' : ''
                 )}
               >
                 {isCollapsed ? (
-                  <div className="flex items-center justify-center py-8 text-[12px] text-[#71717a]">
+                  <div className="flex items-center justify-center py-8 text-[12px] text-[var(--color-text-muted)]">
                     {statusAssets.length} items
                   </div>
                 ) : statusAssets.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-[12px] text-[#71717a]">
-                    <div className="mb-2 text-2xl">⚡</div>
-                    <p>No assets</p>
+                  <div className="flex flex-col items-center justify-center py-[32px] px-[16px] text-center">
+                    <svg className="w-[28px] h-[28px] text-[var(--color-text-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="5" y="5" width="14" height="3" rx="0.5" />
+                      <rect x="5" y="10" width="14" height="3" rx="0.5" />
+                      <rect x="5" y="15" width="14" height="3" rx="0.5" />
+                    </svg>
+                    <p className="text-[12px] text-[var(--color-text-faint)] mt-2">No assets</p>
                   </div>
                 ) : (
                   statusAssets.map((asset) => (
                     <div key={asset.id} draggable onDragStart={() => handleDragStart(asset.id, asset.status)} className="last:mb-0">
-                        <KanbanCard
-                          asset={asset}
-                          isDragging={draggedItem?.assetId === asset.id}
-                          onQuickApprove={
-                            onStatusChange && (asset.status === 'ready_for_review' || asset.status === 'revision_requested')
-                              ? () => onStatusChange(asset.id, 'approved')
-                              : undefined
-                          }
-                        />
+                      <KanbanCard
+                        asset={asset}
+                        isDragging={draggedItem?.assetId === asset.id}
+                        onQuickApprove={
+                          onStatusChange && asset.status === 'revision_requested'
+                            ? () => onStatusChange(asset.id, 'approved')
+                            : undefined
+                        }
+                      />
                     </div>
                   ))
                 )}
@@ -290,7 +389,7 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
         })}
       </div>
 
-      <div className="mt-4 px-4 text-center text-xs text-[#71717a] lg:hidden">
+      <div className="mt-4 px-4 text-center text-xs text-[var(--color-text-muted)] lg:hidden">
         Swipe to see more columns
       </div>
     </div>

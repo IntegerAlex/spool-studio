@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,8 +126,8 @@ function getStatIcon(title: string): React.ReactNode {
       return <Users className="h-5 w-5 text-[#10b981]" />;
     case 'Pending Approvals':
       return <Clock3 className="h-5 w-5 text-[#f59e0b]" />;
-    case 'Failed Uploads':
-      return <AlertCircle className="h-5 w-5 text-[#ef4444]" />;
+    case 'Approved Assets':
+      return <CheckCircle2 className="h-5 w-5 text-[#10b981]" />;
     default:
       return <Sparkles className="h-5 w-5 text-[#6366f1]" />;
   }
@@ -141,8 +141,8 @@ function getStatBg(title: string): string {
       return 'bg-[rgba(16,185,129,0.12)]';
     case 'Pending Approvals':
       return 'bg-[rgba(245,158,11,0.12)]';
-    case 'Failed Uploads':
-      return 'bg-[rgba(239,68,68,0.12)]';
+    case 'Approved Assets':
+      return 'bg-[rgba(16,185,129,0.12)]';
     default:
       return 'bg-[rgba(99,102,241,0.12)]';
   }
@@ -231,7 +231,7 @@ export default function DashboardPage() {
   const upcomingUploads = summary.upcomingUploads;
   const totalClients = summary.totalClients;
   const completedThisMonth = summary.uploadedThisMonth;
-  const failedUploads = assets.filter((asset) => asset.status === 'failed').length;
+  const approvedAssets = assets.filter((asset) => asset.status === 'approved').length;
   const totalAssets = assets.length;
 
   const recentActivity = useMemo<ActivityRow[]>(() => {
@@ -278,15 +278,15 @@ export default function DashboardPage() {
         iconBgClassName: getStatBg('Pending Approvals'),
       },
       {
-        title: 'Failed Uploads',
-        value: failedUploads.toString(),
-        trendLabel: failedUploads > 0 ? 'Investigate errors' : 'No failures',
-        trendDirection: failedUploads > 0 ? 'down' : 'neutral',
-        icon: getStatIcon('Failed Uploads'),
-        iconBgClassName: getStatBg('Failed Uploads'),
+        title: 'Approved Assets',
+        value: approvedAssets.toString(),
+        trendLabel: approvedAssets > 0 ? `${approvedAssets} approved` : 'No approved assets',
+        trendDirection: 'neutral',
+        icon: getStatIcon('Approved Assets'),
+        iconBgClassName: getStatBg('Approved Assets'),
       },
     ],
-    [failedUploads, pendingApprovals, totalAssets, totalClients]
+    [approvedAssets, pendingApprovals, totalAssets, totalClients]
   );
 
   const quickActionItems = [
@@ -370,48 +370,291 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 dashboard-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <style>{`
+        .dashboard-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        header .topbar-breadcrumb {
+          display: none !important;
+        }
+        .page-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+        }
+        .breadcrumb-text {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+        }
+        .new-asset-btn {
+          background: var(--color-accent) !important;
+          color: #000000 !important;
+          font-size: 12.5px !important;
+          font-weight: 600 !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 16px !important;
+          border: none !important;
+          cursor: pointer !important;
+          letter-spacing: 0.01em !important;
+          box-shadow: none !important;
+          transition: all 120ms ease !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .new-asset-btn:hover {
+          opacity: 0.88 !important;
+          transform: translateY(-1px) !important;
+          filter: none !important;
+        }
+        .new-asset-btn:active {
+          transform: translateY(0) !important;
+          opacity: 1 !important;
+        }
+        .stat-card {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          padding: 20px 22px !important;
+          transition: border-color 150ms ease !important;
+          position: relative;
+          overflow: hidden;
+          box-shadow: none !important;
+        }
+        .stat-card:hover {
+          border-color: var(--color-border-strong) !important;
+        }
+        .stat-card-label {
+          font-size: 11px !important;
+          font-weight: 500 !important;
+          letter-spacing: 0.06em !important;
+          color: var(--color-text-muted) !important;
+          text-transform: uppercase !important;
+        }
+        .stat-card-number {
+          font-size: 28px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.03em !important;
+          line-height: 1.1 !important;
+          margin-top: 6px !important;
+        }
+        .stat-trend-text {
+          font-size: 11.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 6px !important;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+        .stat-card-icon-container {
+          width: 28px !important;
+          height: 28px !important;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: transparent !important;
+          flex-shrink: 0;
+        }
+        .stat-card-icon {
+          width: 14px !important;
+          height: 14px !important;
+          color: var(--color-text-faint) !important;
+        }
+        .quick-action-row {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          padding: 14px 20px !important;
+          box-shadow: none !important;
+        }
+        .quick-action-btn {
+          background-color: transparent !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 7px 14px !important;
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          gap: 7px !important;
+          transition: all 120ms ease !important;
+          height: auto !important;
+        }
+        .quick-action-btn:hover {
+          background-color: var(--color-bg-hover) !important;
+          border-color: var(--color-border-strong) !important;
+          color: var(--color-text-secondary) !important;
+        }
+        .quick-action-icon {
+          width: 13px !important;
+          height: 13px !important;
+          color: inherit !important;
+        }
+        .content-panel {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          padding: 0 !important;
+          box-shadow: none !important;
+        }
+        .panel-header {
+          padding: 16px 20px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .panel-title {
+          font-size: 13px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .panel-link {
+          font-size: 12px !important;
+          color: var(--color-text-muted) !important;
+          text-decoration: none !important;
+          transition: color 120ms ease !important;
+        }
+        .panel-link:hover {
+          color: var(--color-text-primary) !important;
+          text-decoration: underline !important;
+        }
+        .empty-state {
+          padding: 48px 20px !important;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px !important;
+        }
+        .breakdown-row {
+          padding: 11px 20px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .breakdown-row:last-child {
+          border-bottom: none !important;
+        }
+        .breakdown-label-container {
+          display: flex;
+          align-items: center;
+          gap: 9px !important;
+        }
+        .breakdown-dot {
+          width: 6px !important;
+          height: 6px !important;
+          border-radius: 50% !important;
+        }
+        .breakdown-label {
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+        }
+        .breakdown-number {
+          font-size: 13px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .section-heading-container {
+          padding-top: 28px !important;
+          margin-bottom: 14px !important;
+        }
+        .section-heading {
+          font-size: 14px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .section-sublabel {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 2px !important;
+        }
+        .client-chip {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-md) !important;
+          padding: 6px 14px !important;
+          display: inline-flex !important;
+          align-items: center;
+          gap: 8px !important;
+          transition: all 120ms ease !important;
+          height: auto !important;
+        }
+        .client-chip:hover {
+          border-color: var(--color-border-strong) !important;
+          background-color: var(--color-bg-hover) !important;
+        }
+        .client-chip-name {
+          font-size: 13px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .client-chip-badge {
+          font-size: 11.5px !important;
+          color: var(--color-text-muted) !important;
+          background-color: var(--color-bg-overlay) !important;
+          border-radius: 4px !important;
+          padding: 2px 7px !important;
+          font-weight: 400 !important;
+        }
+      `}</style>
+
       <div className="space-y-1">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-[18px] font-medium text-white sm:text-[20px]">Dashboard</h1>
-            <p className="mt-1 text-[12px] text-[#71717a]">
-              <span className="text-[#a1a1aa]">Dashboard</span>
-              <span className="mx-2 text-[#52525b]">&gt;</span>
-              <span>Home</span>
+            <h1 className="page-title">Dashboard</h1>
+            <p className="mt-1 breadcrumb-text">
+              Dashboard
             </p>
           </div>
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-            <Button className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-[var(--primary)] px-4 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              New Asset
-            </Button>
+            <AssetFormDialog
+              mode="create"
+              onSaved={(asset) => {
+                setAssets((prev) => [asset, ...prev]);
+                dashboardApi.getSummary().then(setSummary).catch(() => undefined);
+              }}
+              trigger={
+                <Button className="new-asset-btn">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Asset
+                </Button>
+              }
+            />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((card) => (
-          <Card key={card.title} className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] px-5 py-4 shadow-none">
+        {statCards.map((card, index) => (
+          <Card key={card.title} className="stat-card">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">{card.title}</p>
-                <p className="mt-2 text-[24px] font-medium leading-none text-white sm:text-[28px]">{card.value}</p>
-                <div className={`mt-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${getTrendClass(card.trendDirection)}`}>
-                  {card.trendDirection === 'up' ? <ArrowUpRight className="mr-1 h-3 w-3" /> : null}
-                  {card.trendLabel}
+                <p className="stat-card-label">{card.title}</p>
+                <p className="stat-card-number">{card.value}</p>
+                <div className="stat-trend-text">
+                  {card.trendDirection === 'up' ? (
+                    <span style={{ color: '#3ecf8e' }}>↑</span>
+                  ) : card.trendDirection === 'down' ? (
+                    <span style={{ color: '#f87171' }}>↓</span>
+                  ) : null}
+                  <span>{card.trendLabel}</span>
                 </div>
               </div>
-              <div className={`flex h-8 w-8 items-center justify-center rounded-md ${card.iconBgClassName}`}>
-                {card.icon}
+              <div className="stat-card-icon-container">
+                {React.isValidElement(card.icon) && React.cloneElement(card.icon as React.ReactElement<any>, {
+                  className: 'stat-card-icon',
+                })}
               </div>
             </div>
           </Card>
         ))}
       </div>
 
-      <Card className="rounded-[10px] border-0 bg-[#161616] p-4 shadow-none">
+      <Card className="quick-action-row">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <AssetFormDialog
             mode="create"
@@ -420,46 +663,46 @@ export default function DashboardPage() {
               dashboardApi.getSummary().then(setSummary).catch(() => undefined);
             }}
             trigger={
-              <Button className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[#6366f1] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />
-                New Asset
+              <Button className="quick-action-btn flex items-center">
+                <Plus className="quick-action-icon" />
+                <span>New Asset</span>
               </Button>
             }
           />
 
-          <Button asChild variant="ghost" className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
+          <Button asChild variant="ghost" className="quick-action-btn flex items-center">
             <Link href="/dashboard/assets">
-              <Upload className="mr-2 h-4 w-4" />
-              Upload Files
+              <Upload className="quick-action-icon" />
+              <span>Upload Files</span>
             </Link>
           </Button>
 
-          <Button asChild variant="ghost" className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
+          <Button asChild variant="ghost" className="quick-action-btn flex items-center">
             <Link href="/dashboard/clients">
-              <FolderPlus className="mr-2 h-4 w-4" />
-              Add Client
+              <FolderPlus className="quick-action-icon" />
+              <span>Add Client</span>
             </Link>
           </Button>
 
-          <Button asChild variant="ghost" className="h-10 w-full rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white sm:h-9 sm:w-auto">
+          <Button asChild variant="ghost" className="quick-action-btn flex items-center">
             <Link href="/dashboard/kanban">
-              <KanbanSquare className="mr-2 h-4 w-4" />
-              View Kanban
+              <KanbanSquare className="quick-action-icon" />
+              <span>View Kanban</span>
             </Link>
           </Button>
         </div>
       </Card>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="rounded-[10px] border-0 bg-[#161616] p-0 shadow-none xl:col-span-2">
-          <div className="flex items-center justify-between px-5 py-4">
-            <h3 className="text-[13px] font-medium text-white">Recent Activity</h3>
-            <Link href="/dashboard/assets" className="text-[13px] font-medium text-[var(--primary)] hover:text-[#818cf8]">
+        <Card className="content-panel xl:col-span-2">
+          <div className="panel-header">
+            <h3 className="panel-title">Recent Activity</h3>
+            <Link href="/dashboard/assets" className="panel-link">
               View all
             </Link>
           </div>
 
-          <div className="px-2 pb-2">
+          <div className="space-y-1 p-2">
             {recentActivity.length > 0 ? (
               recentActivity.map((item, index) => (
                 <Link
@@ -487,55 +730,64 @@ export default function DashboardPage() {
                 </Link>
               ))
             ) : (
-              <div className="px-5 py-8 text-[13px] text-[#71717a]">No recent activity yet.</div>
+              <div className="empty-state">
+                <svg className="h-8 w-8 text-[var(--color-text-faint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                <p className="text-[13px] font-normal text-[var(--color-text-muted)]">No recent activity yet</p>
+                <p className="text-[12px] text-[var(--color-text-faint)]">Activity from your team will appear here</p>
+              </div>
             )}
           </div>
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-medium text-white">Asset Status Breakdown</h3>
+          <Card className="content-panel">
+            <div className="panel-header">
+              <h3 className="panel-title">Asset Status Breakdown</h3>
             </div>
 
-            <div className="mt-4 space-y-2">
-              {assetStatusBreakdown.map((status) => (
-                <div
-                  key={status.label}
-                  className="flex h-9 items-center justify-between rounded-md px-3 text-[13px] transition-colors hover:bg-[rgba(255,255,255,0.03)]"
-                >
-                  <span className="text-[#a1a1aa]">{status.label}</span>
-                  <span className="font-medium text-white">{status.count}</span>
-                </div>
-              ))}
+            <div className="mt-0 space-y-0">
+              {assetStatusBreakdown.map((status) => {
+                let dotColor = '#525252';
+                if (status.label === 'Revision') dotColor = '#ca8a04';
+                else if (status.label === 'Approved') dotColor = '#16a34a';
+                else if (status.label === 'Published') dotColor = '#3b82f6';
+
+                return (
+                  <div key={status.label} className="breakdown-row">
+                    <div className="breakdown-label-container">
+                      <div className="breakdown-dot" style={{ backgroundColor: dotColor }} />
+                      <span className="breakdown-label">{status.label}</span>
+                    </div>
+                    <span className="breakdown-number">{status.count}</span>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </div>
       </div>
 
-      <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-[13px] font-medium text-white">Clients</h3>
-            <p className="mt-1 text-[12px] text-[#71717a]">Quick access to active client workspaces.</p>
-          </div>
-        </div>
+      <div className="section-heading-container">
+        <h3 className="section-heading">Clients</h3>
+        <p className="section-sublabel">Quick access to active client workspaces</p>
+      </div>
 
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-          {clientChips.map((client) => (
-            <Link
-              key={client.id}
-              href={`/dashboard/clients/${client.id}`}
-              className="inline-flex h-7 shrink-0 items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 text-[13px] text-white transition-colors hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)]"
-            >
-              <span className="max-w-[10rem] truncate">{client.name}</span>
-              <span className="rounded-full bg-[rgba(99,102,241,0.14)] px-2 py-0.5 text-[11px] font-medium text-[#818cf8]">
-                {client.completedDeliverables}/{client.monthlyDeliverables}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </Card>
+      <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
+        {clientChips.map((client) => (
+          <Link
+            key={client.id}
+            href={`/dashboard/clients/${client.id}`}
+            className="client-chip"
+          >
+            <span className="client-chip-name max-w-[10rem] truncate">{client.name}</span>
+            <span className="client-chip-badge">
+              {client.completedDeliverables}/{client.monthlyDeliverables}
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

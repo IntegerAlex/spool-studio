@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getClientDetail, updateClient, removeClient } from '@/services/clients-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -52,6 +53,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
+    const user = await getOrCreateCurrentUserProfile();
+    if (user.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     const params = await context.params;
     console.info('[api/clients/[id]] params', params);
     const clientId = params?.id;

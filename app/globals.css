@@ -241,3 +241,375 @@
     background-size: 200% 100%;
   }
 }
+
+/* Global Color System CSS variables on :root */
+:root {
+  --color-bg-app: #0f0f0f;
+  --color-bg-surface: #141414;
+  --color-bg-overlay: #1a1a1a;
+  --color-bg-hover: rgba(255,255,255,0.04);
+  --color-bg-active: rgba(255,255,255,0.07);
+  --color-border: rgba(255,255,255,0.08);
+  --color-border-strong: rgba(255,255,255,0.13);
+  --color-text-primary: #ededed;
+  --color-text-secondary: #a1a1a1;
+  --color-text-muted: #525252;
+  --color-text-faint: #333333;
+  --color-accent: #3ecf8e;
+  --color-accent-muted: rgba(62,207,142,0.12);
+  --color-destructive: #f87171;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* compatibility variables */
+  --bg-base: var(--color-bg-app);
+  --bg-surface: var(--color-bg-surface);
+  --bg-card: var(--color-bg-surface);
+  --bg-elevated: var(--color-bg-overlay);
+  --border-subtle: var(--color-border);
+  --border-default: var(--color-border);
+  --border-hover: var(--color-border-strong);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --text-faint: var(--color-text-faint);
+  --accent-primary: var(--color-accent);
+  --accent-secondary: var(--color-accent);
+  --accent-cyan: #06b6d4;
+  --accent-green: #3ecf8e;
+  --accent-amber: #f59e0b;
+  --accent-glow: var(--color-accent-muted);
+}
+
+/* Typography System */
+html, body, #__next, [id="root-wrapper"] {
+  background-color: var(--color-bg-app) !important;
+  color: var(--color-text-secondary) !important;
+  font-size: 13.5px !important;
+  line-height: 1.6 !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: -0.02em !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+}
+
+.all-caps-label, 
+[class*="stats-label"], 
+[class*="card-label"], 
+[class*="label-uppercase"] {
+  font-size: 10px !important;
+  letter-spacing: 0.12em !important;
+  font-weight: 700 !important;
+  color: var(--text-muted) !important;
+  text-transform: uppercase !important;
+}
+
+body, p {
+  color: var(--text-secondary) !important;
+  font-size: 13.5px !important;
+}
+
+a {
+  color: var(--accent-primary) !important;
+  text-decoration: none !important;
+  transition: all 150ms ease !important;
+}
+a:hover {
+  text-decoration: underline !important;
+  filter: brightness(1.15) !important;
+}
+
+/* Micro-interactions */
+button, .btn, [role="button"] {
+  transition: all 150ms ease !important;
+}
+button:hover, .btn:hover, [role="button"]:hover {
+  transform: translateY(-1px) !important;
+}
+button:active, .btn:active, [role="button"]:active {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+.card, [class*="card"] {
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease !important;
+}
+
+input, select, textarea, [class*="input"] {
+  transition: border-color 150ms ease, box-shadow 150ms ease !important;
+}
+
+nav a, [class*="nav-item"], [class*="sidebar-menu-button"] {
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease !important;
+}
+
+/* Sidebar collapse */
+aside, [class*="sidebar-container"] {
+  transition: width 250ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Global Scrollbars */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255,255,255,0.08) transparent !important;
+}
+
+*::-webkit-scrollbar {
+  width: 5px !important;
+  height: 5px !important;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 999px !important;
+}
+
+/* Focus States */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px rgba(99, 102, 241, 0.5) !important;
+}
+
+/* Selection Color */
+::selection {
+  background: rgba(99, 102, 241, 0.3) !important;
+  color: #e8e8f0 !important;
+}
+
+/* Custom Loading Screen overlay */
+.global-loader-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: #0a0a0f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  animation: fade-out-overlay 0.3s ease-in-out forwards;
+  animation-delay: 2.2s;
+  pointer-events: auto;
+}
+
+.global-loader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.global-loader-logo {
+  font-size: 36px;
+  font-weight: 800;
+  color: #e8e8f0;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.global-loader-bar-container {
+  width: 280px;
+  height: 2px;
+  background-color: rgba(255,255,255,0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.global-loader-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  border-radius: 999px;
+  width: 0%;
+  animation: loading-fill 1.8s ease-in-out forwards;
+}
+
+.global-loader-text {
+  font-size: 12px;
+  color: #374151;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  margin-top: 16px;
+}
+
+@keyframes pulse-glow {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes loading-fill {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes fade-out-overlay {
+  0% {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  100% {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* Custom status badges */
+.status-badge-draft {
+  background-color: rgba(82, 82, 82, 0.15) !important;
+  color: #737373 !important;
+  border: 1px solid rgba(82, 82, 82, 0.25) !important;
+}
+.status-badge-revision {
+  background-color: rgba(202, 138, 4, 0.1) !important;
+  color: #ca8a04 !important;
+  border: 1px solid rgba(202, 138, 4, 0.2) !important;
+}
+.status-badge-approved {
+  background-color: rgba(22, 163, 74, 0.1) !important;
+  color: #16a34a !important;
+  border: 1px solid rgba(22, 163, 74, 0.2) !important;
+}
+.status-badge-published {
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  color: #60a5fa !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Badge size and border-radius standard overrides */
+.status-badge-draft,
+.status-badge-revision,
+.status-badge-approved,
+.status-badge-published {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  padding: 2px 8px !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  text-transform: capitalize;
+}
+
+/* ==========================================================================
+   GLOBAL MICRO-INTERACTION & TYPOGRAPHY POLISH
+   ========================================================================== */
+
+/* Scrollbar global styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.07) transparent;
+}
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Text Selection */
+::selection {
+  background: rgba(62, 207, 142, 0.2);
+  color: var(--color-text-primary);
+}
+
+/* Typography Polish */
+h1, h2, h3, h4 {
+  letter-spacing: -0.025em !important;
+  font-weight: 600 !important;
+  color: var(--color-text-primary) !important;
+}
+p, span, div {
+  color: var(--color-text-secondary);
+  font-size: 13.5px;
+}
+.tracking-label-uppercase {
+  font-size: 10.5px !important;
+  letter-spacing: 0.08em !important;
+  font-weight: 600 !important;
+  color: var(--color-text-faint) !important;
+  text-transform: uppercase !important;
+}
+
+/* Code/Mono text styling */
+code, pre, .mono-text {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+  font-size: 12.5px !important;
+  color: var(--color-text-secondary) !important;
+  background-color: var(--color-bg-overlay) !important;
+  border-radius: 4px !important;
+  padding: 1px 6px !important;
+}
+
+/* Global button animations */
+button, a.button, .btn {
+  transition: all 120ms ease !important;
+}
+button:hover, a.button:hover, .btn:hover {
+  opacity: 0.88 !important;
+}
+button:active, a.button:active, .btn:active {
+  transform: scale(0.97) !important;
+}
+
+/* Card hover and styles */
+.card, [class*="Card"] {
+  transition: border-color 140ms ease !important;
+}
+.card:hover, [class*="Card"]:hover {
+  border-color: var(--color-border-strong) !important;
+}
+
+/* Inputs/Selects micro-interactions */
+input, select, textarea {
+  transition: border-color 120ms ease, box-shadow 120ms ease !important;
+}
+
+/* Anchor tag transitions */
+a {
+  transition: color 100ms ease, opacity 100ms ease !important;
+}
+a:hover {
+  color: var(--color-text-primary) !important;
+}
+
+/* Global focus styling */
+*:focus-visible, *:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08) !important;
+}

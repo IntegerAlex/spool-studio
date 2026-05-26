@@ -7,7 +7,7 @@ import {
   listClients,
   updateClient as updateClientRow,
 } from '@/repositories/clients-repository';
-import { listAssetSummaries } from '@/repositories/assets-repository';
+import { listAssetSummaries, listAssetsByClientId } from '@/repositories/assets-repository';
 import { createClientDriveFolders } from '@/integrations/google-drive/folder-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
@@ -218,5 +218,9 @@ export async function updateClient(
 }
 
 export async function removeClient(clientId: string): Promise<void> {
+  const assets = await listAssetsByClientId(clientId);
+  if (assets && assets.length > 0) {
+    throw new Error('Cannot delete client because it has linked assets.');
+  }
   await deleteClientRow(clientId);
 }

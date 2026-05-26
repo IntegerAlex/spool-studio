@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useWatch } from 'react-hook-form';
 import type { Asset, AssetStatus, Client, User } from '@/types/index';
-import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
+import { assetsApi, clientsApi, usersApi, clearApiClientCache } from '@/lib/api-client';
+import { useRouter } from 'next/navigation';
 import {
   canUploadFromStatus,
   getUploadEligibilityReason,
@@ -110,6 +111,7 @@ interface AssetFormDialogProps {
 }
 
 export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -257,6 +259,8 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
             title: 'Asset uploaded',
             description: `${uploaded.title} was uploaded successfully.`,
           });
+          clearApiClientCache();
+          router.refresh();
           onSaved?.(uploaded);
           setOpen(false);
           return;
@@ -289,6 +293,8 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
         description: `${saved.title} is ready to go.`,
       });
 
+      clearApiClientCache();
+      router.refresh();
       onSaved?.(saved);
       setOpen(false);
     } catch (error) {

@@ -7,6 +7,7 @@ import { Asset, Client } from '@/types/index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { StatusBadge } from '@/components/assets/status-badge';
 
 function getAssetPublishDate(asset: Asset): Date | null {
   if (asset.publishDate) {
@@ -30,20 +31,6 @@ function getAssetPublishDate(asset: Asset): Date | null {
 
 function formatDateKey(date: Date): string {
   return date.toISOString().split('T')[0];
-}
-
-function getEventColorClasses(asset: Asset): string {
-  const publishDate = getAssetPublishDate(asset);
-
-  if (asset.status === 'published') {
-    return 'bg-[rgba(16,185,129,0.14)] text-[#a7f3d0] border-[rgba(16,185,129,0.16)]';
-  }
-
-  if (publishDate && publishDate.getTime() < new Date().setHours(0, 0, 0, 0) && asset.status === 'approved') {
-    return 'bg-[rgba(239,68,68,0.14)] text-[#fecaca] border-[rgba(239,68,68,0.18)]';
-  }
-
-  return 'bg-[rgba(59,130,246,0.14)] text-[#bfdbfe] border-[rgba(59,130,246,0.16)]';
 }
 
 export default function CalendarPage() {
@@ -144,138 +131,258 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 calendar-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <style>{`
+        .calendar-page-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        .calendar-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+          line-height: 1.25 !important;
+        }
+        .calendar-subtitle {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 3px !important;
+        }
+        .calendar-grid-container {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          overflow: hidden;
+        }
+        .days-header-row {
+          background-color: var(--color-bg-overlay) !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          padding: 10px !important;
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+        }
+        .day-header-cell {
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.07em !important;
+          text-transform: uppercase !important;
+          color: var(--color-text-faint) !important;
+          text-align: center !important;
+        }
+        .calendar-cells-grid {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+        }
+        .date-cell {
+          border-right: 1px solid var(--color-border);
+          border-bottom: 1px solid var(--color-border);
+          padding: 10px !important;
+          aspect-ratio: 1 / 1;
+          display: flex;
+          flex-direction: column;
+          background-color: transparent !important;
+          transition: background-color 100ms ease;
+        }
+        .date-cell:hover {
+          background-color: var(--color-bg-hover) !important;
+        }
+        .date-cell:nth-child(7n) {
+          border-right: none !important;
+        }
+        .date-number {
+          font-size: 12px !important;
+          color: var(--color-text-muted) !important;
+          width: fit-content;
+          display: inline-block;
+        }
+        .today-date {
+          color: var(--color-text-primary) !important;
+          font-weight: 600 !important;
+          background-color: var(--color-bg-hover) !important;
+          border-radius: 4px !important;
+          padding: 2px 6px !important;
+        }
+        .nav-btn {
+          background-color: transparent !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 6px 10px !important;
+          color: var(--color-text-muted) !important;
+          height: auto !important;
+          transition: all 120ms ease !important;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .nav-btn:hover {
+          background-color: var(--color-bg-hover) !important;
+          color: var(--color-text-primary) !important;
+        }
+        .month-year-label {
+          font-size: 14px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+        }
+        .side-panel-container {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          padding: 20px !important;
+        }
+        .panel-heading {
+          font-size: 13px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.05em !important;
+          margin-bottom: 16px !important;
+        }
+        .history-row-item {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 10px 12px !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-md) !important;
+          background-color: transparent !important;
+          transition: background-color 100ms ease !important;
+        }
+        .history-row-item:hover {
+          background-color: var(--color-bg-hover) !important;
+        }
+      `}</style>
+
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Calendar' }]} />
 
-      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-[16px] font-medium text-white">{monthName}</h2>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handlePrevMonth}
-              className="h-8 w-8 border-[rgba(255,255,255,0.08)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleNextMonth}
-              className="h-8 w-8 border-[rgba(255,255,255,0.08)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="calendar-title">Calendar</h1>
+          <p className="calendar-subtitle">Plan and schedule your deliverable publications</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 items-start">
+        {/* Main Calendar Grid */}
+        <div className="xl:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="month-year-label">{monthName}</span>
+            <div className="flex items-center gap-2">
+              <button onClick={handlePrevMonth} className="nav-btn">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button onClick={handleNextMonth} className="nav-btn">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="calendar-grid-container">
+            <div className="days-header-row">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="day-header-cell">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            <div className="calendar-cells-grid">
+              {emptyDays.map((_, i) => (
+                <div key={`empty-${i}`} className="date-cell" />
+              ))}
+
+              {days.map((day) => {
+                const assetsForDay = getAssetsForDate(day);
+                const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
+
+                return (
+                  <div key={day} className="date-cell">
+                    <div className="flex h-full flex-col">
+                      <div>
+                        <span className={cn('date-number', isToday && 'today-date')}>
+                          {day}
+                        </span>
+                      </div>
+                      {assetsForDay.length > 0 && (
+                        <div className="mt-auto space-y-1.5 pb-0.5">
+                          <div className="space-y-1">
+                            {assetsForDay.slice(0, 2).map((asset) => (
+                              <div key={asset.id} className="flex justify-start">
+                                <StatusBadge status={asset.status} className="w-full justify-start truncate" />
+                              </div>
+                            ))}
+                          </div>
+                          {assetsForDay.length > 2 && (
+                            <p className="text-[10px] text-[var(--color-text-muted)]">+{assetsForDay.length - 2} more</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="mb-2 grid grid-cols-7 gap-1 sm:gap-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="py-2 text-center text-[11px] uppercase tracking-[0.18em] text-[#52525b]">
-              {day}
-            </div>
-          ))}
-        </div>
+        {/* Sidebar Info Panels */}
+        <div className="space-y-6">
+          <div className="side-panel-container">
+            <h3 className="panel-heading">Upcoming Approved Posts</h3>
+            <div className="space-y-2">
+              {upcomingApproved.length > 0 ? (
+                upcomingApproved.map((asset) => {
+                  const client = clients.get(asset.clientId);
+                  const publishDate = getAssetPublishDate(asset);
 
-        <div className="grid grid-cols-7 gap-1 sm:gap-2">
-          {emptyDays.map((_, i) => (
-            <div key={`empty-${i}`} className="aspect-square" />
-          ))}
-
-          {days.map((day) => {
-            const assetsForDay = getAssetsForDate(day);
-            const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
-
-            return (
-              <div
-                key={day}
-                className={cn(
-                  'aspect-square rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[#161616] p-2 transition-colors hover:bg-[#1a1a1a]',
-                  isToday && 'border-[var(--primary)]'
-                )}
-              >
-                <div className="flex h-full flex-col">
-                  <p className={cn('text-[12px] font-medium', isToday ? 'text-[var(--primary)]' : 'text-white')}>
-                    {day}
-                  </p>
-                  {assetsForDay.length > 0 && (
-                    <div className="mt-auto space-y-1.5 pb-0.5">
-                      <div className="space-y-1">
-                        {assetsForDay.slice(0, 2).map((asset) => {
-                          const publishDate = getAssetPublishDate(asset);
-                          return (
-                            <div
-                              key={asset.id}
-                              className={cn(
-                                'flex h-[18px] items-center gap-1 rounded-full border px-2 text-[10px] font-medium',
-                                getEventColorClasses(asset)
-                              )}
-                              title={asset.title}
-                            >
-                              <span className="min-w-0 truncate">{asset.title}</span>
-                            </div>
-                          );
-                        })}
+                  return (
+                    <div key={asset.id} className="history-row-item sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-white truncate">{asset.title}</p>
+                        <p className="text-[11.5px] text-[var(--color-text-faint)] truncate mt-0.5">
+                          {client?.name || 'Unknown'} • {publishDate ? publishDate.toLocaleDateString() : 'No date'}
+                        </p>
                       </div>
-                      {assetsForDay.length > 2 && (
-                        <p className="text-[10px] text-[#71717a]">+{assetsForDay.length - 2} more</p>
-                      )}
+                      <div className="shrink-0 self-start sm:self-auto">
+                        <StatusBadge status={asset.status} />
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  );
+                })
+              ) : (
+                <p className="text-[12px] text-[var(--color-text-faint)]">No upcoming approved posts scheduled</p>
+              )}
+            </div>
+          </div>
 
-      </div>
+          <div className="side-panel-container">
+            <h3 className="panel-heading">Published History</h3>
+            <div className="space-y-2">
+              {publishedHistory.length > 0 ? (
+                publishedHistory.map((asset) => {
+                  const client = clients.get(asset.clientId);
+                  const publishedAt = asset.publishedAt ?? getAssetPublishDate(asset);
 
-      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4">
-        <h3 className="mb-4 text-[13px] font-medium text-white">Upcoming Approved Posts</h3>
-        <div className="space-y-2">
-          {upcomingApproved.map((asset) => {
-            const client = clients.get(asset.clientId);
-            const publishDate = getAssetPublishDate(asset);
-
-            return (
-              <div key={asset.id} className="flex flex-col gap-2 rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[13px] font-medium text-white">{asset.title}</p>
-                  <p className="text-[12px] text-[#71717a]">
-                    {client?.name || 'Unknown'} • {publishDate ? publishDate.toLocaleString() : 'No publish date'}
-                  </p>
-                </div>
-                <span className="self-start rounded-full border border-[rgba(59,130,246,0.18)] bg-[rgba(59,130,246,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#93c5fd] sm:self-auto">
-                  Approved
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111] p-4">
-        <h3 className="mb-4 text-[13px] font-medium text-white">Published History</h3>
-        <div className="space-y-2">
-          {publishedHistory.map((asset) => {
-            const client = clients.get(asset.clientId);
-            const publishedAt = asset.publishedAt ?? getAssetPublishDate(asset);
-
-            return (
-              <div key={asset.id} className="flex flex-col gap-2 rounded-[10px] border border-[rgba(255,255,255,0.05)] px-3 py-2 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[13px] font-medium text-white">{asset.title}</p>
-                  <p className="text-[12px] text-[#71717a]">
-                    {client?.name || 'Unknown'} • {publishedAt ? publishedAt.toLocaleString() : 'No publish date'}
-                  </p>
-                </div>
-                <span className="self-start rounded-full border border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[10px] font-medium text-[#34d399] sm:self-auto">
-                  Published
-                </span>
-              </div>
-            );
-          })}
+                  return (
+                    <div key={asset.id} className="history-row-item sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-white truncate">{asset.title}</p>
+                        <p className="text-[11.5px] text-[var(--color-text-faint)] truncate mt-0.5">
+                          {client?.name || 'Unknown'} • {publishedAt ? publishedAt.toLocaleDateString() : 'No date'}
+                        </p>
+                      </div>
+                      <div className="shrink-0 self-start sm:self-auto">
+                        <StatusBadge status={asset.status} />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-[12px] text-[var(--color-text-faint)]">No published history available</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { assetsApi, clientsApi } from '@/lib/api-client';
 import { Asset, Client } from '@/types/index';
 import Link from 'next/link';
-import { CheckCircle, XCircle, Clock, Image as ImageIcon } from 'lucide-react';
 import { StatusBadge } from '@/components/assets/status-badge';
 import { getAssetIcon } from '@/lib/asset-display';
 import { cn } from '@/lib/utils';
@@ -87,33 +86,34 @@ export default function ApprovalsPage() {
     const isBusy = isApproving || isRejecting;
 
     return (
-      <div key={asset.id} className="flex flex-col gap-3 px-4 py-3 transition-colors hover:bg-[rgba(255,255,255,0.03)] sm:flex-row sm:items-center">
-        <Link href={`/dashboard/assets/${asset.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[6px] border border-[rgba(255,255,255,0.06)] bg-[#0f0f0f]">
+      <div key={asset.id} className="table-row-item">
+        <Link href={`/dashboard/assets/${asset.id}`} className="flex flex-1 items-center gap-3 min-w-0">
+          <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]">
             {asset.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" />
+              <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" loading="lazy" />
             ) : (
-              <AssetIcon className="h-5 w-5 text-[#71717a]" />
+              <AssetIcon className="h-5 w-5 text-[var(--color-text-faint)]" />
             )}
           </div>
-
           <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium text-white">{asset.title}</p>
-            <p className="truncate text-[12px] text-[#71717a]">{clientName}</p>
+            <p className="truncate font-medium text-[var(--color-text-primary)]">{asset.title}</p>
+            <p className="text-[11px] text-[var(--color-text-faint)] uppercase tracking-wider mt-0.5">{asset.fileExtension ?? asset.type}</p>
           </div>
         </Link>
 
-        <div className="shrink-0 self-start sm:self-auto">
+        <div className="w-32 shrink-0">
           <StatusBadge status={asset.status} />
         </div>
 
+        <div className="w-32 shrink-0 text-[var(--color-text-secondary)] truncate">
+          {clientName}
+        </div>
+
         {isPending ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          <div className="w-48 shrink-0 flex items-center justify-end gap-2">
             <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-full border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[12px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399] sm:w-auto"
+              className="approve-btn"
               disabled={isBusy}
               aria-busy={isApproving}
               onClick={() => handleApprovalAction(asset.id, 'approve')}
@@ -121,9 +121,7 @@ export default function ApprovalsPage() {
               {isApproving ? 'Approving…' : 'Approve'}
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-full border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5] sm:w-auto"
+              className="reject-btn"
               disabled={isBusy}
               aria-busy={isRejecting}
               onClick={() => handleApprovalAction(asset.id, 'reject')}
@@ -132,7 +130,9 @@ export default function ApprovalsPage() {
             </Button>
           </div>
         ) : (
-          <div className="shrink-0 text-[12px] text-[#71717a]">Resolved</div>
+          <div className="w-48 shrink-0 text-right text-[var(--color-text-muted)] text-[12px]">
+            Resolved
+          </div>
         )}
       </div>
     );
@@ -161,45 +161,169 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 approvals-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <style>{`
+        .approvals-page-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        .approvals-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+          line-height: 1.25 !important;
+        }
+        .approvals-subtitle {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 3px !important;
+        }
+        .table-list-container {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          overflow: hidden;
+        }
+        .table-header-row {
+          background-color: var(--color-bg-overlay) !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          padding: 10px 20px !important;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .header-cell {
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.07em !important;
+          text-transform: uppercase !important;
+          color: var(--color-text-faint) !important;
+        }
+        .table-row-item {
+          padding: 12px 20px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          text-decoration: none !important;
+          transition: background-color 100ms ease !important;
+        }
+        .table-row-item:last-child {
+          border-bottom: none !important;
+        }
+        .table-row-item:hover {
+          background-color: var(--color-bg-hover) !important;
+        }
+        .approve-btn {
+          background-color: transparent !important;
+          border: 1px solid rgba(22,163,74,0.3) !important;
+          color: #16a34a !important;
+          font-size: 12px !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 5px 12px !important;
+          transition: all 120ms ease !important;
+          height: auto !important;
+          box-shadow: none !important;
+          cursor: pointer !important;
+        }
+        .approve-btn:hover:not(:disabled) {
+          background-color: rgba(22,163,74,0.08) !important;
+        }
+        .reject-btn {
+          background-color: transparent !important;
+          border: 1px solid rgba(248,113,113,0.3) !important;
+          color: #f87171 !important;
+          font-size: 12px !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 5px 12px !important;
+          transition: all 120ms ease !important;
+          height: auto !important;
+          box-shadow: none !important;
+          cursor: pointer !important;
+        }
+        .reject-btn:hover:not(:disabled) {
+          background-color: rgba(248,113,113,0.08) !important;
+        }
+      `}</style>
+
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Approvals' }]} />
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-[18px] font-medium text-white">Approvals</h1>
-        <div className="flex items-center gap-2 text-[12px] text-[#71717a]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="approvals-title">Approvals</h1>
+          <p className="approvals-subtitle">Review, approve, or request revisions on client content drafts</p>
+        </div>
+        <div className="flex items-center gap-2 text-[12px] text-[var(--color-text-muted)]">
           <span>{readyForReview.length} pending</span>
-          <span className="h-1 w-1 rounded-full bg-[rgba(255,255,255,0.2)]" />
-          <span>{revisionRequested.length} resolved</span>
+          <span className="h-1 w-1 rounded-full bg-[var(--color-border-strong)]" />
+          <span>{revisionRequested.length} revision requested</span>
         </div>
       </div>
 
-      <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111]">
-        <div className="border-b border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
-          Drafts Pending Approval
-        </div>
-        <div className="divide-y divide-[rgba(255,255,255,0.05)]">
-          {readyForReview.length > 0 ? (
-            readyForReview.map((asset) => {
-              const client = clients.get(asset.clientId);
-              return renderAssetRow(asset, client?.name || 'Unknown Client', true);
-            })
-          ) : (
-            <div className="px-4 py-10 text-center text-[13px] text-[#71717a]">No items pending approval</div>
-          )}
+      <div className="space-y-8">
+        {/* Pending Approvals */}
+        <div className="space-y-3">
+          <h2 className="text-[13px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider px-1">
+            Drafts Pending Approval
+          </h2>
+          <div className="table-list-container">
+            <div className="table-header-row">
+              <div className="flex-1 header-cell">Asset</div>
+              <div className="w-32 header-cell">Status</div>
+              <div className="w-32 header-cell">Client</div>
+              <div className="w-48 header-cell text-right">Actions</div>
+            </div>
+            <div>
+              {readyForReview.length > 0 ? (
+                readyForReview.map((asset) => {
+                  const client = clients.get(asset.clientId);
+                  return renderAssetRow(asset, client?.name || 'Unknown Client', true);
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <svg className="h-8 w-8 text-[var(--color-text-faint)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-[13px] font-normal text-[var(--color-text-muted)]">No items pending approval</p>
+                  <p className="text-[12px] text-[var(--color-text-faint)] mt-0.5">Everything is up to date</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="border-t border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
-          Revision Requested
-        </div>
-        <div className="divide-y divide-[rgba(255,255,255,0.05)]">
-          {revisionRequested.length > 0 ? (
-            revisionRequested.map((asset) => {
-              const client = clients.get(asset.clientId);
-              return renderAssetRow(asset, client?.name || 'Unknown Client', false);
-            })
-          ) : (
-            <div className="px-4 py-10 text-center text-[13px] text-[#71717a]">No resolved review items</div>
-          )}
+        {/* Revision Requested */}
+        <div className="space-y-3">
+          <h2 className="text-[13px] font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider px-1">
+            Revision Requested
+          </h2>
+          <div className="table-list-container">
+            <div className="table-header-row">
+              <div className="flex-1 header-cell">Asset</div>
+              <div className="w-32 header-cell">Status</div>
+              <div className="w-32 header-cell">Client</div>
+              <div className="w-48 header-cell text-right">Status</div>
+            </div>
+            <div>
+              {revisionRequested.length > 0 ? (
+                revisionRequested.map((asset) => {
+                  const client = clients.get(asset.clientId);
+                  return renderAssetRow(asset, client?.name || 'Unknown Client', false);
+                })
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <svg className="h-8 w-8 text-[var(--color-text-faint)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-[13px] font-normal text-[var(--color-text-muted)]">No resolved review items</p>
+                  <p className="text-[12px] text-[var(--color-text-faint)] mt-0.5">No revisions are currently requested</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

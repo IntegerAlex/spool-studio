@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { getAssetIcon } from '@/lib/asset-display';
+import Link from 'next/link';
 
 function getQueueStatusLabel(status: UploadQueue['status']): string {
   switch (status) {
@@ -32,12 +33,13 @@ function getQueueStatusLabel(status: UploadQueue['status']): string {
 function getQueueStatusClass(status: UploadQueue['status']): string {
   switch (status) {
     case 'pending':
+      return 'border-[rgba(82,82,82,0.25)] bg-[rgba(82,82,82,0.15)] text-[#737373]';
     case 'scheduled':
-      return 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.12)] text-[#818cf8]';
+      return 'border-[rgba(202,138,4,0.2)] bg-[rgba(202,138,4,0.1)] text-[#ca8a04]';
     case 'uploaded':
-      return 'border-[rgba(16,185,129,0.18)] bg-[rgba(16,185,129,0.12)] text-[#34d399]';
+      return 'border-[rgba(22,163,74,0.2)] bg-[rgba(22,163,74,0.1)] text-[#16a34a]';
     case 'failed':
-      return 'border-[rgba(239,68,68,0.22)] bg-[rgba(239,68,68,0.12)] text-[#fca5a5]';
+      return 'border-[rgba(239,68,68,0.2)] bg-[rgba(239,68,68,0.1)] text-[#fca5a5]';
   }
 }
 
@@ -101,142 +103,267 @@ export default function QueuePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 queue-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <style>{`
+        .queue-page-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        .queue-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+          line-height: 1.25 !important;
+        }
+        .queue-subtitle {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 3px !important;
+        }
+        .upload-drop-zone {
+          background-color: var(--color-bg-surface) !important;
+          border: 2px dashed var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          padding: 48px 32px !important;
+          text-align: center !important;
+          transition: border-color 150ms ease, background-color 150ms ease !important;
+          cursor: pointer;
+        }
+        .upload-drop-zone:hover {
+          border-color: var(--color-border-strong) !important;
+          background-color: var(--color-bg-overlay) !important;
+        }
+        .upload-icon {
+          width: 36px;
+          height: 36px;
+          color: var(--color-text-faint) !important;
+        }
+        .upload-zone-heading {
+          font-size: 14px !important;
+          font-weight: 500 !important;
+          color: var(--color-text-primary) !important;
+          margin-top: 12px !important;
+        }
+        .upload-zone-subtext {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 4px !important;
+        }
+        .browse-btn {
+          background: #3ecf8e !important;
+          color: #000000 !important;
+          font-size: 12.5px !important;
+          font-weight: 600 !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 16px !important;
+          border: none !important;
+          cursor: pointer !important;
+          box-shadow: none !important;
+          transition: all 120ms ease !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: auto !important;
+        }
+        .browse-btn:hover {
+          opacity: 0.88 !important;
+        }
+        .table-list-container {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          overflow: hidden;
+        }
+        .table-header-row {
+          background-color: var(--color-bg-overlay) !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          padding: 10px 20px !important;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .header-cell {
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.07em !important;
+          text-transform: uppercase !important;
+          color: var(--color-text-faint) !important;
+        }
+        .table-row-item {
+          padding: 12px 20px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          text-decoration: none !important;
+          transition: background-color 100ms ease !important;
+        }
+        .table-row-item:last-child {
+          border-bottom: none !important;
+        }
+        .table-row-item:hover {
+          background-color: var(--color-bg-hover) !important;
+        }
+      `}</style>
+
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Upload Queue' }]} />
 
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-[18px] font-medium text-white">Upload Queue</h1>
-        <p className="text-[12px] text-[#71717a]">{scheduledQueue.length} scheduled next</p>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="queue-title">Upload Queue</h1>
+          <p className="queue-subtitle">Monitor file publishing status and active uploads</p>
+        </div>
+        <p className="text-[12px] text-[var(--color-text-muted)] font-medium">{scheduledQueue.length} scheduled next</p>
       </div>
 
-      <div className="overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#111111]">
-        <div className="grid grid-cols-[1.6fr_0.9fr_0.8fr_0.9fr_120px] items-center gap-3 border-b border-[rgba(255,255,255,0.05)] px-4 py-3 text-[11px] uppercase tracking-[0.16em] text-[#52525b]">
-          <div>File</div>
-          <div>Client</div>
-          <div>Status</div>
-          <div>Progress</div>
-          <div className="text-right">Action</div>
+      <div className="upload-drop-zone">
+        <svg className="upload-icon mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+        </svg>
+        <h3 className="upload-zone-heading">Drag and drop files here to upload</h3>
+        <p className="upload-zone-subtext">Supports MP4, MOV, PNG, JPG, and PDF (up to 100MB)</p>
+        <button className="browse-btn mt-4">Browse Files</button>
+      </div>
+
+      <div className="table-list-container">
+        <div className="table-header-row">
+          <div className="flex-[1.6] min-w-0 header-cell">File</div>
+          <div className="flex-[0.9] min-w-0 header-cell">Client</div>
+          <div className="flex-[0.8] min-w-0 header-cell">Status</div>
+          <div className="flex-[0.9] min-w-0 header-cell">Progress</div>
+          <div className="w-[120px] shrink-0 text-right header-cell">Action</div>
         </div>
 
-        <div className="divide-y divide-[rgba(255,255,255,0.05)]">
+        <div className="divide-y divide-[var(--color-border)]">
           {queuedItems.map((item) => {
-          const asset = assets.get(item.assetId);
-          const client = asset ? clients.get(asset.clientId) : null;
-          const AssetIcon = asset ? getAssetIcon(asset) : FileText;
-          const isFailed = item.status === 'failed';
+            const asset = assets.get(item.assetId);
+            const client = asset ? clients.get(asset.clientId) : null;
+            const AssetIcon = asset ? getAssetIcon(asset) : FileText;
+            const isFailed = item.status === 'failed';
 
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                'grid h-12 grid-cols-[1.6fr_0.9fr_0.8fr_0.9fr_120px] items-center gap-3 px-4 text-[13px] transition-colors hover:bg-[rgba(255,255,255,0.03)]',
-                isFailed && 'border-l-2 border-l-[#ef4444] bg-[rgba(239,68,68,0.04)] hover:bg-[rgba(239,68,68,0.06)]'
-              )}
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-[rgba(255,255,255,0.04)] text-[#71717a]">
-                  <AssetIcon className="h-[18px] w-[18px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-white">{asset?.title || 'Unknown Asset'}</p>
-                  <p className="truncate text-[12px] text-[#71717a]">
-                    {item.caption || 'No caption provided'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="min-w-0 text-[12px] text-[#a1a1aa]">
-                <p className="truncate">{client?.name || 'Unknown Client'}</p>
-                <p className="mt-0.5 inline-flex items-center gap-1 text-[#71717a]">
-                  <Calendar className="h-3 w-3" />
-                  {new Date(item.scheduledDate).toLocaleDateString()}
-                </p>
-              </div>
-
-              <div>
-                <span className={cn('inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium', getQueueStatusClass(item.status))}>
-                  {getQueueStatusLabel(item.status)}
-                </span>
-              </div>
-
-              <div className="pr-4">
-                {item.status === 'uploaded' || item.status === 'failed' ? (
-                  <p className={cn('text-[12px] font-medium', item.status === 'failed' ? 'text-[#fca5a5]' : 'text-[#34d399]')}>
-                    {item.status === 'failed' ? 'Final state' : 'Complete'}
-                  </p>
-                ) : (
-                  <div className="h-[3px] overflow-hidden rounded-full bg-[rgba(255,255,255,0.08)]">
-                    <div className="h-full rounded-full bg-[var(--primary)] transition-all duration-300" style={{ width: getProgressWidth(item.status) }} />
-                  </div>
+            return (
+              <div
+                key={item.id}
+                className={cn(
+                  'table-row-item',
+                  isFailed && 'border-l-2 border-l-[#ef4444] bg-[rgba(239,68,68,0.02)] hover:bg-[rgba(239,68,68,0.04)]'
                 )}
-              </div>
+              >
+                <div className="flex flex-[1.6] min-w-0 items-center gap-3">
+                  <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]">
+                    {asset?.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <AssetIcon className="h-5 w-5 text-[var(--color-text-faint)]" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-[var(--color-text-primary)]">{asset?.title || 'Unknown Asset'}</p>
+                    <p className="truncate text-[12px] text-[var(--color-text-muted)] mt-0.5">
+                      {item.caption || 'No caption provided'}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="flex justify-end">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[#a1a1aa] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
-                      Actions
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white">
-                    {asset?.driveFileUrl && (
-                      <DropdownMenuItem asChild>
-                        <a href={asset.driveFileUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
-                          <ExternalLink className="mr-2 h-4 w-4" />
-                          Open in Drive
-                        </a>
+                <div className="flex-[0.9] min-w-0 text-[12px] text-[var(--color-text-secondary)]">
+                  <p className="truncate">{client?.name || 'Unknown Client'}</p>
+                  <p className="mt-0.5 inline-flex items-center gap-1 text-[var(--color-text-faint)]">
+                    <Calendar className="h-3 w-3" />
+                    {new Date(item.scheduledDate).toLocaleDateString()}
+                  </p>
+                </div>
+
+                <div className="flex-[0.8] min-w-0">
+                  <span className={cn('inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium capitalize', getQueueStatusClass(item.status))}>
+                    {getQueueStatusLabel(item.status)}
+                  </span>
+                </div>
+
+                <div className="flex-[0.9] min-w-0 pr-4">
+                  {item.status === 'uploaded' || item.status === 'failed' ? (
+                    <p className={cn('text-[12px] font-medium', item.status === 'failed' ? 'text-[#fca5a5]' : 'text-[#34d399]')}>
+                      {item.status === 'failed' ? 'Final state' : 'Complete'}
+                    </p>
+                  ) : (
+                    <div className="h-[3px] overflow-hidden rounded-full bg-[var(--color-bg-overlay)]">
+                      <div className="h-full rounded-full bg-[var(--color-accent)] transition-all duration-300" style={{ width: getProgressWidth(item.status) }} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="w-[120px] shrink-0 flex justify-end">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-7 px-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-white">
+                        Actions
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="border-[var(--color-border)] bg-[var(--color-bg-surface)] text-white">
+                      {asset?.driveFileUrl && (
+                        <DropdownMenuItem asChild>
+                          <a href={asset.driveFileUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Open in Drive
+                          </a>
+                        </DropdownMenuItem>
+                      )}
+                      {asset?.driveFolderUrl && (
+                        <DropdownMenuItem asChild>
+                          <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
+                            <Folder className="mr-2 h-4 w-4" />
+                            Open folder
+                          </a>
+                        </DropdownMenuItem>
+                      )}
+                      {asset?.driveFileUrl && (
+                        <DropdownMenuItem
+                          className="cursor-pointer hover:bg-[var(--color-bg-hover)]"
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
+                          }}
+                        >
+                          <Copy className="mr-2 h-4 w-4" />
+                          Copy link
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator className="bg-[var(--color-border)]" />
+                      <DropdownMenuItem className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Asset
                       </DropdownMenuItem>
-                    )}
-                    {asset?.driveFolderUrl && (
-                      <DropdownMenuItem asChild>
-                        <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
-                          <Folder className="mr-2 h-4 w-4" />
-                          Open folder
-                        </a>
+                      <DropdownMenuItem className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
+                        Edit Schedule
                       </DropdownMenuItem>
-                    )}
-                    {asset?.driveFileUrl && (
-                      <DropdownMenuItem
-                        className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]"
-                        onSelect={(e) => {
-                          e.preventDefault();
-                          void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
-                        }}
-                      >
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy link
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
-                    <DropdownMenuItem className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
-                      <Download className="mr-2 h-4 w-4" />
-                      Download Asset
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer hover:bg-[rgba(255,255,255,0.06)]">
-                      Edit Schedule
-                    </DropdownMenuItem>
-                    {isFailed && (
+                      {isFailed && (
+                        <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Retry
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                        Retry
+                        Cancel
                       </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
-                      Cancel
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-            </div>
-          );
+            );
           })}
         </div>
       </div>
 
       {scheduledQueue.length === 0 && (
-        <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[#161616] p-12 text-center">
-          <p className="mb-4 text-[#a1a1aa]">No scheduled uploads</p>
-          <p className="text-sm text-[#71717a]">Upload scheduling will appear here when assets are approved</p>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <svg className="h-8 w-8 text-[var(--color-text-faint)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <p className="text-[13px] font-normal text-[var(--color-text-muted)]">No scheduled uploads</p>
+          <p className="text-[12px] text-[var(--color-text-faint)] mt-0.5">Upload scheduling will appear here when assets are approved</p>
         </div>
       )}
     </div>

@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const AssetFormDialog = dynamic(
   () => import('@/components/assets/asset-form-dialog').then((mod) => mod.AssetFormDialog),
@@ -109,41 +110,148 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 kanban-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '24px 32px' }}>
+      <style>{`
+        .kanban-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        .kanban-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+          line-height: 1.25 !important;
+        }
+        .kanban-subtitle {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 3px !important;
+        }
+        .top-toolbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+        .search-container {
+          position: relative;
+          width: 280px;
+        }
+        .search-icon {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--color-text-faint) !important;
+          pointer-events: none;
+          width: 13px;
+          height: 13px;
+        }
+        .search-input {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 14px 8px 34px !important;
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+          height: auto !important;
+          transition: all 150ms ease !important;
+          width: 100% !important;
+        }
+        .search-input::placeholder {
+          color: var(--color-text-faint) !important;
+        }
+        .search-input:focus {
+          border-color: var(--color-border-strong) !important;
+          box-shadow: 0 0 0 2px rgba(255,255,255,0.03) !important;
+          outline: none !important;
+        }
+        .filter-btn {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          height: auto !important;
+          padding: 6px 14px !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          cursor: pointer;
+          transition: all 150ms ease !important;
+          box-shadow: none !important;
+        }
+        .filter-btn:hover {
+          background-color: var(--color-bg-hover) !important;
+          color: var(--color-text-secondary) !important;
+        }
+        .filter-btn.active {
+          border-color: var(--color-border-strong) !important;
+          color: var(--color-text-primary) !important;
+          background-color: var(--color-bg-overlay) !important;
+        }
+        .new-asset-btn {
+          background: #3ecf8e !important;
+          color: #000000 !important;
+          font-size: 12.5px !important;
+          font-weight: 600 !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 16px !important;
+          border: none !important;
+          cursor: pointer !important;
+          box-shadow: none !important;
+          transition: all 120ms ease !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: auto !important;
+        }
+        .new-asset-btn:hover {
+          opacity: 0.88 !important;
+        }
+      `}</style>
+
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Kanban Board' }]} />
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 max-w-md relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search assets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-muted border-border"
-          />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="kanban-title">Kanban Board</h1>
+          <p className="kanban-subtitle">Track and coordinate deliverable status changes</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="search-container">
+            <Search className="search-icon" />
+            <Input
+              placeholder="Search assets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="border-border text-foreground hover:bg-muted">
+              <Button variant="outline" className={cn("filter-btn", selectedClient !== "all" && "active")}>
                 {selectedClient === 'all'
                   ? 'All Clients'
                   : clients.find((c) => c.id === selectedClient)?.name || 'Select Client'}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border border-border">
+            <DropdownMenuContent align="end" className="bg-[var(--color-bg-surface)] border border-[var(--color-border)]">
               <DropdownMenuItem
-                className={selectedClient === 'all' ? 'bg-primary/10' : ''}
+                className={cn("text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]", selectedClient === 'all' && 'bg-[var(--color-bg-active)] text-white')}
                 onSelect={() => setSelectedClient('all')}
               >
                 All Clients
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuSeparator className="bg-[var(--color-border)]" />
               {clients.map((client) => (
                 <DropdownMenuItem
                   key={client.id}
-                  className={selectedClient === client.id ? 'bg-primary/10' : ''}
+                  className={cn("text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]", selectedClient === client.id && 'bg-[var(--color-bg-active)] text-white')}
                   onSelect={() => setSelectedClient(client.id)}
                 >
                   {client.name}
@@ -156,7 +264,7 @@ export default function KanbanPage() {
             mode="create"
             onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
             trigger={
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Button className="new-asset-btn">
                 <Plus className="w-4 h-4 mr-2" />
                 New Asset
               </Button>

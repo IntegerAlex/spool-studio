@@ -44,6 +44,12 @@ let dashboardSummaryCache: {
   expiresAt: 0,
 };
 
+export function clearApiClientCache() {
+  dashboardSummaryCache.value = null;
+  dashboardSummaryCache.expiresAt = 0;
+  pendingRequests.clear();
+}
+
 function buildRequestKey(input: RequestInfo, init?: RequestInit): string {
   const requestUrl = typeof input === 'string' ? input : String(input);
   const method = init?.method ?? 'GET';

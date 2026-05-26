@@ -14,16 +14,16 @@ interface BreadcrumbProps {
 
 export function Breadcrumb({ items }: BreadcrumbProps) {
   return (
-    <nav className="flex items-center space-x-1 text-sm text-muted-foreground mb-6">
+    <nav className="flex items-center text-[12px] text-[#4b5563] mb-6">
       {items.map((item, index) => (
-        <div key={index} className="flex items-center space-x-1">
-          {index > 0 && <ChevronRight className="w-4 h-4" />}
+        <div key={index} className="flex items-center">
+          {index > 0 && <ChevronRight className="w-3.5 h-3.5 mx-2 text-[#2d2d3a]" />}
           {item.href ? (
-            <Link href={item.href} className="text-primary hover:underline">
+            <Link href={item.href} className="text-[#4b5563] hover:text-[#e8e8f0] transition-colors">
               {item.label}
             </Link>
           ) : (
-            <span className="text-foreground">{item.label}</span>
+            <span className="text-[#4b5563]">{item.label}</span>
           )}
         </div>
       ))}

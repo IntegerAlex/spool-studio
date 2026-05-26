@@ -35,7 +35,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 clients-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Clients' }]} />
       <ClientList
         clients={clients}

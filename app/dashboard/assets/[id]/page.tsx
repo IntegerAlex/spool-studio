@@ -8,7 +8,7 @@ import { AssetRevisionsSection } from '@/components/assets/asset-revisions-secti
 import { AssetActivitySection } from '@/components/assets/asset-activity-section';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import { StatusBadge } from '@/components/assets/status-badge';
-import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
+import { assetsApi, clientsApi, usersApi, authApi, clearApiClientCache } from '@/lib/api-client';
 import { Asset, Client, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,6 +57,7 @@ export default function AssetDetailPage() {
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
   const [workflowAction, setWorkflowAction] = useState<'process' | 'move_to_draft' | null>(null);
   const [revisionRefreshKey, setRevisionRefreshKey] = useState(0);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const revisionInputRef = useRef<HTMLInputElement | null>(null);
 
   const driveFolderLabel = asset?.type === 'reel'
@@ -82,7 +83,11 @@ export default function AssetDetailPage() {
           return;
         }
         setError(null);
-        const assetData = await assetsApi.getSummaryById(assetId);
+        const [assetData, loggedUser] = await Promise.all([
+          assetsApi.getSummaryById(assetId),
+          authApi.getCurrentUser(),
+        ]);
+        setCurrentUser(loggedUser);
         if (assetData) {
           setAsset(assetData);
           const clientData = await clientsApi.getById(assetData.clientId);
@@ -164,6 +169,8 @@ export default function AssetDetailPage() {
       if (result) {
         setAsset(result as unknown as Asset);
       }
+      clearApiClientCache();
+      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       toast({ title: 'Upload failed', description: message, variant: 'destructive' });
@@ -215,6 +222,8 @@ export default function AssetDetailPage() {
       } : prev));
 
       toast({ title: 'Calendar synced', description: 'Google Calendar event created.' });
+      clearApiClientCache();
+      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Calendar sync failed';
       toast({ title: 'Calendar sync failed', description: message, variant: 'destructive' });
@@ -245,6 +254,8 @@ export default function AssetDetailPage() {
       toast({
         title: action === 'approve' ? 'Asset approved' : 'Revision requested',
       });
+      clearApiClientCache();
+      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Approval failed';
       toast({
@@ -267,6 +278,8 @@ export default function AssetDetailPage() {
       setWorkflowAction(action);
       const updated = await assetsApi.update(asset.id, { status: nextStatus });
       setAsset(updated);
+      clearApiClientCache();
+      router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update status';
       toast({
@@ -417,16 +430,20 @@ export default function AssetDetailPage() {
                     <DropdownMenuItem className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white">
                       Share
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
-                    <DropdownMenuItem
-                      className="cursor-pointer text-red-300 focus:bg-red-500/10 focus:text-red-200"
-                      onSelect={(event) => {
-                        event.preventDefault();
-                        setShowDelete(true);
-                      }}
-                    >
-                      Delete
-                    </DropdownMenuItem>
+                    {(currentUser?.role === 'admin' || true) && (
+                      <>
+                        <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
+                        <DropdownMenuItem
+                          className="cursor-pointer text-red-300 focus:bg-red-500/10 focus:text-red-200"
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            setShowDelete(true);
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -762,6 +779,8 @@ export default function AssetDetailPage() {
                 try {
                   await assetsApi.delete(asset.id);
                   toast({ title: 'Asset deleted' });
+                  clearApiClientCache();
+                  router.refresh();
                   router.push('/dashboard/assets');
                 } catch (err) {
                   const message = err instanceof Error ? err.message : 'Failed to delete asset';

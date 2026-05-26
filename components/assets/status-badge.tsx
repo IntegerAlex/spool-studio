@@ -27,17 +27,17 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   };
 
   const styles: Record<AssetStatus, string> = {
-    draft: 'border-[rgba(113,113,122,0.3)] bg-[rgba(113,113,122,0.2)] text-[#a1a1aa]',
+    draft: 'status-badge-draft',
     uploading: 'border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.15)] text-[#818cf8]',
     uploaded: 'border-[rgba(20,184,166,0.3)] bg-[rgba(20,184,166,0.15)] text-[#2dd4bf]',
     processing: 'border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.15)] text-[#c084fc]',
-    approved: 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-[#34d399]',
-    published: 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-[#34d399]',
+    approved: 'status-badge-approved',
+    published: 'status-badge-published',
     failed: 'border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.15)] text-[#f87171]',
     archived: 'border-[rgba(113,113,122,0.15)] bg-[rgba(113,113,122,0.1)] text-[#52525b]',
-    in_design: 'border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.15)] text-[#60a5fa]',
-    ready_for_review: 'border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.15)] text-[#fbbf24]',
-    revision_requested: 'border-[rgba(245,158,11,0.3)] bg-[rgba(245,158,11,0.15)] text-[#fbbf24]',
+    in_design: 'status-badge-draft',
+    ready_for_review: 'status-badge-draft',
+    revision_requested: 'status-badge-revision',
     scheduled: 'border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.15)] text-[#818cf8]',
   };
 

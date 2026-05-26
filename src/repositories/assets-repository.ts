@@ -190,6 +190,13 @@ export async function deleteAsset(
   client?: SupabaseClient<Database>
 ): Promise<void> {
   const supabase = await getClient(client);
+  
+  // Set current_revision_id and latest_revision_id to null first to avoid circular reference key violations
+  await supabase
+    .from('content_assets')
+    .update({ current_revision_id: null, latest_revision_id: null })
+    .eq('id', assetId);
+
   const { error } = await supabase.from('content_assets').delete().eq('id', assetId);
   if (error) {
     throw new Error(error.message);

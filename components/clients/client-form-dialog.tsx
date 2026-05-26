@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type { Client } from '@/types/index';
-import { clientsApi } from '@/lib/api-client';
+import { clientsApi, clearApiClientCache } from '@/lib/api-client';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,7 @@ function toNumber(value?: string): number | undefined {
 }
 
 export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -96,6 +98,8 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
           title: 'Client created',
           description: `${created.name} is ready to go.`,
         });
+        clearApiClientCache();
+        router.refresh();
         onSaved?.(created);
         setOpen(false);
       } catch (error) {

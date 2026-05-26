@@ -144,7 +144,7 @@ function mapAssetRevisions(
     mediaHeight: rev.media_height ?? undefined,
     durationSeconds: rev.duration_seconds ?? undefined,
     changeNote: rev.change_note ?? undefined,
-    metadata: rev.metadata ?? undefined,
+    metadata: (rev.metadata as Record<string, unknown>) ?? undefined,
     createdAt: new Date(rev.created_at),
   }));
 }
@@ -325,7 +325,7 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
             mediaHeight: latest.media_height ?? undefined,
             durationSeconds: latest.duration_seconds ?? undefined,
             changeNote: latest.change_note ?? undefined,
-            metadata: latest.metadata ?? undefined,
+            metadata: (latest.metadata as Record<string, unknown>) ?? undefined,
             createdAt: new Date(latest.created_at),
           };
         }
@@ -985,9 +985,9 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           duration_seconds: metadata.extractedFields.durationSeconds ?? null,
           change_note: null,
           metadata: metadata.extractedFields,
-        } as const;
+        };
 
-        const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert).select('*').single();
+        const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert as any).select('*').single();
         if (revisionError) {
           console.error('[revision][create][failed]', { assetId, error: revisionError });
         } else if (revisionData) {
@@ -1234,7 +1234,7 @@ export async function updateAsset(
     input.assignedTo !== undefined && input.assignedTo !== existing.assigned_to;
 
   if (statusChanged) {
-    logAssetStatusTransition(assetId, existing.status, input.status, 'api-update');
+    logAssetStatusTransition(assetId, existing.status as AssetStatus, input.status as AssetStatus, 'api-update');
     try {
       await logAssetActivity({
         assetId,
@@ -1345,5 +1345,18 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
 }
 
 export async function removeAsset(assetId: string): Promise<void> {
+  const supabase = await createServerSupabaseClient();
+  const asset = await getAssetById(assetId, supabase);
+  if (asset?.google_calendar_event_id) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { deleteCalendarEvent } = await import('@/services/calendar-sync.service');
+        await deleteCalendarEvent(user.id, asset.google_calendar_event_id);
+      }
+    } catch (err) {
+      console.warn('Failed to delete Google Calendar event for asset', assetId, err);
+    }
+  }
   await deleteAssetRow(assetId);
 }

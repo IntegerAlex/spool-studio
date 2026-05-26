@@ -390,30 +390,33 @@ export default function AssetsPage() {
       <Link
         key={asset.id}
         href={`/dashboard/assets/${asset.id}`}
-        className="group flex items-center gap-4 rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-3 transition-colors duration-150 hover:border-[rgba(255,255,255,0.18)] hover:bg-[#1a1a1a]"
+        className="table-row-item"
       >
-        <div className="relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-[#0f0f0f]">
-          {asset.thumbnailUrl && previewType === 'image' ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" loading="lazy" />
-          ) : (
-            <AssetIcon className="h-7 w-7 text-[#71717a]" />
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-white">{asset.title}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-[18px] items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2 text-[10px] uppercase tracking-wide text-[#a1a1aa]">
-              {asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type}
-            </span>
-            <StatusBadge status={asset.status} />
+        <div className="flex flex-1 items-center gap-3 min-w-0">
+          <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]">
+            {asset.thumbnailUrl && previewType === 'image' ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" loading="lazy" />
+            ) : (
+              <AssetIcon className="h-5 w-5 text-[var(--color-text-faint)]" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-[var(--color-text-primary)]">{asset.title}</p>
+            <p className="text-[11px] text-[var(--color-text-faint)] uppercase tracking-wider mt-0.5">{asset.fileExtension ?? asset.type}</p>
           </div>
         </div>
 
-        <div className="hidden text-right sm:block">
-          <p className="text-[12px] text-[#a1a1aa]">{clientName}</p>
-          <p className="mt-1 text-[12px] text-[#71717a]">{formatRelativeTime(asset.updatedAt)}</p>
+        <div className="w-32 shrink-0">
+          <StatusBadge status={asset.status} />
+        </div>
+
+        <div className="w-32 shrink-0 text-[var(--color-text-secondary)] truncate">
+          {clientName}
+        </div>
+
+        <div className="w-32 shrink-0 text-right text-[var(--color-text-muted)] text-[12px]">
+          {formatRelativeTime(asset.updatedAt)}
         </div>
       </Link>
     );
@@ -442,9 +445,120 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 assets-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <style>{`
+        .assets-page-container {
+          background-color: var(--color-bg-app);
+          max-width: none !important;
+        }
+        .assets-title {
+          font-size: 20px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-primary) !important;
+          letter-spacing: -0.025em !important;
+        }
+        .assets-subtitle {
+          font-size: 12.5px !important;
+          color: var(--color-text-muted) !important;
+          margin-top: 3px !important;
+        }
+        .new-asset-btn {
+          background: #3ecf8e !important;
+          color: #000000 !important;
+          font-size: 12.5px !important;
+          font-weight: 600 !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 16px !important;
+          border: none !important;
+          cursor: pointer !important;
+          box-shadow: none !important;
+          transition: all 120ms ease !important;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .new-asset-btn:hover {
+          opacity: 0.88 !important;
+          filter: none !important;
+        }
+        .search-container {
+          position: relative;
+          width: 280px;
+        }
+        .search-icon {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--color-text-faint) !important;
+          pointer-events: none;
+          width: 13px;
+          height: 13px;
+        }
+        .search-input {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 8px 14px 8px 34px !important;
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+          height: auto !important;
+          transition: all 150ms ease !important;
+          width: 100%;
+        }
+        .search-input::placeholder {
+          color: var(--color-text-faint) !important;
+        }
+        .search-input:focus {
+          border-color: var(--color-border-strong) !important;
+          box-shadow: 0 0 0 2px rgba(255,255,255,0.03) !important;
+          outline: none !important;
+        }
+        .table-list-container {
+          background-color: var(--color-bg-surface) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-lg) !important;
+          overflow: hidden;
+        }
+        .table-header-row {
+          background-color: var(--color-bg-overlay) !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          padding: 10px 20px !important;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .header-cell {
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          letter-spacing: 0.07em !important;
+          text-transform: uppercase !important;
+          color: var(--color-text-faint) !important;
+        }
+        .table-row-item {
+          padding: 12px 20px !important;
+          border-bottom: 1px solid var(--color-border) !important;
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          text-decoration: none !important;
+          transition: background-color 100ms ease !important;
+        }
+        .table-row-item:last-child {
+          border-bottom: none !important;
+        }
+        .table-row-item:hover {
+          background-color: var(--color-bg-hover) !important;
+        }
+      `}</style>
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-[18px] font-medium text-white sm:text-[20px]">Assets</h1>
+        <div>
+          <h1 className="assets-title">Assets</h1>
+          <p className="assets-subtitle">Manage and preview client content deliverables</p>
+        </div>
 
         <div className="flex flex-wrap items-stretch gap-2 sm:items-center">
           <div className="inline-flex rounded-md border border-[rgba(255,255,255,0.08)] bg-[#161616] p-0.5">
@@ -553,7 +667,7 @@ export default function AssetsPage() {
             mode="create"
             onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
             trigger={
-              <Button className="h-[34px] w-full rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5] sm:w-auto">
+              <Button className="new-asset-btn">
                 <Plus className="mr-2 h-4 w-4" />
                 New Asset
               </Button>
@@ -562,13 +676,13 @@ export default function AssetsPage() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#52525b]" />
+      <div className="search-container">
+        <Search className="search-icon" />
         <Input
-          placeholder="Search title, client, type, mime type, filename..."
+          placeholder="Search assets..."
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
-          className="h-9 border-[rgba(255,255,255,0.08)] bg-[#161616] pl-10 text-[13px] text-white placeholder:text-[#52525b] focus-visible:border-[rgba(99,102,241,0.4)] focus-visible:ring-0"
+          className="search-input"
         />
       </div>
 
@@ -582,49 +696,34 @@ export default function AssetsPage() {
             ))}
           </div>
         ) : (
-          <div className="space-y-3">
-            {visibleAssets.map((asset) => renderAssetRow(asset))}
+          <div className="table-list-container">
+            <div className="table-header-row">
+              <div className="flex-1 header-cell">Asset</div>
+              <div className="w-32 header-cell">Status</div>
+              <div className="w-32 header-cell">Client</div>
+              <div className="w-32 header-cell text-right">Updated</div>
+            </div>
+            <div>
+              {visibleAssets.map((asset) => renderAssetRow(asset))}
+            </div>
           </div>
         )
       ) : assets.length === 0 ? (
-        <Empty className="border-0 bg-[#161616]">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Plus className="size-6" />
-            </EmptyMedia>
-            <EmptyTitle>No assets yet</EmptyTitle>
-            <EmptyDescription className="text-[#71717a]">Upload the first asset to start building the library.</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <AssetFormDialog
-              mode="create"
-              onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
-              trigger={
-                <Button className="bg-[var(--primary)] text-white hover:bg-[#4f46e5]">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Asset
-                </Button>
-              }
-            />
-          </EmptyContent>
-        </Empty>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <svg className="h-8 w-8 text-[var(--color-text-faint)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <p className="text-[13px] font-normal text-[var(--color-text-muted)]">No assets yet</p>
+          <p className="text-[12px] text-[var(--color-text-faint)] mt-0.5">Upload the first asset to start building the library</p>
+        </div>
       ) : (
-        <Empty className="border-0 bg-[#161616]">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Search className="size-6" />
-            </EmptyMedia>
-            <EmptyTitle>{emptyState.title}</EmptyTitle>
-            <EmptyDescription className="text-[#71717a]">{emptyState.description}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            {activeFilterCount > 0 && (
-              <Button variant="outline" onClick={clearFilters} className="border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]">
-                Clear filters
-              </Button>
-            )}
-          </EmptyContent>
-        </Empty>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <svg className="h-8 w-8 text-[var(--color-text-faint)] mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <p className="text-[13px] font-normal text-[var(--color-text-muted)]">{emptyState.title}</p>
+          <p className="text-[12px] text-[var(--color-text-faint)] mt-0.5">{emptyState.description}</p>
+        </div>
       )}
     </div>
   );

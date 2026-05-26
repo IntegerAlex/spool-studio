@@ -42,6 +42,15 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background text-foreground">
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
+        <div className="global-loader-overlay">
+          <div className="global-loader-content">
+            <div className="global-loader-logo">AF</div>
+            <div className="global-loader-bar-container">
+              <div className="global-loader-bar-fill"></div>
+            </div>
+            <div className="global-loader-text">Loading your workspace...</div>
+          </div>
+        </div>
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}

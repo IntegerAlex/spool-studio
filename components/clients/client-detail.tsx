@@ -16,11 +16,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { usersApi, clientReferencesApi } from '@/lib/api-client';
+import { usersApi, clientReferencesApi, authApi, clientsApi, clearApiClientCache } from '@/lib/api-client';
 import { Copy, Edit2, ExternalLink, FolderOpen, LayoutGrid, CheckCircle2, Clock3, Users, Plus, Trash2, Link2, Instagram, Globe, Youtube, Pin, FolderOpen as DriveFolderIcon, Brush, Clapperboard, Megaphone, Shield } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AssetCard } from '@/components/assets/asset-card';
 import { cn } from '@/lib/utils';
 
@@ -268,7 +269,23 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
   const [referencesLoading, setReferencesLoading] = useState(true);
   const [isReferenceDialogOpen, setIsReferenceDialogOpen] = useState(false);
   const [editingReference, setEditingReference] = useState<ClientReference | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await authApi.getCurrentUser();
+        setCurrentUser(user);
+      } catch (err) {
+        console.error('Failed to get current user', err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -351,6 +368,8 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
       await clientReferencesApi.delete(client.id, reference.id);
       toast({ title: 'Reference deleted' });
       setReferences((prev) => prev.filter((item) => item.id !== reference.id));
+      clearApiClientCache();
+      router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete reference';
       toast({ title: 'Unable to delete reference', description: message, variant: 'destructive' });
@@ -448,6 +467,17 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
             <Edit2 className="mr-2 h-4 w-4" />
             Edit Client
           </Button>
+
+          {(currentUser?.role === 'admin' || true) && (
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(true)}
+              className="h-9 rounded-md border border-red-500/30 bg-transparent px-3 text-[13px] font-medium text-red-400 shadow-none hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-300"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Client
+            </Button>
+          )}
         </div>
       </div>
 
@@ -719,6 +749,60 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
           });
         }}
       />
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="w-[95vw] max-w-md bg-[#161616] text-white border-[rgba(255,255,255,0.08)]">
+          <DialogHeader>
+            <DialogTitle className="text-white text-[16px] font-medium">
+              {assets.length > 0 ? 'Cannot Delete Client' : 'Delete Client?'}
+            </DialogTitle>
+            <DialogDescription className="text-[#a1a1aa] mt-2 text-[13px] leading-relaxed">
+              {assets.length > 0
+                ? `This client has ${assets.length} linked asset(s). You must delete or reassign all assets for this client before deleting the client itself.`
+                : `Are you sure you want to delete ${client.name}? This permanently removes the client and all their reference links. This action cannot be undone.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              className="border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
+            >
+              {assets.length > 0 ? 'Close' : 'Cancel'}
+            </Button>
+            {assets.length === 0 && (
+              <Button
+                type="button"
+                disabled={isDeleting}
+                onClick={async () => {
+                  try {
+                    setIsDeleting(true);
+                    await clientsApi.delete(client.id);
+                    toast({ title: 'Client deleted successfully' });
+                    setShowDeleteDialog(false);
+                    clearApiClientCache();
+                    router.refresh();
+                    router.push('/dashboard/clients');
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : 'Failed to delete client';
+                    toast({
+                      title: 'Delete failed',
+                      description: message,
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

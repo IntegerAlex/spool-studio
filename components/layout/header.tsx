@@ -74,29 +74,113 @@ export function Header({ title, className }: HeaderProps) {
   })();
 
   return (
-    <header className={cn('fixed left-[220px] right-0 top-0 z-40 hidden h-14 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:flex lg:w-[calc(100%-220px)] xl:px-6', className)}>
+    <header 
+      className={cn('fixed left-[220px] right-0 top-0 z-40 hidden items-center justify-between border-b px-6 lg:flex lg:w-[calc(100%-220px)]', className)}
+      style={{
+        height: '57px',
+        backgroundColor: '#0f0f0f',
+        borderColor: 'var(--color-border)',
+        boxShadow: 'none',
+      }}
+    >
+      <style>{`
+        .topbar-breadcrumb {
+          font-size: 12.5px;
+          color: var(--color-text-muted);
+          display: flex;
+          align-items: center;
+        }
+        .topbar-breadcrumb-separator {
+          color: var(--color-text-faint);
+          margin: 0 8px;
+        }
+        .topbar-breadcrumb-current {
+          color: var(--color-text-secondary);
+          font-weight: 500;
+        }
+        .topbar-search-container {
+          position: relative;
+          width: 220px;
+        }
+        .topbar-search-icon {
+          position: absolute;
+          left: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 13px;
+          height: 13px;
+          color: var(--color-text-faint) !important;
+          pointer-events: none;
+        }
+        .topbar-search-input {
+          background-color: var(--color-bg-overlay) !important;
+          border: 1px solid var(--color-border) !important;
+          border-radius: var(--radius-sm) !important;
+          padding: 6px 12px 6px 30px !important;
+          font-size: 13px !important;
+          color: var(--color-text-secondary) !important;
+          width: 100% !important;
+          height: 30px !important;
+          transition: all 120ms ease;
+        }
+        .topbar-search-input::placeholder {
+          color: var(--color-text-faint) !important;
+        }
+        .topbar-search-input:focus {
+          border-color: var(--color-border-strong) !important;
+          outline: none !important;
+          box-shadow: 0 0 0 2px rgba(255,255,255,0.04) !important;
+        }
+        .topbar-bell {
+          color: var(--color-text-muted) !important;
+          transition: color 120ms ease !important;
+        }
+        .topbar-bell:hover {
+          color: var(--color-text-primary) !important;
+          background-color: transparent !important;
+        }
+        .topbar-avatar {
+          height: 28px !important;
+          width: 28px !important;
+          border-radius: 50% !important;
+          background-color: var(--color-bg-overlay) !important;
+          border: 1px solid var(--color-border) !important;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .topbar-avatar-fallback {
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          color: var(--color-text-secondary) !important;
+          background-color: transparent !important;
+        }
+      `}</style>
+
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-[15px] font-medium text-white">{routeTitle}</h2>
+        <div className="min-w-0 topbar-breadcrumb">
+          <span>Home</span>
+          <span className="topbar-breadcrumb-separator">/</span>
+          <span className="topbar-breadcrumb-current truncate">{routeTitle}</span>
         </div>
       </div>
 
       <div className="flex min-w-0 items-center gap-3">
-        <div className="relative hidden w-[200px] md:flex xl:w-[240px]">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#71717a]" />
+        <div className="topbar-search-container hidden md:flex">
+          <Search className="topbar-search-icon" />
           <Input
             placeholder="Search..."
-            className="h-8 border-[rgba(255,255,255,0.07)] bg-transparent pl-9 text-[13px] text-white placeholder:text-[#71717a] focus-visible:border-[rgba(99,102,241,0.5)] focus-visible:ring-[rgba(99,102,241,0.2)]"
+            className="topbar-search-input"
           />
         </div>
 
-        <Button variant="ghost" size="icon" className="size-8 shrink-0 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white">
+        <Button variant="ghost" size="icon" className="size-8 shrink-0 topbar-bell">
           <Bell className="h-[18px] w-[18px]" />
         </Button>
 
-        <Avatar className="size-8 border border-[rgba(255,255,255,0.08)] bg-[var(--surface-elevated)]">
+        <Avatar className="topbar-avatar">
           <AvatarImage src={avatarUrl} alt={displayName} />
-          <AvatarFallback className="bg-[var(--surface-elevated)] text-[12px] font-semibold text-white">
+          <AvatarFallback className="topbar-avatar-fallback">
             {initials}
           </AvatarFallback>
         </Avatar>

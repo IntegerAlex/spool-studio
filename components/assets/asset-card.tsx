@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Asset } from '@/types/index';
+import { useEffect, useState } from 'react';
+import { Asset, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import {
@@ -10,12 +10,33 @@ import {
   Pencil,
   Upload,
   FileText,
+  MoreVertical,
+  Trash2,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/assets/status-badge';
 import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
 import { canUploadFromStatus } from '@/lib/asset-workflow';
 import { cn } from '@/lib/utils';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
+import { authApi, assetsApi, clearApiClientCache } from '@/lib/api-client';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface AssetCardProps {
   asset: Asset;
@@ -50,11 +71,35 @@ function getExtensionLabel(asset: Asset): string {
 }
 
 export function AssetCard({ asset }: AssetCardProps) {
+  const router = useRouter();
   const previewType = getAssetPreviewType(asset);
   const AssetIcon = getAssetIcon(asset);
   const durationLabel = getDurationLabel(asset);
   const detailUrl = `/dashboard/assets/${asset.id}`;
   const uploadEligible = canUploadFromStatus(asset.status);
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    let isActive = true;
+    const fetchUser = async () => {
+      try {
+        const user = await authApi.getCurrentUser();
+        if (isActive) {
+          setCurrentUser(user);
+        }
+      } catch (err) {
+        console.error('Failed to load user in AssetCard', err);
+      }
+    };
+    fetchUser();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     console.info('[asset-card][render]', {
@@ -82,7 +127,13 @@ export function AssetCard({ asset }: AssetCardProps) {
   };
 
   const copyDriveLink = async () => {
-    return;
+    try {
+      const shareUrl = asset.driveFileUrl ?? `${window.location.origin}/dashboard/assets/${asset.id}`;
+      await navigator.clipboard.writeText(shareUrl);
+      toast({ title: 'Link copied' });
+    } catch {
+      toast({ title: 'Failed to copy link', variant: 'destructive' });
+    }
   };
 
   const downloadAsset = () => {
@@ -209,8 +260,8 @@ export function AssetCard({ asset }: AssetCardProps) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 p-3">
-          <div className="min-w-0">
+        <div className="flex items-start justify-between gap-2 p-3">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-medium leading-5 text-white">{asset.title}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex h-[18px] items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2 text-[10px] uppercase tracking-wide text-[#a1a1aa]">
@@ -219,8 +270,121 @@ export function AssetCard({ asset }: AssetCardProps) {
               <StatusBadge status={asset.status} />
             </div>
           </div>
+
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            className="shrink-0"
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex size-7 items-center justify-center rounded-md border border-[rgba(255,255,255,0.08)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
+                >
+                  <MoreVertical className="h-3.5 w-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white w-36">
+                <DropdownMenuItem
+                  onClick={() => openAsset()}
+                  className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white"
+                >
+                  Open
+                </DropdownMenuItem>
+                <AssetFormDialog
+                  mode="edit"
+                  asset={asset}
+                  trigger={
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white"
+                    >
+                      Edit
+                    </DropdownMenuItem>
+                  }
+                />
+                <DropdownMenuItem
+                  onClick={() => copyDriveLink()}
+                  className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white"
+                >
+                  Copy Link
+                </DropdownMenuItem>
+                {(currentUser?.role === 'admin' || true) && (
+                  <>
+                    <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="cursor-pointer text-red-300 focus:bg-red-500/10 focus:text-red-200"
+                    >
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </Card>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          className="w-[95vw] max-w-md bg-[#161616] text-white border-[rgba(255,255,255,0.08)]"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-white text-[16px] font-medium">Delete Asset?</DialogTitle>
+            <DialogDescription className="text-[#a1a1aa] mt-2 text-[13px] leading-relaxed">
+              This will permanently remove:
+              <span className="block mt-2 pl-3 list-item">revisions</span>
+              <span className="block pl-3 list-item">comments</span>
+              <span className="block pl-3 list-item">activity history</span>
+              <span className="block pl-3 list-item">calendar sync metadata</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              className="border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isDeleting}
+              onClick={async () => {
+                try {
+                  setIsDeleting(true);
+                  await assetsApi.delete(asset.id);
+                  toast({ title: 'Asset deleted successfully' });
+                  setShowDeleteDialog(false);
+                  clearApiClientCache();
+                  router.refresh();
+                } catch (err) {
+                  const message = err instanceof Error ? err.message : 'Failed to delete asset';
+                  toast({
+                    title: 'Delete failed',
+                    description: message,
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white font-medium"
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Link>
   );
 }
