@@ -87,7 +87,6 @@ export async function createCalendarEvent(input: CalendarEventInput): Promise<Ca
       calendarId: PRIMARY_CALENDAR_ID,
       requestBody: payload,
     });
-
     if (!response.data) {
       throw new Error("Google Calendar create event failed");
     }

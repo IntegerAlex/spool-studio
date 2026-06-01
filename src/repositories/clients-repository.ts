@@ -5,7 +5,7 @@ import type { Database } from '@/types/database';
 export type DbClient = Database['public']['Tables']['clients']['Row'];
 
 const clientSelect =
-  'id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,drive_folder_id,drive_folder_url';
+  'id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,drive_folder_id,drive_folder_url,created_by,created_at,updated_at';
 const clientOptionSelect = 'id,name';
 
 async function getClient(client?: SupabaseClient<Database>) {
@@ -22,6 +22,12 @@ export async function listClients(client?: SupabaseClient<Database>): Promise<Db
   if (error) {
     throw new Error(error.message);
   }
+
+  console.info('[dashboard-debug][repository]', {
+    operation: 'listClients',
+    table: 'clients',
+    repositoryResultCount: data?.length ?? 0,
+  });
 
   return data ?? [];
 }
@@ -44,15 +50,27 @@ export async function listClientOptions(
 
 export async function countClients(client?: SupabaseClient<Database>): Promise<number> {
   const supabase = await getClient(client);
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from('clients')
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'exact' });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return count ?? 0;
+  console.info('[dashboard-debug][supabase]', {
+    operation: 'countClients',
+    table: 'clients',
+    rawSupabaseCount: data?.length ?? 0,
+  });
+
+  console.info('[dashboard-debug][repository]', {
+    operation: 'countClients',
+    table: 'clients',
+    repositoryResultCount: data?.length ?? 0,
+  });
+
+  return data?.length ?? 0;
 }
 
 export async function getClientById(

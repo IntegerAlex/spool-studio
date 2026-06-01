@@ -21,6 +21,8 @@ export interface Client {
   logo?: string;
   driveFolderId?: string;
   driveFolderUrl?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface KanbanClientOption {

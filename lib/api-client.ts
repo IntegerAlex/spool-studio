@@ -31,22 +31,29 @@ export interface UploadFileOptions {
 }
 
 const pendingRequests = new Map<string, Promise<unknown>>();
-let dashboardSummaryCache: {
-  value: {
-    pendingApprovals: number;
-    upcomingUploads: number;
-    totalClients: number;
-    uploadedThisMonth: number;
-  } | null;
-  expiresAt: number;
-} = {
-  value: null,
-  expiresAt: 0,
-};
+
+export interface DashboardActivityItem {
+  id: string;
+  kind: 'asset' | 'client';
+  href: string;
+  title: string;
+  detail: string;
+  timestamp: Date;
+  iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client';
+}
+
+export interface DashboardSummaryData {
+  totalAssets: number;
+  pendingApprovals: number;
+  approvedAssets: number;
+  upcomingUploads: number;
+  totalClients: number;
+  uploadedThisMonth: number;
+  assetStatusBreakdown: Array<{ label: 'Draft' | 'Revision' | 'Approved' | 'Published'; count: number }>;
+  recentActivity: DashboardActivityItem[];
+}
 
 export function clearApiClientCache() {
-  dashboardSummaryCache.value = null;
-  dashboardSummaryCache.expiresAt = 0;
   pendingRequests.clear();
 }
 
@@ -220,6 +227,14 @@ function hydrateClientReference(reference: ClientReference): ClientReference {
   };
 }
 
+function hydrateClient(client: Client): Client {
+  return {
+    ...client,
+    createdAt: client.createdAt ? new Date(client.createdAt as unknown as string) : undefined,
+    updatedAt: client.updatedAt ? new Date(client.updatedAt as unknown as string) : undefined,
+  };
+}
+
 export const authApi = {
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
     const supabase = createBrowserSupabaseClient();
@@ -268,11 +283,13 @@ export const authApi = {
 
 export const clientsApi = {
   getAll: async (): Promise<Client[]> => {
-    return fetchJsonDeduped<Client[]>('/api/clients');
+    const clients = await fetchJsonDeduped<Client[]>('/api/clients');
+    return clients.map(hydrateClient);
   },
 
   getById: async (id: string): Promise<Client | null> => {
-    return fetchJsonNullableDeduped<Client>(`/api/clients/${id}`);
+    const client = await fetchJsonNullableDeduped<Client>(`/api/clients/${id}`);
+    return client ? hydrateClient(client) : null;
   },
 
   create: async (client: {
@@ -283,10 +300,11 @@ export const clientsApi = {
     monthlyReelsTarget?: number;
     monthlyPostsTarget?: number;
   }): Promise<Client> => {
-    return fetchJson<Client>('/api/clients', {
+    const created = await fetchJson<Client>('/api/clients', {
       method: 'POST',
       body: JSON.stringify(client),
     });
+    return hydrateClient(created);
   },
 
   update: async (
@@ -300,10 +318,11 @@ export const clientsApi = {
       monthlyPostsTarget?: number;
     }>
   ): Promise<Client> => {
-    return fetchJson<Client>(`/api/clients/${id}`, {
+    const updated = await fetchJson<Client>(`/api/clients/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
     });
+    return hydrateClient(updated);
   },
 
   delete: async (id: string): Promise<void> => {
@@ -558,23 +577,15 @@ export const activityApi = {
 };
 
 export const dashboardApi = {
-  getSummary: async (): Promise<{
-    pendingApprovals: number;
-    upcomingUploads: number;
-    totalClients: number;
-    uploadedThisMonth: number;
-  }> => {
-    const now = Date.now();
-    if (dashboardSummaryCache.value && dashboardSummaryCache.expiresAt > now) {
-      return dashboardSummaryCache.value;
-    }
-
-    const summary = await fetchJsonDeduped('/api/dashboard/summary');
-    dashboardSummaryCache = {
-      value: summary,
-      expiresAt: now + 30_000,
+  getSummary: async (): Promise<DashboardSummaryData> => {
+    const summary = await fetchJsonDeduped<DashboardSummaryData>('/api/dashboard/summary');
+    return {
+      ...summary,
+      recentActivity: summary.recentActivity.map((entry) => ({
+        ...entry,
+        timestamp: new Date(entry.timestamp),
+      })),
     };
-    return summary;
   },
 };
 
@@ -583,7 +594,10 @@ export const kanbanApi = {
     assets: Asset[];
     clients: { id: string; name: string }[];
   }> => {
-    const payload = await fetchJsonDeduped('/api/kanban/board');
+    const payload = await fetchJsonDeduped<{
+      assets: Asset[];
+      clients: { id: string; name: string }[];
+    }>('/api/kanban/board');
     return {
       assets: payload.assets.map(hydrateAsset),
       clients: payload.clients,

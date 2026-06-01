@@ -75,6 +75,8 @@ function mapClient(
     brandColor: client.brand_color ?? undefined,
     driveFolderId: client.drive_folder_id ?? undefined,
     driveFolderUrl: client.drive_folder_url ?? undefined,
+    createdAt: new Date(client.created_at),
+    updatedAt: new Date(client.updated_at),
   };
 }
 
@@ -85,11 +87,25 @@ export async function getClients(): Promise<Client[]> {
       listAssetSummaries(),
     ]);
 
-    return clients
+    const mappedClients = clients
       .map((client) => mapClient(client, assetSummaries))
       .filter((client): client is Client => Boolean(client));
+
+    console.info('[dashboard-debug][service]', {
+      operation: 'getClients',
+      serviceResultCount: mappedClients.length,
+      repositoryClientCount: clients.length,
+      assetSummaryCount: assetSummaries.length,
+    });
+
+    return mappedClients;
   } catch (error) {
     logProductionRuntimeError('clients-loader', error);
+    console.info('[dashboard-debug][service]', {
+      operation: 'getClients',
+      serviceResultCount: 0,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 }

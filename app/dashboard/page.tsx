@@ -4,15 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { assetsApi, clientsApi, dashboardApi } from '@/lib/api-client';
+import { clientsApi, dashboardApi } from '@/lib/api-client';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import { Asset, Client } from '@/types/index';
+import { Client } from '@/types/index';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import {
-  ArrowUpRight,
-  AlertCircle,
   Clock3,
-  FileText,
   FolderPlus,
   KanbanSquare,
   Upload,
@@ -21,12 +18,12 @@ import {
   FileWarning,
   LayoutGrid,
   Plus,
-  Film,
-  Image as ImageIcon,
   Sparkles,
 } from 'lucide-react';
 
 type TrendDirection = 'up' | 'down' | 'neutral';
+
+type DashboardSummary = Awaited<ReturnType<typeof dashboardApi.getSummary>>;
 
 type DashboardStatCard = {
   title: string;
@@ -39,83 +36,48 @@ type DashboardStatCard = {
 
 type ActivityRow = {
   id: string;
-  asset: Asset;
-  action: string;
-  timestamp: string;
+  kind: DashboardSummary['recentActivity'][number]['kind'];
+  href: string;
+  title: string;
+  detail: string;
+  timestamp: Date;
+  iconKind: DashboardSummary['recentActivity'][number]['iconKind'];
   icon: React.ReactNode;
   iconBgClassName: string;
 };
 
-function getActivityAction(asset: Asset): string {
-  if (asset.status === 'revision_requested') {
-    return 'revision requested';
+function getActivityIcon(entry: DashboardSummary['recentActivity'][number]): React.ReactNode {
+  if (entry.iconKind === 'client') {
+    return <Users className="h-4 w-4 text-[#10b981]" />;
   }
-  if (asset.status === 'ready_for_review') {
-    return 'awaiting approval';
-  }
-  if (asset.status === 'approved') {
-    return 'approved for publish';
-  }
-  if (asset.status === 'published') {
-    return 'published';
-  }
-  if (asset.status === 'failed') {
-    return 'upload failed';
-  }
-
-  return 'updated';
-}
-
-function getActivityIcon(asset: Asset): React.ReactNode {
-  if (asset.status === 'revision_requested') {
+  if (entry.iconKind === 'revision') {
     return <FileWarning className="h-4 w-4 text-[#f59e0b]" />;
   }
-  if (asset.status === 'ready_for_review') {
-    return <Clock3 className="h-4 w-4 text-[#f59e0b]" />;
-  }
-  if (asset.status === 'approved') {
-    return <Upload className="h-4 w-4 text-[#10b981]" />;
-  }
-  if (asset.status === 'published') {
+  if (entry.iconKind === 'approval') {
     return <CheckCircle2 className="h-4 w-4 text-[#10b981]" />;
   }
-  if (asset.status === 'failed') {
-    return <AlertCircle className="h-4 w-4 text-[#ef4444]" />;
-  }
-  if (asset.type === 'reel') {
-    return <Film className="h-4 w-4 text-[#6366f1]" />;
-  }
-  if (asset.type === 'poster') {
-    return <ImageIcon className="h-4 w-4 text-[#10b981]" />;
+  if (entry.iconKind === 'upload') {
+    return <Upload className="h-4 w-4 text-[#3b82f6]" />;
   }
 
-  return <FileText className="h-4 w-4 text-[#3b82f6]" />;
+  return <Clock3 className="h-4 w-4 text-[#f59e0b]" />;
 }
 
-function getActivityBg(asset: Asset): string {
-  if (asset.status === 'revision_requested') {
+function getActivityBg(entry: DashboardSummary['recentActivity'][number]): string {
+  if (entry.iconKind === 'client') {
+    return 'bg-[rgba(16,185,129,0.14)]';
+  }
+  if (entry.iconKind === 'revision') {
     return 'bg-[rgba(245,158,11,0.14)]';
   }
-  if (asset.status === 'ready_for_review') {
-    return 'bg-[rgba(245,158,11,0.14)]';
-  }
-  if (asset.status === 'approved') {
+  if (entry.iconKind === 'approval') {
     return 'bg-[rgba(16,185,129,0.14)]';
   }
-  if (asset.status === 'published') {
-    return 'bg-[rgba(16,185,129,0.14)]';
-  }
-  if (asset.status === 'failed') {
-    return 'bg-[rgba(239,68,68,0.14)]';
-  }
-  if (asset.type === 'reel') {
-    return 'bg-[rgba(99,102,241,0.14)]';
-  }
-  if (asset.type === 'poster') {
-    return 'bg-[rgba(16,185,129,0.14)]';
+  if (entry.iconKind === 'upload') {
+    return 'bg-[rgba(59,130,246,0.14)]';
   }
 
-  return 'bg-[rgba(59,130,246,0.14)]';
+  return 'bg-[rgba(245,158,11,0.14)]';
 }
 
 function getStatIcon(title: string): React.ReactNode {
@@ -168,14 +130,8 @@ function initialsFromName(name: string): string {
 }
 
 export default function DashboardPage() {
-  const [assets, setAssets] = useState<Asset[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [summary, setSummary] = useState({
-    pendingApprovals: 0,
-    upcomingUploads: 0,
-    totalClients: 0,
-    uploadedThisMonth: 0,
-  });
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -185,15 +141,14 @@ export default function DashboardPage() {
     const loadData = async () => {
       try {
         setError(null);
-        const [assetsData, clientsData, summaryData] = await Promise.all([
-          assetsApi.getAll(),
+        const [clientsData, summaryData] = await Promise.all([
           clientsApi.getAll(),
           dashboardApi.getSummary(),
         ]);
+        console.log('[dashboard-ui][api]', summaryData);
         if (!isActive) {
           return;
         }
-        setAssets(assetsData);
         setClients(clientsData);
         setSummary(summaryData);
       } catch (err) {
@@ -204,14 +159,8 @@ export default function DashboardPage() {
         logProductionRuntimeError('dashboard-loader', err, {
           pathname: '/dashboard',
         });
-        setAssets([]);
         setClients([]);
-        setSummary({
-          pendingApprovals: 0,
-          upcomingUploads: 0,
-          totalClients: 0,
-          uploadedThisMonth: 0,
-        });
+        setSummary(null);
         setError(message);
       } finally {
         if (isActive) {
@@ -227,29 +176,33 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const pendingApprovals = summary.pendingApprovals;
-  const upcomingUploads = summary.upcomingUploads;
-  const totalClients = summary.totalClients;
-  const completedThisMonth = summary.uploadedThisMonth;
-  const approvedAssets = assets.filter((asset) => asset.status === 'approved').length;
-  const totalAssets = assets.length;
+  const pendingApprovals = summary?.pendingApprovals ?? 0;
+  const totalClients = summary?.totalClients || clients.length || 0;
+  const approvedAssets = summary?.approvedAssets ?? 0;
+  const totalAssets = summary?.totalAssets ?? 0;
+
+  console.log('[dashboard-ui][state]', summary);
 
   const recentActivity = useMemo<ActivityRow[]>(() => {
-    return [...assets]
-      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
-      .slice(0, 5)
-      .map((asset) => ({
-        id: asset.id,
-        asset,
-        action: getActivityAction(asset),
-        timestamp: asset.updatedAt.toLocaleString([], {
-          hour: 'numeric',
-          minute: '2-digit',
-        }),
-        icon: getActivityIcon(asset),
-        iconBgClassName: getActivityBg(asset),
-      }));
-  }, [assets]);
+    return (summary?.recentActivity ?? []).map((entry) => ({
+      id: entry.id,
+      kind: entry.kind,
+      href: entry.href,
+      title: entry.title,
+      detail: entry.detail,
+      timestamp: entry.timestamp,
+      iconKind: entry.iconKind,
+      icon: getActivityIcon(entry),
+      iconBgClassName: getActivityBg(entry),
+    }));
+  }, [summary]);
+
+  const assetStatusBreakdown = summary?.assetStatusBreakdown ?? [
+    { label: 'Draft' as const, count: 0 },
+    { label: 'Revision' as const, count: 0 },
+    { label: 'Approved' as const, count: 0 },
+    { label: 'Published' as const, count: 0 },
+  ];
 
   const statCards = useMemo<DashboardStatCard[]>(
     () => [
@@ -289,57 +242,16 @@ export default function DashboardPage() {
     [approvedAssets, pendingApprovals, totalAssets, totalClients]
   );
 
-  const quickActionItems = [
-    {
-      label: 'New Asset',
-      icon: <Plus className="h-4 w-4" />,
-      accent: true,
-      trigger: (
-        <AssetFormDialog
-          mode="create"
-          onSaved={(asset) => {
-            setAssets((prev) => [asset, ...prev]);
-            dashboardApi.getSummary().then(setSummary).catch(() => undefined);
-          }}
-          trigger={
-            <Button className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)] hover:text-white">
-              <Plus className="mr-2 h-4 w-4" />
-              New Asset
-            </Button>
-          }
-        />
-      ),
-    },
-    {
-      label: 'Upload Files',
-      icon: <Upload className="h-4 w-4" />,
-      href: '/dashboard/assets',
-    },
-    {
-      label: 'Add Client',
-      icon: <FolderPlus className="h-4 w-4" />,
-      href: '/dashboard/clients',
-    },
-    {
-      label: 'View Kanban',
-      icon: <KanbanSquare className="h-4 w-4" />,
-      href: '/dashboard/kanban',
-    },
-  ] as const;
+  console.log('[dashboard-ui][cards]', {
+    totalClients,
+    totalAssets,
+    pendingApprovals,
+    approvedAssets,
+  });
 
   const clientChips = useMemo(() => {
     return clients.slice(0, 10);
   }, [clients]);
-
-  const assetStatusBreakdown = useMemo(
-    () => [
-      { label: 'Draft', count: assets.filter((a) => a.status === 'draft').length },
-      { label: 'Revision', count: assets.filter((a) => a.status === 'revision_requested').length },
-      { label: 'Approved', count: assets.filter((a) => a.status === 'approved').length },
-      { label: 'Published', count: assets.filter((a) => a.status === 'published').length },
-    ],
-    [assets]
-  );
 
   if (isLoading) {
     return (
@@ -613,8 +525,7 @@ export default function DashboardPage() {
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <AssetFormDialog
               mode="create"
-              onSaved={(asset) => {
-                setAssets((prev) => [asset, ...prev]);
+              onSaved={() => {
                 dashboardApi.getSummary().then(setSummary).catch(() => undefined);
               }}
               trigger={
@@ -658,8 +569,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <AssetFormDialog
             mode="create"
-            onSaved={(asset) => {
-              setAssets((prev) => [asset, ...prev]);
+            onSaved={() => {
               dashboardApi.getSummary().then(setSummary).catch(() => undefined);
             }}
             trigger={
@@ -707,7 +617,7 @@ export default function DashboardPage() {
               recentActivity.map((item, index) => (
                 <Link
                   key={item.id}
-                  href={`/dashboard/assets/${item.asset.id}`}
+                  href={item.href}
                   className="relative flex h-10 items-center justify-between rounded-md px-3 text-sm transition-colors hover:bg-[rgba(255,255,255,0.03)]"
                 >
                   <div className="flex min-w-0 items-center gap-3">
@@ -715,14 +625,17 @@ export default function DashboardPage() {
                       {item.icon}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-[13px] font-medium text-white">{item.asset.title}</p>
-                      <p className="truncate text-[12px] text-[#a1a1aa]">
-                        {item.action} • {item.asset.type} asset
-                      </p>
+                      <p className="truncate text-[13px] font-medium text-white">{item.title}</p>
+                      <p className="truncate text-[12px] text-[#a1a1aa]">{item.detail}</p>
                     </div>
                   </div>
 
-                  <span className="shrink-0 text-[12px] text-[#71717a]">{item.timestamp}</span>
+                  <span className="shrink-0 text-[12px] text-[#71717a]">
+                    {item.timestamp.toLocaleString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
 
                   {index < recentActivity.length - 1 && (
                     <div className="absolute inset-x-3 bottom-0 h-px bg-[rgba(255,255,255,0.05)]" aria-hidden="true" />

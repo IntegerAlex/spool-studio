@@ -34,6 +34,29 @@ export async function listActivityByAssetId(
   return data ?? [];
 }
 
+export async function listRecentActivity(
+  client?: SupabaseClient<Database>,
+  options?: { limit?: number }
+): Promise<DbAssetActivity[]> {
+  const supabase = await getClient(client);
+  let query = supabase
+    .from('asset_activity_logs')
+    .select(activitySelect)
+    .order('created_at', { ascending: false });
+
+  if (options?.limit !== undefined) {
+    query = query.limit(Math.max(options.limit, 1));
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
 export async function insertActivity(
   payload: Database['public']['Tables']['asset_activity_logs']['Insert'],
   client?: SupabaseClient<Database>
