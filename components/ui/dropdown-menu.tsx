@@ -74,7 +74,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "focus:bg-[rgba(255,255,255,0.06)] focus:text-white data-[variant=destructive]:text-[#fca5a5] data-[variant=destructive]:focus:bg-[rgba(239,68,68,0.08)] data-[variant=destructive]:focus:text-[#fca5a5] data-[variant=destructive]:*:[svg]:!text-[#fca5a5] [&_svg:not([class*='text-'])]:text-[#71717a] relative flex cursor-default items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] text-[#a1a1aa] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[inset]:pl-8 hover:text-white [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "focus:bg-[rgba(255,255,255,0.06)] focus:text-white data-[variant=destructive]:text-[#fca5a5] data-[variant=destructive]:focus:bg-[rgba(239,68,68,0.08)] data-[variant=destructive]:focus:text-[#fca5a5] data-[variant=destructive]:*:[svg]:!text-[#fca5a5] [&_svg:not([class*='text-'])]:text-[#71717a] relative flex cursor-default items-center gap-2 rounded-[6px] px-2 py-1.5 min-h-[44px] sm:min-h-0 text-[13px] text-[#a1a1aa] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[inset]:pl-8 hover:text-white [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}
@@ -92,7 +92,7 @@ function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        "focus:bg-[rgba(255,255,255,0.06)] focus:text-white relative flex cursor-default items-center gap-2 rounded-[6px] py-1.5 pr-2 pl-8 text-[13px] text-[#a1a1aa] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-white",
+        "focus:bg-[rgba(255,255,255,0.06)] focus:text-white relative flex cursor-default items-center gap-2 rounded-[6px] py-1.5 pr-2 pl-8 min-h-[44px] sm:min-h-0 text-[13px] text-[#a1a1aa] outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-white",
         className,
       )}
       checked={checked}
@@ -128,7 +128,7 @@ function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "focus:bg-accent focus:text-accent-foreground relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 min-h-[44px] sm:min-h-0 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}
@@ -211,7 +211,7 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "focus:bg-[rgba(255,255,255,0.06)] focus:text-white data-[state=open]:bg-[rgba(255,255,255,0.06)] data-[state=open]:text-white [&_svg:not([class*='text-'])]:text-[#71717a] flex cursor-default items-center gap-2 rounded-[6px] px-2 py-1.5 text-[13px] text-[#a1a1aa] outline-hidden select-none data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-white",
+        "focus:bg-[rgba(255,255,255,0.06)] focus:text-white data-[state=open]:bg-[rgba(255,255,255,0.06)] data-[state=open]:text-white [&_svg:not([class*='text-'])]:text-[#71717a] flex cursor-default items-center gap-2 rounded-[6px] px-2 py-1.5 min-h-[44px] sm:min-h-0 text-[13px] text-[#a1a1aa] outline-hidden select-none data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:text-white",
         className,
       )}
       {...props}

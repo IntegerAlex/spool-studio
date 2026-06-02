@@ -231,10 +231,10 @@ export default function QueuePage() {
       <div className="table-list-container">
         <div className="table-header-row">
           <div className="flex-[1.6] min-w-0 header-cell">File</div>
-          <div className="flex-[0.9] min-w-0 header-cell">Client</div>
-          <div className="flex-[0.8] min-w-0 header-cell">Status</div>
+          <div className="flex-[0.9] min-w-0 header-cell hidden md:block">Client</div>
+          <div className="flex-[0.8] min-w-0 header-cell hidden md:block">Status</div>
           <div className="flex-[0.9] min-w-0 header-cell">Progress</div>
-          <div className="w-[120px] shrink-0 text-right header-cell">Action</div>
+          <div className="w-[80px] sm:w-[120px] shrink-0 text-right header-cell">Action</div>
         </div>
 
         <div className="divide-y divide-[var(--color-border)]">
@@ -269,7 +269,7 @@ export default function QueuePage() {
                   </div>
                 </div>
 
-                <div className="flex-[0.9] min-w-0 text-[12px] text-[var(--color-text-secondary)]">
+                <div className="flex-[0.9] min-w-0 text-[12px] text-[var(--color-text-secondary)] hidden md:block">
                   <p className="truncate">{client?.name || 'Unknown Client'}</p>
                   <p className="mt-0.5 inline-flex items-center gap-1 text-[var(--color-text-faint)]">
                     <Calendar className="h-3 w-3" />
@@ -277,7 +277,7 @@ export default function QueuePage() {
                   </p>
                 </div>
 
-                <div className="flex-[0.8] min-w-0">
+                <div className="flex-[0.8] min-w-0 hidden md:block">
                   <span className={cn('inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-medium capitalize', getQueueStatusClass(item.status))}>
                     {getQueueStatusLabel(item.status)}
                   </span>
@@ -295,7 +295,7 @@ export default function QueuePage() {
                   )}
                 </div>
 
-                <div className="w-[120px] shrink-0 flex justify-end">
+                <div className="w-[80px] sm:w-[120px] shrink-0 flex justify-end">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="sm" className="h-7 px-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)] hover:text-white">

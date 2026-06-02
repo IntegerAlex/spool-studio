@@ -159,7 +159,7 @@ export default function AssetDetailPage() {
       const result = await assetsApi.uploadFile(asset.id, file, {
         onProgress: ({ percentage }) => {
           setIsUploadingRevision(true);
-          setRevisionUploadProgress(percentage);
+          setRevisionUploadProgress((prev) => Math.max(prev, percentage));
         },
       });
       setRevisionUploadProgress(100);
@@ -171,6 +171,9 @@ export default function AssetDetailPage() {
       }
       clearApiClientCache();
       router.refresh();
+
+      // Let the user see 100% and success state before hiding
+      await new Promise((resolve) => setTimeout(resolve, 800));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       toast({ title: 'Upload failed', description: message, variant: 'destructive' });

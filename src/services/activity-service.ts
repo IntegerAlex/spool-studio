@@ -7,6 +7,7 @@ import {
 import { getOrCreateCurrentUserProfile, getUsersByIds } from '@/services/users-service';
 import type { Json } from '@/types/database';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { emitEvent } from '@/lib/event-bus';
 
 export interface ActivityInput {
   assetId: string;
@@ -97,5 +98,22 @@ export async function logAssetActivity(input: ActivityInput): Promise<AssetActiv
     supabase
   );
 
-  return mapActivity(record);
+  const mapped = mapActivity(record);
+
+  try {
+    emitEvent({
+      type: 'asset.activity',
+      payload: {
+        id: mapped.id,
+        assetId: input.assetId,
+        action: input.action,
+        metadata: input.metadata ?? {},
+        createdAt: mapped.createdAt.toISOString(),
+      },
+    });
+  } catch (_err) {
+    // non-blocking - event bus is in-memory only
+  }
+
+  return mapped;
 }

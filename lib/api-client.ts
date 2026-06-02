@@ -80,13 +80,55 @@ async function dedupeRequest<T>(key: string, loader: () => Promise<T>): Promise<
 }
 
 async function fetchJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
+  const start = Date.now();
+  const requestUrl = typeof input === 'string' ? input : String(input);
+  const method = init?.method ?? 'GET';
+
+  const timeoutMs = 15000;
+  const maxRetries = method === 'GET' ? 2 : 0;
+
+  async function fetchWithRetry(attempt: number): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(init?.headers ?? {}),
+        },
+      });
+      clearTimeout(timer);
+      // retry on transient server errors / rate limits
+      if ((response.status === 429 || response.status === 502 || response.status === 503 || response.status === 504) && attempt < maxRetries) {
+        const backoff = Math.min(30000, 200 * Math.pow(2, attempt));
+        console.warn('[api][retry]', { url: requestUrl, method, status: response.status, attempt, backoff });
+        await new Promise((r) => setTimeout(r, backoff));
+        return fetchWithRetry(attempt + 1);
+      }
+      return response;
+    } catch (err) {
+      clearTimeout(timer);
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      if ((isAbort || err instanceof TypeError) && attempt < maxRetries) {
+        const backoff = Math.min(30000, 200 * Math.pow(2, attempt));
+        console.warn('[api][retry]', { url: requestUrl, method, attempt, backoff, reason: isAbort ? 'timeout' : 'network' });
+        await new Promise((r) => setTimeout(r, backoff));
+        return fetchWithRetry(attempt + 1);
+      }
+      throw err;
+    }
+  }
+
+  const response = await fetchWithRetry(0);
+
+  const duration = Date.now() - start;
+  try {
+    console.info('[api][perf]', { url: requestUrl, method, status: response.status, duration });
+  } catch (e) {
+    // ignore logging errors
+  }
 
   if (!response.ok) {
     const payload = (await response.json()) as ApiEnvelope<T>;
@@ -105,9 +147,29 @@ async function fetchJsonDeduped<T>(input: RequestInfo, init?: RequestInit): Prom
 }
 
 async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
-  const response = await fetch(input, {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const start = Date.now();
+  const requestUrl = typeof input === 'string' ? input : String(input);
+
+  const timeoutMs = 15000;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(input, { headers: { 'Content-Type': 'application/json' }, signal: controller.signal });
+  } catch (err) {
+    clearTimeout(timer);
+    console.warn('[api][perf][nullable][error]', { url: requestUrl, method: 'GET', error: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
+  clearTimeout(timer);
+
+  const duration = Date.now() - start;
+  try {
+    console.info('[api][perf]', { url: requestUrl, method: 'GET', status: response.status, duration });
+  } catch (e) {
+    // ignore
+  }
 
   if (response.status === 404) {
     return null;
@@ -146,10 +208,7 @@ async function uploadFileToDriveSession(
   let timer: ReturnType<typeof globalThis.setInterval> | null = null;
 
   if (onProgress) {
-    emitUploadProgress(onProgress, 'uploading', 12);
-    timer = globalThis.setInterval(() => {
-      emitUploadProgress(onProgress, 'uploading', 12);
-    }, 300);
+    emitUploadProgress(onProgress, 'uploading', 0);
   }
 
   try {
@@ -185,9 +244,7 @@ async function uploadFileToDriveSession(
       xhr.send(file);
     });
   } finally {
-    if (timer) {
-      globalThis.clearInterval(timer);
-    }
+
   }
 }
 
@@ -299,6 +356,10 @@ export const clientsApi = {
     brandColor?: string;
     monthlyReelsTarget?: number;
     monthlyPostsTarget?: number;
+    monthlyGoal?: number;
+    weeklyGoal?: number;
+    weeklyPosterGoal?: number;
+    weeklyReelGoal?: number;
   }): Promise<Client> => {
     const created = await fetchJson<Client>('/api/clients', {
       method: 'POST',
@@ -316,6 +377,10 @@ export const clientsApi = {
       brandColor?: string;
       monthlyReelsTarget?: number;
       monthlyPostsTarget?: number;
+      monthlyGoal?: number;
+      weeklyGoal?: number;
+      weeklyPosterGoal?: number;
+      weeklyReelGoal?: number;
     }>
   ): Promise<Client> => {
     const updated = await fetchJson<Client>(`/api/clients/${id}`, {

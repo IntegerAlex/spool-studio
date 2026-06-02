@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Download, ExternalLink, FileAudio, FileText, Image as ImageIcon, PlayCircle } from 'lucide-react';
 
@@ -88,11 +88,7 @@ export function AssetPreviewMedia({ item, className, compact = false }: AssetPre
         return null;
       }
 
-      console.log('[preview][video]', {
-        fileId: item.driveFileId ?? null,
-        mimeType: item.mimeType ?? null,
-        previewUrl: videoUrl,
-      });
+      // suppressed noisy preview logs to reduce client-side render work
 
       return (
         <video

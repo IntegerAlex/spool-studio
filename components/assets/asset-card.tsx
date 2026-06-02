@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Asset, User } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
@@ -70,7 +70,7 @@ function getExtensionLabel(asset: Asset): string {
   return (asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type).toUpperCase();
 }
 
-export function AssetCard({ asset }: AssetCardProps) {
+function AssetCardImpl({ asset }: AssetCardProps) {
   const router = useRouter();
   const previewType = getAssetPreviewType(asset);
   const AssetIcon = getAssetIcon(asset);
@@ -78,37 +78,10 @@ export function AssetCard({ asset }: AssetCardProps) {
   const detailUrl = `/dashboard/assets/${asset.id}`;
   const uploadEligible = canUploadFromStatus(asset.status);
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    let isActive = true;
-    const fetchUser = async () => {
-      try {
-        const user = await authApi.getCurrentUser();
-        if (isActive) {
-          setCurrentUser(user);
-        }
-      } catch (err) {
-        console.error('Failed to load user in AssetCard', err);
-      }
-    };
-    fetchUser();
-    return () => {
-      isActive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    console.info('[asset-card][render]', {
-      assetId: asset.id,
-      assetType: asset.type,
-      previewStrategy: previewType,
-      uploadEligible,
-    });
-  }, [asset.id, asset.type, asset.durationSeconds, previewType, uploadEligible]);
+  // Removed per-card current user fetch and debug logging to avoid per-card async work and noisy renders
 
   const openAsset = () => {
     try {
@@ -125,6 +98,18 @@ export function AssetCard({ asset }: AssetCardProps) {
       // ignore open errors
     }
   };
+
+  const handlePreview = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    previewAsset();
+  }, [asset.id]);
+
+  const handleOpen = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openAsset();
+  }, [asset.id]);
 
   const copyDriveLink = async () => {
     try {
@@ -200,11 +185,7 @@ export function AssetCard({ asset }: AssetCardProps) {
           <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                previewAsset();
-              }}
+              onClick={handlePreview}
               className="flex size-8 items-center justify-center rounded-full bg-black/70 text-white transition-transform duration-150 hover:scale-105"
               aria-label="Preview asset"
               title="Preview asset"
@@ -214,11 +195,7 @@ export function AssetCard({ asset }: AssetCardProps) {
 
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                openAsset();
-              }}
+              onClick={handleOpen}
               className="flex size-8 items-center justify-center rounded-full bg-black/70 text-white transition-transform duration-150 hover:scale-105"
               aria-label="Edit asset"
               title="Edit asset"
@@ -312,7 +289,7 @@ export function AssetCard({ asset }: AssetCardProps) {
                 >
                   Copy Link
                 </DropdownMenuItem>
-                {(currentUser?.role === 'admin' || true) && (
+                {true && (
                   <>
                     <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
                     <DropdownMenuItem
@@ -388,3 +365,5 @@ export function AssetCard({ asset }: AssetCardProps) {
     </Link>
   );
 }
+
+export const AssetCard = React.memo(AssetCardImpl);

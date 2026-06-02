@@ -47,6 +47,10 @@ export interface Database {
           brand_color: string | null;
           monthly_reels_target: number;
           monthly_posts_target: number;
+          monthly_goal: number | null;
+          weekly_goal: number | null;
+          weekly_poster_goal: number;
+          weekly_reel_goal: number;
           drive_folder_id: string | null;
           drive_folder_url: string | null;
           created_by: string | null;
@@ -62,6 +66,10 @@ export interface Database {
           brand_color?: string | null;
           monthly_reels_target?: number;
           monthly_posts_target?: number;
+          monthly_goal?: number | null;
+          weekly_goal?: number | null;
+          weekly_poster_goal?: number;
+          weekly_reel_goal?: number;
           drive_folder_id?: string | null;
           drive_folder_url?: string | null;
           created_by?: string | null;
@@ -75,6 +83,10 @@ export interface Database {
           brand_color?: string | null;
           monthly_reels_target?: number;
           monthly_posts_target?: number;
+          monthly_goal?: number | null;
+          weekly_goal?: number | null;
+          weekly_poster_goal?: number;
+          weekly_reel_goal?: number;
           drive_folder_id?: string | null;
           drive_folder_url?: string | null;
           created_by?: string | null;
@@ -400,6 +412,16 @@ export interface Database {
       revision_status: 'open' | 'resolved';
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      clients_weekly_counts: {
+        Args: {
+          week_start: string;
+        };
+        Returns: {
+          client_id: string;
+          weekly_count: number;
+        }[];
+      };
+    };
   };
 }

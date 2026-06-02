@@ -14,6 +14,7 @@ export type DbAssetSummary = Pick<
   | 'published_at'
   | 'approved_at'
   | 'created_at'
+  | 'type'
 >;
 
 export type DbDashboardAssetSummary = Pick<
@@ -71,7 +72,7 @@ export async function listAssetSummaries(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
-    .select('client_id,status,assigned_to,scheduled_at,publish_date,publish_time,published_at,approved_at,created_at');
+    .select('client_id,status,assigned_to,scheduled_at,publish_date,publish_time,published_at,approved_at,created_at,type');
 
   if (error) {
     throw new Error(error.message);
@@ -109,6 +110,39 @@ export async function listKanbanAssets(
   }
 
   return data ?? [];
+}
+
+export async function listAssetsByIds(
+  ids: string[],
+  client?: SupabaseClient<Database>
+): Promise<Pick<DbAsset, 'id' | 'title' | 'type' | 'status' | 'publish_date' | 'publish_time' | 'published_at' | 'thumbnail_url'>[]> {
+  if (!ids || ids.length === 0) return [];
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('content_assets')
+    .select('id,title,type,status,publish_date,publish_time,published_at,thumbnail_url')
+    .in('id', ids)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
+export async function getWeeklyCountsGroupedByClient(
+  weekStartIso: string,
+  client?: SupabaseClient<Database>
+): Promise<{ client_id: string; weekly_count: number }[]> {
+  const supabase = await getClient(client);
+  // Call Postgres function created by migration: clients_weekly_counts(week_start timestamptz)
+  const { data, error } = await supabase.rpc('clients_weekly_counts', { week_start: weekStartIso });
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as any) ?? [];
 }
 
 export async function listAssetsByClientId(

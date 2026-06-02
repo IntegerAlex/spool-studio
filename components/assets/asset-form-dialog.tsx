@@ -250,7 +250,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
           const uploaded = await assetsApi.uploadFile(saved.id, selectedFile, {
             onProgress: ({ percentage }) => {
               setUploadState('uploading');
-              setUploadProgress(percentage);
+              setUploadProgress((prev) => Math.max(prev, percentage));
             },
           });
           setUploadState('uploaded');
@@ -262,6 +262,10 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
           clearApiClientCache();
           router.refresh();
           onSaved?.(uploaded);
+          
+          // Let the user see 100% and success state before hiding
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          
           setOpen(false);
           return;
         } catch (uploadError) {

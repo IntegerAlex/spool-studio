@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
 import { logGoogleEnvCheck, logMailgunEnvCheck, logSupabaseEnvCheck } from '@/lib/runtime-diagnostics'
 import './globals.css'
+import PerfClient from '@/components/perf/client-perf'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -53,6 +54,7 @@ export default function RootLayout({
         </div>
         {children}
         <Toaster />
+        {process.env.NEXT_PUBLIC_PERF_DIAG === '1' && <PerfClient />}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

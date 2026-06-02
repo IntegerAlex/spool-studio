@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
+import ErrorBoundary from '@/components/ui/error-boundary';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { workspaceApi, usersApi } from '@/lib/api-client';
 import { Workspace, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Bell, CalendarCheck, Lock, Palette, Save, Users, Sparkles } from 'lucide-react';
+import { Bell, CalendarCheck, Lock, Palette, Save, Users, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const sections = [
@@ -61,6 +62,9 @@ export default function SettingsPage() {
     googleEmail: null,
   });
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -138,7 +142,8 @@ export default function SettingsPage() {
   const activeMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
 
   return (
-    <div className="space-y-6 settings-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+    <ErrorBoundary>
+      <div className="space-y-6 settings-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
       <style>{`
         .settings-page-container {
           background-color: var(--color-bg-app);
@@ -600,7 +605,17 @@ export default function SettingsPage() {
                     <p className="text-[13px] font-semibold text-white">Current password</p>
                     <p className="text-[11px] text-[var(--color-text-muted)]">Required before changing password</p>
                   </div>
-                  <Input type="password" placeholder="Enter current password" className="field-input w-full max-w-full md:max-w-[260px]" />
+                  <div className="relative w-full max-w-full md:max-w-[260px]">
+                    <Input type={showCurrentPassword ? "text" : "password"} placeholder="Enter current password" className="field-input w-full pr-10" />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                      aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
@@ -608,7 +623,17 @@ export default function SettingsPage() {
                     <p className="text-[13px] font-semibold text-white">New password</p>
                     <p className="text-[11px] text-[var(--color-text-muted)]">Use a long, unique password</p>
                   </div>
-                  <Input type="password" placeholder="Enter new password" className="field-input w-full max-w-full md:max-w-[260px]" />
+                  <div className="relative w-full max-w-full md:max-w-[260px]">
+                    <Input type={showNewPassword ? "text" : "password"} placeholder="Enter new password" className="field-input w-full pr-10" />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
@@ -616,7 +641,17 @@ export default function SettingsPage() {
                     <p className="text-[13px] font-semibold text-white">Confirm password</p>
                     <p className="text-[11px] text-[var(--color-text-muted)]">Re-enter new password exactly</p>
                   </div>
-                  <Input type="password" placeholder="Confirm new password" className="field-input w-full max-w-full md:max-w-[260px]" />
+                  <div className="relative w-full max-w-full md:max-w-[260px]">
+                    <Input type={showConfirmPassword ? "text" : "password"} placeholder="Confirm new password" className="field-input w-full pr-10" />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="danger-zone">
@@ -635,6 +670,7 @@ export default function SettingsPage() {
           )}
         </main>
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

@@ -11,7 +11,10 @@ import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { getUsersByIds } from '@/services/users-service';
 import type { Database } from '@/types/database';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-
+import { sendDesignerNotification } from '@/lib/notifications/mailgun';
+import { getAssetById } from '@/repositories/assets-repository';
+import { getClientById } from '@/repositories/clients-repository';
+import { getUserById } from '@/repositories/users-repository';
 export interface CommentInput {
   assetId: string;
   type: Database['public']['Enums']['comment_type'];
@@ -95,6 +98,47 @@ export async function createComment(input: CommentInput): Promise<AssetComment> 
   const mapped = mapComment(record);
   if (!mapped) {
     throw new Error('Failed to map comment');
+  }
+
+  // Handle Notifications
+  try {
+    const asset = await getAssetById(input.assetId, supabase);
+    if (asset?.assigned_to) {
+      const assignedDesigner = await getUserById(asset.assigned_to, supabase);
+      
+      // Do not send if the user adding the comment is the assigned designer themselves
+      if (assignedDesigner?.email && user.id !== assignedDesigner.id) {
+        let clientName = 'Unknown Client';
+        if (asset.client_id) {
+          const client = await getClientById(asset.client_id, supabase);
+          if (client) {
+            clientName = client.name;
+          }
+        }
+
+        const notificationType = mapped.type === 'revision' ? 'revision_requested' : 'comment_added';
+
+        void sendDesignerNotification({
+          notificationType,
+          assetId: mapped.assetId,
+          assetTitle: asset.title,
+          assetType: asset.type,
+          clientId: asset.client_id,
+          clientName,
+          commentMessage: mapped.message,
+          designerId: assignedDesigner.id,
+          designerEmail: assignedDesigner.email,
+          designerName: assignedDesigner.full_name || assignedDesigner.name || null,
+          requestedBy: {
+            email: user.email,
+            name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+          },
+          timestamp: mapped.createdAt,
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[comments-service] Failed to send designer notification', err);
   }
 
   return mapped;

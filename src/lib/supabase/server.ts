@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { logProductionRuntimeError, logSupabaseEnvCheck } from '@/lib/runtime-diagnostics';
+import { wrapWithTiming } from '@/lib/perf';
 
 function getSupabaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -29,7 +30,7 @@ export async function createServerSupabaseClient(): Promise<SupabaseClient<Datab
   };
 
   try {
-    return createServerClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
+    const client = createServerClient<Database>(getSupabaseUrl(), getSupabaseAnonKey(), {
       cookieOptions: {
         path: '/',
         sameSite: 'lax',
@@ -47,6 +48,8 @@ export async function createServerSupabaseClient(): Promise<SupabaseClient<Datab
         },
       },
     });
+    // Optionally wrap returned client to emit query timing diagnostics
+    return wrapWithTiming(client, 'supabase');
   } catch (error) {
     logProductionRuntimeError('supabase-server-client', error);
     throw error;

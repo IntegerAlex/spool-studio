@@ -25,6 +25,10 @@ export async function POST(request: Request) {
       brandColor: body.brandColor,
       monthlyReelsTarget: body.monthlyReelsTarget,
       monthlyPostsTarget: body.monthlyPostsTarget,
+      monthlyGoal: body.monthlyGoal,
+      weeklyGoal: body.weeklyGoal,
+      weeklyPosterGoal: body.weeklyPosterGoal,
+      weeklyReelGoal: body.weeklyReelGoal,
     });
     return NextResponse.json({ data: client }, { status: 201 });
   } catch (error) {

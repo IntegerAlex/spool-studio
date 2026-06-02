@@ -39,25 +39,7 @@ export function ClientList({ clients, onCreated }: ClientListProps) {
           color: var(--color-text-muted) !important;
           margin-top: 3px !important;
         }
-        .add-client-btn {
-          background: #3ecf8e !important;
-          color: #000000 !important;
-          font-size: 12.5px !important;
-          font-weight: 600 !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 8px 16px !important;
-          border: none !important;
-          cursor: pointer !important;
-          box-shadow: none !important;
-          transition: all 120ms ease !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          height: auto !important;
-        }
-        .add-client-btn:hover {
-          opacity: 0.88 !important;
-        }
+
         .search-container {
           position: relative;
           width: 280px;
@@ -158,15 +140,25 @@ export function ClientList({ clients, onCreated }: ClientListProps) {
         }
       `}</style>
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="clients-title">Clients</h1>
           <p className="clients-subtitle">Manage client profiles, deliverables, and team assignments</p>
         </div>
+        
+        <div className="search-container w-full lg:hidden">
+          <Search className="search-icon" />
+          <Input
+            placeholder="Search clients..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input w-full"
+          />
+        </div>
         <ClientFormDialog
           onSaved={onCreated}
           trigger={
-            <Button className="add-client-btn">
+            <Button variant="accent" className="add-client-btn">
               <Plus className="mr-2 h-4 w-4" />
               Add Client
             </Button>
@@ -174,7 +166,7 @@ export function ClientList({ clients, onCreated }: ClientListProps) {
         />
       </div>
 
-      <div className="search-container">
+      <div className="search-container hidden lg:block">
         <Search className="search-icon" />
         <Input
           placeholder="Search clients..."
@@ -185,58 +177,152 @@ export function ClientList({ clients, onCreated }: ClientListProps) {
       </div>
 
       <div className="client-cards-grid">
-        {filteredClients.map((client) => (
-          <Link key={client.id} href={`/dashboard/clients/${client.id}`}>
-            <Card className="client-card shadow-none group">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="client-name">{client.name}</h3>
-                  <p className="client-handle">
-                    {client.instagramHandle || client.slug || 'No handle set'}
-                  </p>
-                </div>
+        {filteredClients.map((client) => {
+          const targetPosters = client.monthlyPostsTarget ?? 0;
+          const completedPosters = client.completedPosters ?? 0;
+          const posterProgress = targetPosters > 0 ? (completedPosters / targetPosters) * 100 : 100;
 
-                <div className="card-divider" />
+          const targetReels = client.monthlyReelsTarget ?? 0;
+          const completedReels = client.completedReels ?? 0;
+          const reelProgress = targetReels > 0 ? (completedReels / targetReels) * 100 : 100;
 
-                <div className="stats-row gap-4">
-                  <div className="space-y-1">
-                    <p className="stats-label">Team Members</p>
-                    <p className="stats-val">{client.assignedTeamMembers.length}</p>
+          let overallPct = 100;
+          if (targetPosters > 0 && targetReels > 0) {
+            overallPct = (posterProgress + reelProgress) / 2;
+          } else if (targetPosters > 0) {
+            overallPct = posterProgress;
+          } else if (targetReels > 0) {
+            overallPct = reelProgress;
+          }
+
+          const weeklyGoal = client.weeklyGoal ?? 0;
+          const weeklyCompleted = client.weeklyCompleted ?? 0;
+          const weeklyProgress = weeklyGoal > 0 ? (weeklyCompleted / weeklyGoal) * 100 : 100;
+
+          const weeklyPosterGoal = client.weeklyPosterGoal ?? 0;
+          const weeklyReelGoal = client.weeklyReelGoal ?? 0;
+          const weeklyCompletedPosters = client.weeklyCompletedPosters ?? 0;
+          const weeklyCompletedReels = client.weeklyCompletedReels ?? 0;
+
+          const pendingApprovals = client.pendingApprovals ?? 0;
+          const pendingRevisions = client.pendingRevisions ?? 0;
+
+          let statusLabel = 'On Track';
+          let statusColorClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+          if (overallPct < 70) {
+            statusLabel = 'Behind';
+            statusColorClass = 'bg-red-500/10 text-red-400 border border-red-500/20';
+          } else if (overallPct < 90) {
+            statusLabel = 'Attention';
+            statusColorClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+          }
+
+          return (
+            <Link key={client.id} href={`/dashboard/clients/${client.id}`}>
+              <Card className="client-card shadow-none group">
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="client-name truncate">{client.name}</h3>
+                      <p className="client-handle truncate">
+                        {client.instagramHandle || client.slug || 'No handle set'}
+                      </p>
+                    </div>
+                    <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wider', statusColorClass)}>
+                      {statusLabel}
+                    </span>
                   </div>
-                  <div className="space-y-1 text-right">
-                    <p className="stats-label">Deliverables</p>
-                    <p className="stats-val">
-                      {client.completedDeliverables}/{client.monthlyDeliverables}
-                    </p>
+
+                  <div className="card-divider" />
+
+                  {weeklyPosterGoal === 0 && weeklyReelGoal === 0 ? (
+                    <div className="py-4 px-3 rounded-lg bg-amber-500/5 border border-amber-500/10 text-center space-y-1">
+                      <p className="text-[11px] font-semibold text-amber-500 flex items-center justify-center gap-1">
+                        <span>⚠️</span> Weekly goals not configured
+                      </p>
+                      <p className="text-[10px] text-[var(--color-text-muted)]">
+                        Configure goals in Client settings
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-medium">
+                          <span className="text-[var(--color-text-secondary)]">Posters</span>
+                          <span className="text-[var(--color-text-muted)] font-mono">
+                            {weeklyCompletedPosters} / {weeklyPosterGoal}
+                          </span>
+                        </div>
+                        <div className="progress-bar-container">
+                          <div
+                            className="progress-bar-fill transition-all duration-150"
+                            style={{
+                              width: `${weeklyPosterGoal > 0 ? Math.min(100, (weeklyCompletedPosters / weeklyPosterGoal) * 100) : 0}%`,
+                              backgroundColor: weeklyPosterGoal > 0 && weeklyCompletedPosters > 0 ? '#3b82f6' : 'var(--color-border-strong)'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-medium">
+                          <span className="text-[var(--color-text-secondary)]">Reels</span>
+                          <span className="text-[var(--color-text-muted)] font-mono">
+                            {weeklyCompletedReels} / {weeklyReelGoal}
+                          </span>
+                        </div>
+                        <div className="progress-bar-container">
+                          <div
+                            className="progress-bar-fill transition-all duration-150"
+                            style={{
+                              width: `${weeklyReelGoal > 0 ? Math.min(100, (weeklyCompletedReels / weeklyReelGoal) * 100) : 0}%`,
+                              backgroundColor: weeklyReelGoal > 0 && weeklyCompletedReels > 0 ? '#ec4899' : 'var(--color-border-strong)'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-medium">
+                          <span className="text-[var(--color-text-secondary)]">Total Progress</span>
+                          <span className="text-[var(--color-text-muted)] font-mono">
+                            {weeklyCompleted} / {weeklyGoal} ({weeklyGoal > 0 ? Math.round((weeklyCompleted / weeklyGoal) * 100) : 0}%)
+                          </span>
+                        </div>
+                        <div className="progress-bar-container">
+                          <div
+                            className="progress-bar-fill transition-all duration-150"
+                            style={{
+                              width: `${weeklyGoal > 0 ? Math.min(100, (weeklyCompleted / weeklyGoal) * 100) : 0}%`,
+                              backgroundColor: weeklyGoal > 0 && weeklyCompleted > 0 ? '#10b981' : 'var(--color-border-strong)'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="card-divider" />
+
+                  <div className="flex justify-between text-[11px] pt-0.5">
+                    <div className="text-[var(--color-text-muted)]">
+                      Pending Approvals: <span className={cn('font-semibold font-mono', pendingApprovals > 0 ? 'text-amber-400' : 'text-[var(--color-text-faint)]')}>{pendingApprovals}</span>
+                    </div>
+                    <div className="text-[var(--color-text-muted)]">
+                      Pending Revisions: <span className={cn('font-semibold font-mono', pendingRevisions > 0 ? 'text-red-400' : 'text-[var(--color-text-faint)]')}>{pendingRevisions}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end opacity-0 transition-opacity duration-150 group-hover:opacity-100 pt-1">
+                    <span className={cn('text-[12px] font-medium text-[var(--color-accent)]')}>
+                      View <ArrowRight className="ml-1 inline-block h-3 w-3" />
+                    </span>
                   </div>
                 </div>
-
-                <div className="space-y-1">
-                  <p className="stats-label">Progress</p>
-                  <div className="progress-bar-container">
-                    <div
-                      className="progress-bar-fill transition-all duration-150"
-                      style={{
-                        width: client.monthlyDeliverables > 0
-                          ? `${(client.completedDeliverables / client.monthlyDeliverables) * 100}%`
-                          : '0%',
-                        backgroundColor: (client.monthlyDeliverables > 0 && client.completedDeliverables > 0)
-                          ? 'var(--color-accent)'
-                          : 'var(--color-border-strong)'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                  <span className={cn('text-[12px] font-medium text-[var(--color-accent)]')}>
-                    View <ArrowRight className="ml-1 inline-block h-3 w-3" />
-                  </span>
-                </div>
-              </div>
-            </Card>
-          </Link>
-        ))}
+              </Card>
+            </Link>
+          );
+        })}
       </div>
 
       {filteredClients.length === 0 && (

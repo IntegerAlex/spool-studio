@@ -20,14 +20,15 @@ const buttonVariants = cva(
         ghost:
           'bg-transparent text-[#a1a1aa] hover:bg-[rgba(255,255,255,0.06)] hover:text-white',
         link: 'text-primary underline-offset-4 hover:underline',
+        accent: 'bg-[#3ecf8e] text-black shadow-none hover:opacity-90',
       },
       size: {
-        default: 'h-[34px] px-3 py-2 has-[>svg]:px-3',
-        sm: 'h-[34px] rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
-        lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-        icon: 'size-8',
-        'icon-sm': 'size-8',
-        'icon-lg': 'size-10',
+        default: 'h-[44px] sm:h-[34px] px-3 py-2 has-[>svg]:px-3',
+        sm: 'h-[44px] sm:h-[34px] rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
+        lg: 'h-[44px] sm:h-10 rounded-md px-6 has-[>svg]:px-4',
+        icon: 'size-[44px] sm:size-8',
+        'icon-sm': 'size-[44px] sm:size-8',
+        'icon-lg': 'size-[44px] sm:size-10',
       },
     },
     defaultVariants: {

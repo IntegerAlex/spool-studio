@@ -15,7 +15,7 @@ export async function listClientReferencesByClientId(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('client_references')
-    .select('*')
+    .select('id,client_id,title,url,description,type,created_at,updated_at')
     .eq('client_id', clientId)
     .order('created_at', { ascending: false });
 
@@ -33,7 +33,7 @@ export async function getClientReferenceById(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('client_references')
-    .select('*')
+    .select('id,client_id,title,url,description,type,created_at,updated_at')
     .eq('id', referenceId)
     .maybeSingle();
 
@@ -52,7 +52,7 @@ export async function insertClientReference(
   const { data, error } = await supabase
     .from('client_references')
     .insert(payload)
-    .select('*')
+    .select('id,client_id,title,url,description,type,created_at,updated_at')
     .single();
 
   if (error) {
@@ -72,7 +72,7 @@ export async function updateClientReference(
     .from('client_references')
     .update(updates)
     .eq('id', referenceId)
-    .select('*')
+    .select('id,client_id,title,url,description,type,created_at,updated_at')
     .single();
 
   if (error) {

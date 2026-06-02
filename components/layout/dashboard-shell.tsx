@@ -84,16 +84,18 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
       <Sidebar />
 
       <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[220px] lg:w-[calc(100%-220px)]">
-        <div className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:hidden">
+        <div className="sticky top-0 z-50 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:hidden pt-[env(safe-area-inset-top)] h-[calc(3.5rem+env(safe-area-inset-top))]">
           <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <Image
-              src="/asset_flow.png"
-              alt="Asset Flow"
-              width={180}
-              height={54}
-              priority
-              className="h-10 w-auto shrink-0 object-contain"
-            />
+            <div className="relative flex items-center h-full w-full ml-1">
+              <Image
+                src="/asset_flow.png"
+                alt="Asset Flow"
+                width={180}
+                height={54}
+                priority
+                className="h-[36px] w-auto shrink-0 object-contain"
+              />
+            </div>
             <span className="sr-only">Asset Flow</span>
           </Link>
 

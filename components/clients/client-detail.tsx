@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AssetCard } from '@/components/assets/asset-card';
 import { cn } from '@/lib/utils';
+import { ClientFormDialog } from '@/components/clients/client-form-dialog';
 
 interface ClientDetailProps {
   client: Client;
@@ -263,7 +264,12 @@ interface ClientDetailProps {
   assets: Asset[];
 }
 
-export function ClientDetail({ client, assets }: ClientDetailProps) {
+export function ClientDetail({ client: initialClient, assets }: ClientDetailProps) {
+  const [client, setClient] = useState<Client>(initialClient);
+
+  useEffect(() => {
+    setClient(initialClient);
+  }, [initialClient]);
   const [team, setTeam] = useState<User[]>([]);
   const [references, setReferences] = useState<ClientReference[]>([]);
   const [referencesLoading, setReferencesLoading] = useState(true);
@@ -342,11 +348,46 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
     };
   }, [client.id]);
 
-  const progress = client.monthlyDeliverables > 0
-    ? Math.round((client.completedDeliverables / client.monthlyDeliverables) * 100)
-    : 0;
+  // Monthly targets & completions
+  const monthlyPostsTarget = client.monthlyPostsTarget ?? 0;
+  const completedPosters = client.completedPosters ?? 0;
+  const monthlyReelsTarget = client.monthlyReelsTarget ?? 0;
+  const completedReels = client.completedReels ?? 0;
 
-  const pendingDeliverables = Math.max(client.monthlyDeliverables - client.completedDeliverables, 0);
+  const monthlyTarget = monthlyPostsTarget + monthlyReelsTarget;
+  const monthlyCompleted = completedPosters + completedReels;
+  const monthlyRemaining = Math.max(0, monthlyTarget - monthlyCompleted);
+  const monthlyProgressPct = monthlyTarget > 0 ? Math.round((monthlyCompleted / monthlyTarget) * 100) : 0;
+
+  const monthlyPosterProgress = monthlyPostsTarget > 0 ? (completedPosters / monthlyPostsTarget) * 100 : 0;
+  const monthlyReelProgress = monthlyReelsTarget > 0 ? (completedReels / monthlyReelsTarget) * 100 : 0;
+
+  // Weekly targets & completions
+  const weeklyPosterGoal = client.weeklyPosterGoal ?? 0;
+  const weeklyCompletedPosters = client.weeklyCompletedPosters ?? 0;
+  const weeklyReelGoal = client.weeklyReelGoal ?? 0;
+  const weeklyCompletedReels = client.weeklyCompletedReels ?? 0;
+
+  const weeklyGoal = client.weeklyGoal ?? (weeklyPosterGoal + weeklyReelGoal);
+  const weeklyCompleted = client.weeklyCompleted ?? (weeklyCompletedPosters + weeklyCompletedReels);
+  const weeklyRemaining = Math.max(0, weeklyGoal - weeklyCompleted);
+
+  const weeklyPosterProgress = weeklyPosterGoal > 0 ? (weeklyCompletedPosters / weeklyPosterGoal) * 100 : 0;
+  const weeklyReelProgress = weeklyReelGoal > 0 ? (weeklyCompletedReels / weeklyReelGoal) * 100 : 0;
+
+  const progress = monthlyProgressPct;
+  const pendingDeliverables = monthlyRemaining;
+
+  // Status Indicator
+  let statusLabel = 'On Track';
+  let statusColorClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+  if (monthlyProgressPct < 70) {
+    statusLabel = 'Behind';
+    statusColorClass = 'bg-red-500/10 text-red-400 border border-red-500/20';
+  } else if (monthlyProgressPct < 90) {
+    statusLabel = 'Attention';
+    statusColorClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+  }
 
   const sortedReferences = useMemo(
     () => [...references].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()),
@@ -390,7 +431,7 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
       iconBg: 'bg-[rgba(16,185,129,0.12)]',
     },
     {
-      title: 'Pending',
+      title: 'Remaining Target',
       value: pendingDeliverables,
       icon: <Clock3 className="h-5 w-5 text-[#f59e0b]" />,
       iconBg: 'bg-[rgba(245,158,11,0.12)]',
@@ -463,10 +504,16 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
             </>
           )}
 
-          <Button className="h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]">
-            <Edit2 className="mr-2 h-4 w-4" />
-            Edit Client
-          </Button>
+          <ClientFormDialog
+            client={client}
+            onSaved={(updatedClient) => setClient(updatedClient)}
+            trigger={
+              <Button className="h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]">
+                <Edit2 className="mr-2 h-4 w-4" />
+                Edit Client
+              </Button>
+            }
+          />
 
           {(currentUser?.role === 'admin' || true) && (
             <Button
@@ -499,42 +546,127 @@ export function ClientDetail({ client, assets }: ClientDetailProps) {
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none xl:col-span-2">
-          <div className="flex items-end justify-between gap-4">
+          <div className="flex items-center justify-between gap-4 border-b border-[rgba(255,255,255,0.05)] pb-4 mb-4">
             <div>
               <h2 className="text-[13px] font-medium text-white">Delivery Progress</h2>
-              <p className="mt-1 text-[12px] text-[#71717a]">Monthly deliverables at a glance.</p>
+              <p className="mt-1 text-[12px] text-[#71717a]">Weekly & Monthly targets at a glance.</p>
             </div>
-            <div className="text-right">
-              <p className="text-[20px] font-medium text-[#6366f1]">{progress}%</p>
-              <p className="text-[12px] text-[#71717a]">Complete</p>
+            <div className="flex items-center gap-3">
+              <span className={cn('text-[10px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 uppercase tracking-wider', statusColorClass)}>
+                {statusLabel}
+              </span>
+              <div className="text-right">
+                <span className="text-[18px] font-medium text-white">{monthlyProgressPct}%</span>
+                <span className="text-[11px] text-[#71717a] ml-1">Complete</span>
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 space-y-4">
-            <div>
-              <div className="mb-2 flex items-end justify-between">
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Progress</p>
-                  <p className="mt-1 text-[20px] font-medium text-white">
-                    {client.completedDeliverables}
-                    <span className="text-[13px] text-[#71717a]">/{client.monthlyDeliverables}</span>
-                  </p>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Monthly Targets Section */}
+            <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
+              <div>
+                <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Monthly Targets</h3>
+                
+                {monthlyTarget === 0 ? (
+                  <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
+                    ⚠️ Goals Not Configured
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Posters Split */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-medium">
+                        <span className="text-[#a1a1aa]">Posters</span>
+                        <span className="text-white font-mono">{completedPosters} / {monthlyPostsTarget}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                        <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyPosterProgress)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Reels Split */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-medium">
+                        <span className="text-[#a1a1aa]">Reels</span>
+                        <span className="text-white font-mono">{completedReels} / {monthlyReelsTarget}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                        <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyReelProgress)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="h-[3px] rounded-full bg-[rgba(255,255,255,0.08)]">
-                <div className="h-full rounded-full bg-[#6366f1]" style={{ width: `${progress}%` }} />
+
+              {/* Monthly KPI Summary */}
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
+                <div>
+                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Target</p>
+                  <p className="text-xs font-semibold text-white mt-0.5">{monthlyTarget}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
+                  <p className="text-xs font-semibold text-[#10b981] mt-0.5">{monthlyCompleted}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
+                  <p className="text-xs font-semibold text-white mt-0.5">{monthlyRemaining}</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] p-4 shadow-none">
-                <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Remaining</p>
-                <p className="mt-2 text-[24px] font-medium text-white">{pendingDeliverables}</p>
-              </Card>
-              <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] p-4 shadow-none">
-                <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Time Left</p>
-                <p className="mt-2 text-[24px] font-medium text-white">~10 days</p>
-              </Card>
+            {/* Weekly Targets Section */}
+            <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
+              <div>
+                <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Weekly Targets</h3>
+                
+                {weeklyGoal === 0 ? (
+                  <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
+                    ⚠️ Goals Not Configured
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Posters Split */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-medium">
+                        <span className="text-[#a1a1aa]">Posters</span>
+                        <span className="text-white font-mono">{weeklyCompletedPosters} / {weeklyPosterGoal}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                        <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyPosterProgress)}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Reels Split */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-medium">
+                        <span className="text-[#a1a1aa]">Reels</span>
+                        <span className="text-white font-mono">{weeklyCompletedReels} / {weeklyReelGoal}</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                        <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyReelProgress)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Weekly KPI Summary */}
+              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
+                <div>
+                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Goal</p>
+                  <p className="text-xs font-semibold text-white mt-0.5">{weeklyGoal}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
+                  <p className="text-xs font-semibold text-[#10b981] mt-0.5">{weeklyCompleted}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
+                  <p className="text-xs font-semibold text-white mt-0.5">{weeklyRemaining}</p>
+                </div>
+              </div>
             </div>
           </div>
         </Card>

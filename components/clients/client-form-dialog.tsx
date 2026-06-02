@@ -35,28 +35,33 @@ const formSchema = z.object({
   brandColor: z.string().optional(),
   monthlyReelsTarget: z.string().optional(),
   monthlyPostsTarget: z.string().optional(),
+  weeklyPosterGoal: z.string().optional(),
+  weeklyReelGoal: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface ClientFormDialogProps {
   trigger: React.ReactNode;
+  client?: Client;
   onSaved?: (client: Client) => void;
 }
 
 function toNumber(value?: string): number | undefined {
-  if (!value) {
+  if (value === undefined || value === '') {
     return undefined;
   }
   const parsed = Number(value);
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
-export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
+export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const isEditMode = !!client;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -67,15 +72,52 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
       brandColor: '',
       monthlyReelsTarget: '',
       monthlyPostsTarget: '',
+      weeklyPosterGoal: '',
+      weeklyReelGoal: '',
     },
   });
 
+  const monthlyReels = form.watch('monthlyReelsTarget');
+  const monthlyPosts = form.watch('monthlyPostsTarget');
+  const weeklyPosterGoalVal = form.watch('weeklyPosterGoal');
+  const weeklyReelGoalVal = form.watch('weeklyReelGoal');
+
+  const reels = toNumber(monthlyReels) ?? 0;
+  const posts = toNumber(monthlyPosts) ?? 0;
+  const suggestedGoal = Math.round((reels + posts) / 4);
+
+  const wPosterGoal = toNumber(weeklyPosterGoalVal) ?? 0;
+  const wReelGoal = toNumber(weeklyReelGoalVal) ?? 0;
+  const totalWeeklyGoal = wPosterGoal + wReelGoal;
+
   useEffect(() => {
-    if (!open) {
-      form.reset();
+    if (open) {
+      if (client) {
+        form.reset({
+          name: client.name || '',
+          slug: client.slug || '',
+          instagramHandle: client.instagramHandle || '',
+          brandColor: client.brandColor || '',
+          monthlyReelsTarget: client.monthlyReelsTarget !== undefined ? client.monthlyReelsTarget.toString() : '',
+          monthlyPostsTarget: client.monthlyPostsTarget !== undefined ? client.monthlyPostsTarget.toString() : '',
+          weeklyPosterGoal: client.weeklyPosterGoal !== undefined ? client.weeklyPosterGoal.toString() : '',
+          weeklyReelGoal: client.weeklyReelGoal !== undefined ? client.weeklyReelGoal.toString() : '',
+        });
+      } else {
+        form.reset({
+          name: '',
+          slug: '',
+          instagramHandle: '',
+          brandColor: '',
+          monthlyReelsTarget: '',
+          monthlyPostsTarget: '',
+          weeklyPosterGoal: '',
+          weeklyReelGoal: '',
+        });
+      }
       setApiError(null);
     }
-  }, [form, open]);
+  }, [client, open, form]);
 
   const handleSubmit = form.handleSubmit(
     async (values) => {
@@ -88,26 +130,37 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
         brandColor: values.brandColor?.trim() || undefined,
         monthlyReelsTarget: toNumber(values.monthlyReelsTarget),
         monthlyPostsTarget: toNumber(values.monthlyPostsTarget),
+        weeklyPosterGoal: toNumber(values.weeklyPosterGoal),
+        weeklyReelGoal: toNumber(values.weeklyReelGoal),
       };
       console.info('[client-form] api request', payload);
 
       try {
-        const created = await clientsApi.create(payload);
-        console.info('[client-form] api response', created);
-        toast({
-          title: 'Client created',
-          description: `${created.name} is ready to go.`,
-        });
+        let saved: Client;
+        if (isEditMode && client) {
+          saved = await clientsApi.update(client.id, payload);
+          toast({
+            title: 'Client updated',
+            description: `${saved.name} changes have been saved.`,
+          });
+        } else {
+          saved = await clientsApi.create(payload);
+          toast({
+            title: 'Client created',
+            description: `${saved.name} is ready to go.`,
+          });
+        }
         clearApiClientCache();
         router.refresh();
-        onSaved?.(created);
+        onSaved?.(saved);
         setOpen(false);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to create client';
+        const actionLabel = isEditMode ? 'update' : 'create';
+        const message = error instanceof Error ? error.message : `Failed to ${actionLabel} client`;
         console.error('[client-form] api error', { error });
         setApiError(message);
         toast({
-          title: 'Unable to create client',
+          title: `Unable to ${actionLabel} client`,
           description: message,
           variant: 'destructive',
         });
@@ -124,8 +177,10 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create client</DialogTitle>
-          <DialogDescription>Enter the core client details to get started.</DialogDescription>
+          <DialogTitle>{isEditMode ? 'Edit Client' : 'Add Client'}</DialogTitle>
+          <DialogDescription>
+            {isEditMode ? 'Modify client details and configuration.' : 'Enter the core client details to get started.'}
+          </DialogDescription>
         </DialogHeader>
 
         {apiError && (
@@ -157,7 +212,7 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
                 <FormItem>
                   <FormLabel>Slug</FormLabel>
                   <FormControl>
-                    <Input placeholder="client-name" {...field} />
+                    <Input placeholder="client-name" {...field} disabled={isEditMode} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -212,7 +267,7 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
                 name="monthlyPostsTarget"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Monthly Posts</FormLabel>
+                    <FormLabel>Monthly Posts (Posters)</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" placeholder="0" {...field} />
                     </FormControl>
@@ -222,12 +277,68 @@ export function ClientFormDialog({ trigger, onSaved }: ClientFormDialogProps) {
               />
             </div>
 
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="weeklyPosterGoal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Weekly Poster Goal</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="weeklyReelGoal"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex justify-between items-center">
+                      <FormLabel>Weekly Reel Goal</FormLabel>
+                      {(reels > 0 || posts > 0) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sugReels = Math.round(reels / 4);
+                            const sugPosters = Math.round(posts / 4);
+                            form.setValue('weeklyReelGoal', sugReels.toString());
+                            form.setValue('weeklyPosterGoal', sugPosters.toString());
+                          }}
+                          className="text-[11px] text-[var(--color-accent)] hover:underline"
+                        >
+                          Use suggested
+                        </button>
+                      )}
+                    </div>
+                    <FormControl>
+                      <Input type="number" min="0" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="p-3 bg-[rgba(255,255,255,0.02)] rounded-md border border-[var(--color-border)] text-xs space-y-1">
+              <div className="flex justify-between text-white font-medium">
+                <span>Total Weekly Goal (Calculated)</span>
+                <span className="font-mono">{totalWeeklyGoal}</span>
+              </div>
+              <p className="text-[11px] text-[var(--color-text-muted)]">
+                Suggested Weekly Goal: {suggestedGoal} (from monthly targets).
+              </p>
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saving...' : 'Add Client'}
+                {form.formState.isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Client'}
               </Button>
             </DialogFooter>
           </form>

@@ -9,6 +9,10 @@ import {
   updateClientReference as updateClientReferenceRow,
 } from '@/repositories/client-references-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { sendReferenceNotification } from '@/lib/notifications/mailgun';
+import { listAssetsByClientId } from '@/repositories/assets-repository';
+import { getUserById } from '@/repositories/users-repository';
+import { getClientById } from '@/repositories/clients-repository';
 
 const allowedProtocols = new Set(['http:', 'https:']);
 
@@ -121,6 +125,48 @@ export async function createClientReference(input: ClientReferenceInput): Promis
   if (!mapped) {
     throw new Error('Failed to map client reference');
   }
+
+  // Handle Notifications async (do not block reference creation)
+  (async () => {
+    try {
+      const client = await getClientById(input.clientId, supabase);
+      const clientName = client?.name || 'Unknown Client';
+      const assets = await listAssetsByClientId(input.clientId, supabase);
+      
+      const assignedIds = new Set<string>();
+      for (const asset of assets) {
+        if (asset.assigned_to) {
+          assignedIds.add(asset.assigned_to);
+        }
+      }
+
+      for (const designerId of assignedIds) {
+        if (designerId === user.id) continue; // Don't notify the person who added it
+
+        const designer = await getUserById(designerId, supabase);
+        if (designer?.email) {
+          void sendReferenceNotification({
+            clientId: input.clientId,
+            clientName,
+            referenceId: mapped.id,
+            referenceTitle: mapped.title,
+            referenceType: mapped.type,
+            referenceDescription: mapped.description,
+            referenceUrl: mapped.url,
+            addedBy: {
+              email: user.email,
+              name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+            },
+            timestamp: mapped.createdAt,
+            designerEmail: designer.email,
+            designerId: designer.id,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[client-references-service] Failed to send reference notifications', err);
+    }
+  })();
 
   return mapped;
 }

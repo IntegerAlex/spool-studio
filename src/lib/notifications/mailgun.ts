@@ -1,6 +1,7 @@
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { logMailgunEnvCheck, logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { enqueueBackgroundJob } from '@/lib/background-queue';
 
 const MAILGUN_LOG_PREFIX = '[notifications][mailgun]';
 
@@ -141,33 +142,37 @@ async function sendMailgunNotification(
     ...context,
   });
 
-  try {
-    await client.messages.create(domain, {
-      from,
-      to,
-      subject,
-      text,
-      html,
-    });
+  // enqueue mail send to avoid blocking request lifecycle; let queue handle retries
+  enqueueBackgroundJob(async () => {
+    try {
+      await client.messages.create(domain, {
+        from,
+        to,
+        subject,
+        text,
+        html,
+      });
 
-    console.info(`${MAILGUN_LOG_PREFIX} send-success`, {
-      subject,
-      to,
-      ...context,
-    });
-  } catch (error) {
-    logProductionRuntimeError('mailgun-send', error, {
-      subject,
-      to,
-      ...context,
-    });
-    console.error(`${MAILGUN_LOG_PREFIX} send-failure`, {
-      subject,
-      to,
-      message: error instanceof Error ? error.message : 'unknown',
-      ...context,
-    });
-  }
+      console.info(`${MAILGUN_LOG_PREFIX} send-success`, {
+        subject,
+        to,
+        ...context,
+      });
+    } catch (error) {
+      logProductionRuntimeError('mailgun-send', error, {
+        subject,
+        to,
+        ...context,
+      });
+      console.error(`${MAILGUN_LOG_PREFIX} send-failure`, {
+        subject,
+        to,
+        message: error instanceof Error ? error.message : 'unknown',
+        ...context,
+      });
+      throw error;
+    }
+  }, `mailgun:${context.kind ?? 'unknown'}:${context.assetId ?? context.subject ?? Date.now()}`);
 }
 
 export async function sendAssetUploadNotification(
@@ -248,3 +253,252 @@ export async function sendRevisionUploadNotification(
   });
 }
 
+export interface DesignerNotificationInput {
+  notificationType: 'comment_added' | 'revision_requested';
+  assetId: string;
+  assetTitle: string;
+  assetType: string;
+  clientId: string;
+  clientName: string;
+  commentMessage?: string | null;
+  designerId: string;
+  designerEmail: string;
+  designerName?: string | null;
+  requestedBy: NotificationRecipient;
+  timestamp: string | Date;
+}
+
+export async function sendDesignerNotification(
+  input: DesignerNotificationInput
+): Promise<void> {
+  const requestedBy = formatSender(input.requestedBy);
+  const timeStr = formatTimestamp(input.timestamp);
+  const dashboardUrl = formatAssetDashboardUrl(input.assetId);
+  const clientUrl = new URL(`/dashboard/clients/${input.clientId}`, dashboardUrl).toString();
+
+  const titleText = input.notificationType === 'revision_requested' 
+    ? 'Revision Required' 
+    : 'New Comment on Asset';
+
+  const statusText = input.notificationType === 'revision_requested'
+    ? 'Revision Requested'
+    : 'Comment Added';
+
+  const text = [
+    `${titleText}: ${input.assetTitle}`,
+    `Client: ${input.clientName}`,
+    `Asset: ${input.assetTitle}`,
+    `Asset Type: ${input.assetType}`,
+    input.commentMessage ? \`Comment: \${input.commentMessage}\` : '',
+    `Status: ${statusText}`,
+    `Requested By: ${requestedBy}`,
+    `Time: ${timeStr}`,
+    `Open Asset: ${dashboardUrl}`,
+    `Open Client: ${clientUrl}`,
+  ].filter(Boolean).join('\n');
+
+  const html = \`
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 16px;">\${titleText}: \${input.assetTitle}</h2>
+      <ul style="padding-left: 20px; margin: 0;">
+        <li><strong>Client:</strong> \${input.clientName}</li>
+        <li><strong>Asset:</strong> \${input.assetTitle}</li>
+        <li><strong>Asset Type:</strong> \${input.assetType}</li>
+        \${input.commentMessage ? \`<li><strong>Comment:</strong> \${input.commentMessage}</li>\` : ''}
+        <li><strong>Status:</strong> \${statusText}</li>
+        <li><strong>Requested By:</strong> \${requestedBy}</li>
+        <li><strong>Time:</strong> \${timeStr}</li>
+        <li><strong>Open Asset:</strong> <a href="\${dashboardUrl}">\${dashboardUrl}</a></li>
+        <li><strong>Open Client:</strong> <a href="\${clientUrl}">\${clientUrl}</a></li>
+      </ul>
+    </div>
+  \`;
+
+  // We temporarily override the configured \`to\` address with the designer's email
+  // Normally mailgunConfig.to is used, but for specific targeted notifications we send directly.
+  const { domain, from } = getMailgunConfig();
+  if (!domain || !from) {
+    console.warn('[notifications][mailgun] failure', { reason: 'missing-configuration' });
+    return;
+  }
+
+  const client = getMailgunClient();
+  if (!client) {
+    console.warn('[notifications][mailgun] failure', { reason: 'client-unavailable' });
+    return;
+  }
+
+  const subject = \`\${titleText}: \${input.assetTitle}\`;
+  const to = input.designerEmail;
+
+  console.info('[notifications][mailgun] send-start', {
+    subject,
+    to,
+    notification_type: input.notificationType,
+    asset_id: input.assetId,
+    designer_id: input.designerId,
+    email: input.designerEmail,
+  });
+
+  enqueueBackgroundJob(async () => {
+    try {
+      await client.messages.create(domain, {
+        from,
+        to,
+        subject,
+        text,
+        html,
+      });
+
+      console.info('[notifications][mailgun] send-success', {
+        subject,
+        to,
+        notification_type: input.notificationType,
+        asset_id: input.assetId,
+        designer_id: input.designerId,
+        email: input.designerEmail,
+      });
+    } catch (error) {
+      logProductionRuntimeError('mailgun-send', error, {
+        subject,
+        to,
+        asset_id: input.assetId,
+      });
+      console.error('[notifications][mailgun] send-failure', {
+        subject,
+        to,
+        notification_type: input.notificationType,
+        asset_id: input.assetId,
+        designer_id: input.designerId,
+        email: input.designerEmail,
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+      throw error;
+    }
+  }, \`mailgun:\${input.notificationType}:\${input.assetId}:\${Date.now()}\`);
+}
+
+export interface ReferenceNotificationInput {
+  clientId: string;
+  clientName: string;
+  referenceId: string;
+  referenceTitle: string;
+  referenceType: string;
+  referenceDescription?: string | null;
+  referenceUrl: string;
+  addedBy: NotificationRecipient;
+  timestamp: string | Date;
+  designerEmail: string;
+  designerId: string;
+}
+
+export async function sendReferenceNotification(
+  input: ReferenceNotificationInput
+): Promise<void> {
+  const addedBy = formatSender(input.addedBy);
+  const timeStr = formatTimestamp(input.timestamp);
+  const baseUrl =
+    process.env.NEXT_PUBLIC_APP_URL ??
+    process.env.APP_URL ??
+    process.env.SITE_URL ??
+    (process.env.VERCEL_URL ? \`https://\${process.env.VERCEL_URL}\` : 'http://localhost:3000');
+  const clientUrl = new URL(\`/dashboard/clients/\${input.clientId}\`, baseUrl).toString();
+
+  const titleText = \`New Reference Added: \${input.clientName}\`;
+
+  const text = [
+    titleText,
+    \`Client: \${input.clientName}\`,
+    \`Reference Title: \${input.referenceTitle}\`,
+    \`Reference Type: \${input.referenceType}\`,
+    input.referenceDescription ? \`Reference Description: \${input.referenceDescription}\` : '',
+    \`Added By: \${addedBy}\`,
+    \`Added At: \${timeStr}\`,
+    \`Reference URL: \${input.referenceUrl}\`,
+    \`Open Client: \${clientUrl}\`,
+  ].filter(Boolean).join('\\n');
+
+  const html = \`
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 16px;">\${titleText}</h2>
+      <ul style="padding-left: 20px; margin: 0;">
+        <li><strong>Client:</strong> \${input.clientName}</li>
+        <li><strong>Reference Title:</strong> \${input.referenceTitle}</li>
+        <li><strong>Reference Type:</strong> \${input.referenceType}</li>
+        \${input.referenceDescription ? \`<li><strong>Description:</strong> \${input.referenceDescription}</li>\` : ''}
+        <li><strong>Added By:</strong> \${addedBy}</li>
+        <li><strong>Added At:</strong> \${timeStr}</li>
+        <li><strong>Reference URL:</strong> <a href="\${input.referenceUrl}">\${input.referenceUrl}</a></li>
+        <li><strong>Open Client:</strong> <a href="\${clientUrl}">\${clientUrl}</a></li>
+      </ul>
+    </div>
+  \`;
+
+  const { domain, from } = getMailgunConfig();
+  if (!domain || !from) {
+    console.warn('[notifications][mailgun] failure', { reason: 'missing-configuration' });
+    return;
+  }
+
+  const client = getMailgunClient();
+  if (!client) {
+    console.warn('[notifications][mailgun] failure', { reason: 'client-unavailable' });
+    return;
+  }
+
+  const subject = titleText;
+  const to = input.designerEmail;
+
+  console.info('[notifications][mailgun] send-start', {
+    subject,
+    to,
+    notification_type: 'reference_added',
+    client_id: input.clientId,
+    reference_id: input.referenceId,
+    designer_id: input.designerId,
+    recipient_email: input.designerEmail,
+    status: 'pending'
+  });
+
+  enqueueBackgroundJob(async () => {
+    try {
+      await client.messages.create(domain, {
+        from,
+        to,
+        subject,
+        text,
+        html,
+      });
+
+      console.info('[notifications][mailgun] send-success', {
+        subject,
+        to,
+        notification_type: 'reference_added',
+        client_id: input.clientId,
+        reference_id: input.referenceId,
+        designer_id: input.designerId,
+        recipient_email: input.designerEmail,
+        status: 'success'
+      });
+    } catch (error) {
+      logProductionRuntimeError('mailgun-send', error, {
+        subject,
+        to,
+        client_id: input.clientId,
+        reference_id: input.referenceId,
+      });
+      console.error('[notifications][mailgun] send-failure', {
+        subject,
+        to,
+        notification_type: 'reference_added',
+        client_id: input.clientId,
+        reference_id: input.referenceId,
+        designer_id: input.designerId,
+        recipient_email: input.designerEmail,
+        status: 'failed',
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+      throw error;
+    }
+  }, \`mailgun:reference_added:\${input.referenceId}:\${input.designerId}:\${Date.now()}\`);
+}

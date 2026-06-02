@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
+import ErrorBoundary from '@/components/ui/error-boundary';
 import { assetsApi, clientsApi } from '@/lib/api-client';
 import { Asset, Client } from '@/types/index';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -131,7 +132,8 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-6 calendar-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+    <ErrorBoundary>
+      <div className="space-y-6 calendar-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
       <style>{`
         .calendar-page-container {
           background-color: var(--color-bg-app);
@@ -385,6 +387,7 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

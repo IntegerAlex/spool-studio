@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
+import ErrorBoundary from '@/components/ui/error-boundary';
 import { ClientList } from '@/components/clients/client-list';
 import { clientsApi } from '@/lib/api-client';
 import { Client } from '@/types/index';
@@ -35,7 +36,8 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="space-y-6 clients-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+    <ErrorBoundary>
+      <div className="space-y-6 clients-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Clients' }]} />
       <ClientList
         clients={clients}
@@ -44,6 +46,7 @@ export default function ClientsPage() {
           setClients((prev) => [client, ...prev]);
         }}
       />
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

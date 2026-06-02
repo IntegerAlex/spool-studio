@@ -16,6 +16,10 @@ export interface Client {
   instagramHandle: string;
   monthlyDeliverables: number;
   completedDeliverables: number;
+  monthlyGoal?: number;
+  weeklyGoal?: number;
+  weeklyCompleted?: number;
+  weeklyRemaining?: number;
   assignedTeamMembers: string[];
   brandColor?: string;
   logo?: string;
@@ -23,6 +27,16 @@ export interface Client {
   driveFolderUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  monthlyReelsTarget?: number;
+  monthlyPostsTarget?: number;
+  completedReels?: number;
+  completedPosters?: number;
+  pendingApprovals?: number;
+  pendingRevisions?: number;
+  weeklyPosterGoal?: number;
+  weeklyReelGoal?: number;
+  weeklyCompletedReels?: number;
+  weeklyCompletedPosters?: number;
 }
 
 export interface KanbanClientOption {

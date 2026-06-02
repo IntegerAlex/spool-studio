@@ -102,16 +102,16 @@ export default function ApprovalsPage() {
           </div>
         </Link>
 
-        <div className="w-32 shrink-0">
+        <div className="w-32 shrink-0 hidden sm:block">
           <StatusBadge status={asset.status} />
         </div>
 
-        <div className="w-32 shrink-0 text-[var(--color-text-secondary)] truncate">
+        <div className="w-32 shrink-0 text-[var(--color-text-secondary)] truncate hidden md:block">
           {clientName}
         </div>
 
         {isPending ? (
-          <div className="w-48 shrink-0 flex items-center justify-end gap-2">
+          <div className="w-[120px] sm:w-48 shrink-0 flex items-center justify-end gap-2">
             <Button
               className="approve-btn"
               disabled={isBusy}
@@ -130,7 +130,7 @@ export default function ApprovalsPage() {
             </Button>
           </div>
         ) : (
-          <div className="w-48 shrink-0 text-right text-[var(--color-text-muted)] text-[12px]">
+          <div className="w-[120px] sm:w-48 shrink-0 text-right text-[var(--color-text-muted)] text-[12px]">
             Resolved
           </div>
         )}
@@ -272,9 +272,9 @@ export default function ApprovalsPage() {
           <div className="table-list-container">
             <div className="table-header-row">
               <div className="flex-1 header-cell">Asset</div>
-              <div className="w-32 header-cell">Status</div>
-              <div className="w-32 header-cell">Client</div>
-              <div className="w-48 header-cell text-right">Actions</div>
+              <div className="w-32 header-cell hidden sm:block">Status</div>
+              <div className="w-32 header-cell hidden md:block">Client</div>
+              <div className="w-[120px] sm:w-48 header-cell text-right">Actions</div>
             </div>
             <div>
               {readyForReview.length > 0 ? (
@@ -303,9 +303,9 @@ export default function ApprovalsPage() {
           <div className="table-list-container">
             <div className="table-header-row">
               <div className="flex-1 header-cell">Asset</div>
-              <div className="w-32 header-cell">Status</div>
-              <div className="w-32 header-cell">Client</div>
-              <div className="w-48 header-cell text-right">Status</div>
+              <div className="w-32 header-cell hidden sm:block">Status</div>
+              <div className="w-32 header-cell hidden md:block">Client</div>
+              <div className="w-[120px] sm:w-48 header-cell text-right">Actions</div>
             </div>
             <div>
               {revisionRequested.length > 0 ? (

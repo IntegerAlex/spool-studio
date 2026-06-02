@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import ErrorBoundary from '@/components/ui/error-boundary';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { clientsApi, dashboardApi } from '@/lib/api-client';
+import { Skeleton } from '@/components/ui/skeleton';
+import { clientsApi, dashboardApi, assetsApi } from '@/lib/api-client';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { Client } from '@/types/index';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
@@ -132,8 +134,10 @@ function initialsFromName(name: string): string {
 export default function DashboardPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [recentActivityLocal, setRecentActivityLocal] = useState<DashboardSummary['recentActivity'] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -145,12 +149,13 @@ export default function DashboardPage() {
           clientsApi.getAll(),
           dashboardApi.getSummary(),
         ]);
-        console.log('[dashboard-ui][api]', summaryData);
+        // api response received
         if (!isActive) {
           return;
         }
         setClients(clientsData);
         setSummary(summaryData);
+        setRecentActivityLocal(summaryData.recentActivity ?? []);
       } catch (err) {
         if (!isActive) {
           return;
@@ -181,10 +186,11 @@ export default function DashboardPage() {
   const approvedAssets = summary?.approvedAssets ?? 0;
   const totalAssets = summary?.totalAssets ?? 0;
 
-  console.log('[dashboard-ui][state]', summary);
+  // summary state updated
 
   const recentActivity = useMemo<ActivityRow[]>(() => {
-    return (summary?.recentActivity ?? []).map((entry) => ({
+    const source = recentActivityLocal ?? (summary?.recentActivity ?? []);
+    return source.map((entry) => ({
       id: entry.id,
       kind: entry.kind,
       href: entry.href,
@@ -195,7 +201,25 @@ export default function DashboardPage() {
       icon: getActivityIcon(entry),
       iconBgClassName: getActivityBg(entry),
     }));
-  }, [summary]);
+  }, [summary, recentActivityLocal]);
+
+  const groupedActivities = useMemo(() => {
+    const map = new Map<string, ActivityRow[]>();
+    for (const item of recentActivity) {
+      const label = formatDateLabel(item.timestamp);
+      const arr = map.get(label) ?? [];
+      arr.push(item);
+      map.set(label, arr);
+    }
+    const groups = Array.from(map.entries())
+      .map(([label, items]) => ({ label, items }))
+      .sort((a, b) => {
+        const aTime = a.items[0]?.timestamp?.getTime() ?? 0;
+        const bTime = b.items[0]?.timestamp?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+    return groups;
+  }, [recentActivity]);
 
   const assetStatusBreakdown = summary?.assetStatusBreakdown ?? [
     { label: 'Draft' as const, count: 0 },
@@ -242,16 +266,211 @@ export default function DashboardPage() {
     [approvedAssets, pendingApprovals, totalAssets, totalClients]
   );
 
-  console.log('[dashboard-ui][cards]', {
-    totalClients,
-    totalAssets,
-    pendingApprovals,
-    approvedAssets,
-  });
+  // stat cards computed
 
   const clientChips = useMemo(() => {
     return clients.slice(0, 10);
   }, [clients]);
+
+  function formatDateLabel(date: Date): string {
+    const d = new Date(date);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function formatTime(date: Date): string {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  useEffect(() => {
+    // SSE with reconnection/backoff/jitter and authoritative reconciliation
+    if (typeof window === 'undefined') return;
+    if (eventSourceRef.current) return;
+
+    const RECONCILE_AFTER_EVENTS = 5;
+    const RECONCILE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+    const sseEventCountRef = { current: 0 } as { current: number };
+    let lastReconcileAt = Date.now();
+
+    let backoffAttempt = 0;
+    let reconnectTimer: number | null = null;
+
+    function hasActivityId(id?: string) {
+      if (!id) return false;
+      const src = recentActivityLocal ?? (summary?.recentActivity ?? []);
+      return src.some((a) => a.id === id);
+    }
+
+    async function reconcileIfNeeded(force = false) {
+      const now = Date.now();
+      const since = now - lastReconcileAt;
+      if (!force && sseEventCountRef.current < RECONCILE_AFTER_EVENTS && since < RECONCILE_INTERVAL_MS) {
+        return;
+      }
+      try {
+        const full = await dashboardApi.getSummary();
+        setSummary(full);
+        setRecentActivityLocal(full.recentActivity ?? []);
+        sseEventCountRef.current = 0;
+        lastReconcileAt = Date.now();
+        backoffAttempt = 0;
+      } catch (err) {
+        // log and keep trying later
+        console.warn('[dashboard][reconcile][failed]', err instanceof Error ? err.message : String(err));
+      }
+    }
+
+    function connect() {
+      if (eventSourceRef.current) return;
+      const es = new EventSource('/api/events/stream');
+      eventSourceRef.current = es;
+
+      const handleAssetEvent = async (ev: MessageEvent) => {
+        try {
+          const payload = JSON.parse(ev.data);
+          const activityId = payload.id as string | undefined;
+          const assetId = payload.assetId ?? payload.asset_id;
+          const action = payload.action ?? payload.type;
+          if (!assetId) return;
+
+          // dedupe using stable activity id
+          if (activityId && hasActivityId(activityId)) {
+            return;
+          }
+
+          // fetch lightweight asset summary (best-effort)
+          let assetSummary = null;
+          try {
+            assetSummary = await assetsApi.getSummaryById(assetId);
+          } catch (_err) {
+            assetSummary = null;
+          }
+
+          const entry = {
+            id: activityId ?? `asset-${assetId}-${Date.now()}`,
+            kind: 'asset' as const,
+            href: `/dashboard/assets/${assetId}`,
+            title: assetSummary?.title ?? `Asset ${assetId}`,
+            detail: `${(action ?? '').toString().replace(/_/g, ' ')} • ${assetSummary?.type ?? ''} asset`,
+            timestamp: new Date(payload.createdAt ?? payload.created_at ?? new Date().toISOString()),
+            iconKind:
+              action === 'revision_created' || action === 'revision_activated'
+                ? 'revision'
+                : action === 'asset_created' || action === 'file_uploaded'
+                ? 'upload'
+                : action === 'status_changed' && payload.metadata && (payload.metadata.to === 'approved' || payload.metadata.to === 'published')
+                ? 'approval'
+                : 'status',
+          };
+
+          setRecentActivityLocal((prev) => {
+            const existing = (prev ?? []).filter((r) => r.id !== entry.id);
+            const next = [entry, ...existing];
+            return next.slice(0, 8);
+          });
+
+          // minimal delta updates
+          setSummary((prev) => {
+            if (!prev) return prev;
+            const next = { ...prev } as DashboardSummary;
+            if (action === 'asset_created') {
+              next.totalAssets = (next.totalAssets ?? 0) + 1;
+              const status = payload.metadata?.status ?? assetSummary?.status;
+              if (status && ['draft', 'in_design', 'ready_for_review', 'revision_requested'].includes(status)) {
+                next.pendingApprovals = Math.max(0, (next.pendingApprovals ?? 0) + 1);
+              }
+            }
+
+            if (action === 'status_changed') {
+              const to = typeof payload.metadata?.to === 'string' ? payload.metadata.to : null;
+              if (to === 'approved') {
+                next.approvedAssets = Math.max(0, (next.approvedAssets ?? 0) + 1);
+                next.pendingApprovals = Math.max(0, (next.pendingApprovals ?? 0) - 1);
+              }
+              if (to === 'published') {
+                try {
+                  const publishedAt = assetSummary?.publishedAt ? new Date(assetSummary.publishedAt) : null;
+                  if (publishedAt) {
+                    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                    if (publishedAt >= monthStart) {
+                      next.uploadedThisMonth = (next.uploadedThisMonth ?? 0) + 1;
+                    }
+                  }
+                } catch (_e) {
+                  // ignore
+                }
+              }
+            }
+
+            return next;
+          });
+
+          // reconciliation triggers
+          sseEventCountRef.current++;
+          const isCritical = action === 'asset_created' || (action === 'status_changed' && payload.metadata && (payload.metadata.to === 'approved' || payload.metadata.to === 'published'));
+          if (isCritical) {
+            // immediate authoritative reconciliation
+            void reconcileIfNeeded(true);
+          } else {
+            // schedule reconcile if threshold reached
+            if (sseEventCountRef.current >= RECONCILE_AFTER_EVENTS) {
+              void reconcileIfNeeded(false);
+            }
+          }
+        } catch (_err) {
+          // parse error - ignore
+        }
+      };
+
+      es.addEventListener('asset.activity', handleAssetEvent as EventListener);
+      es.onmessage = handleAssetEvent;
+
+      es.onopen = () => {
+        backoffAttempt = 0;
+      };
+
+      es.onerror = () => {
+        try {
+          es.close();
+        } catch (_e) {}
+        eventSourceRef.current = null;
+        // schedule reconnect with exponential backoff + jitter
+        backoffAttempt = Math.min(10, backoffAttempt + 1);
+        const base = 500; // ms
+        const backoff = Math.min(60000, base * Math.pow(2, backoffAttempt));
+        const jitter = 0.5 + Math.random();
+        const delay = Math.round(backoff * jitter);
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = window.setTimeout(() => {
+          reconnectTimer = null;
+          connect();
+        }, delay) as unknown as number;
+      };
+    }
+
+    connect();
+
+    // periodic reconciliation
+    const periodic = window.setInterval(() => {
+      void reconcileIfNeeded(false);
+    }, RECONCILE_INTERVAL_MS);
+
+    return () => {
+      try {
+        if (eventSourceRef.current) eventSourceRef.current.close();
+      } catch (_e) {}
+      eventSourceRef.current = null;
+      try {
+        clearInterval(periodic);
+      } catch (_e) {}
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -260,8 +479,53 @@ export default function DashboardPage() {
           <h1 className="text-[18px] font-medium text-white">Dashboard</h1>
           <div className="mt-1 text-[12px] text-[#71717a]">Dashboard</div>
         </div>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading dashboard...</p>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+          <Skeleton className="h-20" />
+        </div>
+
+        <Skeleton className="h-14" />
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <Card className="content-panel xl:col-span-2">
+            <div className="panel-header">
+              <h3 className="panel-title">Recent Activity</h3>
+            </div>
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-4 mb-2" />
+                    <Skeleton className="h-3 w-3/4" />
+                  </div>
+                  <Skeleton className="h-4 w-12" />
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <div className="space-y-6">
+            <Card className="content-panel">
+              <div className="panel-header">
+                <h3 className="panel-title">Asset Status Breakdown</h3>
+              </div>
+              <div className="p-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="mb-3">
+                    <Skeleton className="h-4" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
+
+        <div>
+          <Skeleton className="h-8 w-40" />
         </div>
       </div>
     );
@@ -282,7 +546,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 dashboard-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+    <ErrorBoundary>
+      <div className="space-y-6 dashboard-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
       <style>{`
         .dashboard-container {
           background-color: var(--color-bg-app);
@@ -301,31 +566,7 @@ export default function DashboardPage() {
           font-size: 12.5px !important;
           color: var(--color-text-muted) !important;
         }
-        .new-asset-btn {
-          background: var(--color-accent) !important;
-          color: #000000 !important;
-          font-size: 12.5px !important;
-          font-weight: 600 !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 8px 16px !important;
-          border: none !important;
-          cursor: pointer !important;
-          letter-spacing: 0.01em !important;
-          box-shadow: none !important;
-          transition: all 120ms ease !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .new-asset-btn:hover {
-          opacity: 0.88 !important;
-          transform: translateY(-1px) !important;
-          filter: none !important;
-        }
-        .new-asset-btn:active {
-          transform: translateY(0) !important;
-          opacity: 1 !important;
-        }
+
         .stat-card {
           background-color: var(--color-bg-surface) !important;
           border: 1px solid var(--color-border) !important;
@@ -335,6 +576,10 @@ export default function DashboardPage() {
           position: relative;
           overflow: hidden;
           box-shadow: none !important;
+          height: 100% !important;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
         }
         .stat-card:hover {
           border-color: var(--color-border-strong) !important;
@@ -522,14 +767,14 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <AssetFormDialog
               mode="create"
               onSaved={() => {
                 dashboardApi.getSummary().then(setSummary).catch(() => undefined);
               }}
               trigger={
-                <Button className="new-asset-btn">
+                <Button variant="accent" className="new-asset-btn">
                   <Plus className="mr-2 h-4 w-4" />
                   New Asset
                 </Button>
@@ -573,7 +818,7 @@ export default function DashboardPage() {
               dashboardApi.getSummary().then(setSummary).catch(() => undefined);
             }}
             trigger={
-              <Button className="quick-action-btn flex items-center">
+              <Button variant="accent" className="quick-action-btn flex items-center">
                 <Plus className="quick-action-icon" />
                 <span>New Asset</span>
               </Button>
@@ -613,34 +858,34 @@ export default function DashboardPage() {
           </div>
 
           <div className="space-y-1 p-2">
-            {recentActivity.length > 0 ? (
-              recentActivity.map((item, index) => (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className="relative flex h-10 items-center justify-between rounded-md px-3 text-sm transition-colors hover:bg-[rgba(255,255,255,0.03)]"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.iconBgClassName}`}>
-                      {item.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-medium text-white">{item.title}</p>
-                      <p className="truncate text-[12px] text-[#a1a1aa]">{item.detail}</p>
-                    </div>
-                  </div>
+            {groupedActivities.length > 0 ? (
+              groupedActivities.map((group) => (
+                <div key={group.label} className="mb-2">
+                  <div className="text-[12px] text-[#a1a1aa] mb-1 font-semibold">{group.label}</div>
+                  {group.items.map((item, idx) => (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className="relative flex h-10 items-center justify-between rounded-md px-3 text-sm transition-colors hover:bg-[rgba(255,255,255,0.03)]"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.iconBgClassName}`}>
+                          {item.icon}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13px] font-medium text-white">{item.title}</p>
+                          <p className="truncate text-[12px] text-[#a1a1aa]">{item.detail}</p>
+                        </div>
+                      </div>
 
-                  <span className="shrink-0 text-[12px] text-[#71717a]">
-                    {item.timestamp.toLocaleString([], {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                      <span className="shrink-0 text-[12px] text-[#71717a]">{formatTime(item.timestamp)}</span>
 
-                  {index < recentActivity.length - 1 && (
-                    <div className="absolute inset-x-3 bottom-0 h-px bg-[rgba(255,255,255,0.05)]" aria-hidden="true" />
-                  )}
-                </Link>
+                      {idx < group.items.length - 1 && (
+                        <div className="absolute inset-x-3 bottom-0 h-px bg-[rgba(255,255,255,0.05)]" aria-hidden="true" />
+                      )}
+                    </Link>
+                  ))}
+                </div>
               ))
             ) : (
               <div className="empty-state">
@@ -679,6 +924,36 @@ export default function DashboardPage() {
               })}
             </div>
           </Card>
+
+          <Card className="content-panel">
+            <div className="panel-header">
+              <h3 className="panel-title">Weekly Goals</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              {clients.length > 0 ? (
+                clients
+                  .slice(0, 8)
+                  .map((client) => {
+                    const goal = client.weeklyGoal ?? 0;
+                    const done = client.weeklyCompleted ?? 0;
+                    const pct = goal > 0 ? Math.round((Math.min(done, goal) / goal) * 100) : 0;
+                    return (
+                      <div key={client.id} className="mb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="text-[13px] font-medium text-white truncate max-w-[14rem]">{client.name}</div>
+                          <div className="text-[12px] text-[#71717a]">{done}/{goal}</div>
+                        </div>
+                        <div className="mt-2 h-2 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                          <div style={{ width: `${pct}%` }} className="h-full bg-[linear-gradient(90deg,#10b981,#34d399)]" />
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="p-3 text-[12px] text-[#a1a1aa]">No clients to display</div>
+              )}
+            </div>
+          </Card>
         </div>
       </div>
 
@@ -701,6 +976,7 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

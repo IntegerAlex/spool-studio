@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+import React from 'react';
 import { Asset, AssetStatus } from '@/types/index';
 import { Card } from '@/components/ui/card';
 import Link from 'next/link';
@@ -49,6 +50,7 @@ function isOverdue(asset: Asset): boolean {
 }
 
 function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQuickApprove?: () => void; isDragging?: boolean }) {
+  // shallow compare relevant asset fields to avoid unnecessary rerenders
   const [showActions, setShowActions] = useState(false);
   const revisionCount = asset.revisions.length;
   const commentCount = asset.comments.length;
@@ -140,6 +142,20 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
     </Card>
   );
 }
+
+function areEqual(prev: any, next: any) {
+  const a = prev.asset;
+  const b = next.asset;
+  if (a.id !== b.id) return false;
+  if (a.title !== b.title) return false;
+  if (a.status !== b.status) return false;
+  if (a.thumbnailUrl !== b.thumbnailUrl) return false;
+  if ((a.revisions?.length ?? 0) !== (b.revisions?.length ?? 0)) return false;
+  if ((a.comments?.length ?? 0) !== (b.comments?.length ?? 0)) return false;
+  return prev.isDragging === next.isDragging && prev.onQuickApprove === next.onQuickApprove;
+}
+
+const MemoizedKanbanCard = React.memo(KanbanCard, areEqual);
 
 export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
   const [collapsedColumns, setCollapsedColumns] = useState<Set<KanbanWorkflowColumnId>>(new Set());
@@ -371,7 +387,7 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
                 ) : (
                   statusAssets.map((asset) => (
                     <div key={asset.id} draggable onDragStart={() => handleDragStart(asset.id, asset.status)} className="last:mb-0">
-                      <KanbanCard
+                      <MemoizedKanbanCard
                         asset={asset}
                         isDragging={draggedItem?.assetId === asset.id}
                         onQuickApprove={

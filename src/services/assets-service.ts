@@ -9,7 +9,9 @@ import { extractAssetMetadata } from '@/lib/asset-metadata';
 import {
   sendAssetUploadNotification,
   sendRevisionUploadNotification,
+  sendDesignerNotification,
 } from '@/lib/notifications/mailgun';
+import { listCommentsByAssetId } from '@/repositories/asset-comments-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import {
   deleteAsset as deleteAssetRow,
@@ -657,7 +659,8 @@ export async function finalizeAssetUpload(
     }
     // Create an immutable revision record for this upload and update the asset's revision pointers
     try {
-      const persistedAfterUpdate = await getAssetById(assetId, supabase);
+      // Reuse refreshed asset fetched above instead of making a duplicate DB call
+      const persistedAfterUpdate = refreshed ?? persisted;
       const currentCount = persistedAfterUpdate?.revision_count ?? 0;
       const versionNumber = (currentCount ?? 0) + 1;
 
@@ -684,7 +687,7 @@ export async function finalizeAssetUpload(
         },
       } as const;
 
-      const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert).select('*').single();
+      const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert).select('id').single();
       if (revisionError) {
         console.error('[revision][create][failed]', { assetId, error: revisionError });
       } else if (revisionData) {
@@ -967,7 +970,8 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
       }
       // Create an immutable revision record for this upload and update the asset's revision pointers
       try {
-        const persistedAfterUpdate = await getAssetById(assetId, supabase);
+        // Reuse refreshed asset fetched above instead of making a duplicate DB call
+        const persistedAfterUpdate = refreshed ?? persisted;
         const currentCount = persistedAfterUpdate?.revision_count ?? 0;
         const versionNumber = (currentCount ?? 0) + 1;
 
@@ -987,7 +991,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           metadata: metadata.extractedFields,
         };
 
-        const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert as any).select('*').single();
+        const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert as any).select('id').single();
         if (revisionError) {
           console.error('[revision][create][failed]', { assetId, error: revisionError });
         } else if (revisionData) {
@@ -1335,6 +1339,57 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
     },
     supabase
   );
+
+  // Handle Notifications
+  try {
+    if (existing.assigned_to) {
+      const assignedDesigner = await getUserById(existing.assigned_to, supabase);
+      
+      // Do not send if the user rejecting is the assigned designer
+      if (assignedDesigner?.email && userId !== assignedDesigner.id) {
+        let clientName = 'Unknown Client';
+        if (existing.client_id) {
+          const client = await getClientById(existing.client_id, supabase);
+          if (client) {
+            clientName = client.name;
+          }
+        }
+
+        const requestingUser = await getUserById(userId, supabase);
+
+        // Fetch latest comment to include in the email
+        let latestCommentText = null;
+        try {
+          const comments = await listCommentsByAssetId(assetId, supabase, { limit: 1 });
+          if (comments && comments.length > 0) {
+            latestCommentText = comments[0].message;
+          }
+        } catch (_err) {
+          // non-blocking
+        }
+
+        void sendDesignerNotification({
+          notificationType: 'revision_requested',
+          assetId: existing.id,
+          assetTitle: existing.title,
+          assetType: existing.type,
+          clientId: existing.client_id,
+          clientName,
+          commentMessage: latestCommentText,
+          designerId: assignedDesigner.id,
+          designerEmail: assignedDesigner.email,
+          designerName: assignedDesigner.full_name || assignedDesigner.name || null,
+          requestedBy: {
+            email: requestingUser?.email || 'unknown',
+            name: requestingUser?.full_name || requestingUser?.name || null,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[assets-service] Failed to send designer notification on reject', err);
+  }
 
   const mapped = mapAsset(updated);
   if (!mapped) {

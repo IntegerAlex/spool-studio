@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { KanbanBoard } from '@/components/kanban/board';
+import ErrorBoundary from '@/components/ui/error-boundary';
+const KanbanBoard = dynamic(() => import('@/components/kanban/board').then((mod) => mod.KanbanBoard), { ssr: false });
 import { assetsApi, kanbanApi } from '@/lib/api-client';
 import type { Asset, KanbanClientOption } from '@/types/index';
 import { Button } from '@/components/ui/button';
@@ -110,7 +111,8 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="space-y-6 kanban-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '24px 32px' }}>
+    <ErrorBoundary>
+      <div className="space-y-6 kanban-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '24px 32px' }}>
       <style>{`
         .kanban-container {
           background-color: var(--color-bg-app);
@@ -192,25 +194,7 @@ export default function KanbanPage() {
           color: var(--color-text-primary) !important;
           background-color: var(--color-bg-overlay) !important;
         }
-        .new-asset-btn {
-          background: #3ecf8e !important;
-          color: #000000 !important;
-          font-size: 12.5px !important;
-          font-weight: 600 !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 8px 16px !important;
-          border: none !important;
-          cursor: pointer !important;
-          box-shadow: none !important;
-          transition: all 120ms ease !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          height: auto !important;
-        }
-        .new-asset-btn:hover {
-          opacity: 0.88 !important;
-        }
+
       `}</style>
 
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Kanban Board' }]} />
@@ -221,8 +205,18 @@ export default function KanbanPage() {
           <p className="kanban-subtitle">Track and coordinate deliverable status changes</p>
         </div>
 
+        <div className="search-container w-full lg:hidden">
+          <Search className="search-icon" />
+          <Input
+            placeholder="Search assets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input w-full"
+          />
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
-          <div className="search-container">
+          <div className="search-container hidden lg:block">
             <Search className="search-icon" />
             <Input
               placeholder="Search assets..."
@@ -264,7 +258,7 @@ export default function KanbanPage() {
             mode="create"
             onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
             trigger={
-              <Button className="new-asset-btn">
+              <Button variant="accent" className="new-asset-btn">
                 <Plus className="w-4 h-4 mr-2" />
                 New Asset
               </Button>
@@ -273,7 +267,8 @@ export default function KanbanPage() {
         </div>
       </div>
 
-      <KanbanBoard assets={filteredAssets} onStatusChange={handleStatusChange} />
-    </div>
+        <KanbanBoard assets={filteredAssets} onStatusChange={handleStatusChange} />
+      </div>
+    </ErrorBoundary>
   );
 }

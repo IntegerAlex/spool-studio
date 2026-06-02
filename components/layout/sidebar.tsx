@@ -197,22 +197,25 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
       `}</style>
 
       <div 
-        className="flex items-center px-5" 
+        className="flex items-center px-4" 
         style={{ 
-          height: '57px', 
+          height: '64px', 
           borderBottom: '1px solid var(--color-border)',
-          backgroundColor: '#0f0f0f'
+          backgroundColor: '#0f0f0f',
+          paddingTop: 'env(safe-area-inset-top)'
         }}
       >
-        <Link href="/dashboard" className="flex min-w-0 items-center">
-          <Image
-            src="/asset_flow.png"
-            alt="Asset Flow"
-            width={240}
-            height={72}
-            priority
-            className="h-10 w-auto shrink-0 object-contain"
-          />
+        <Link href="/dashboard" className="flex min-w-0 items-center h-full w-full">
+          <div className="relative flex items-center h-full w-full ml-1">
+            <Image
+              src="/asset_flow.png"
+              alt="Asset Flow"
+              width={240}
+              height={72}
+              priority
+              className="h-[44px] w-auto shrink-0 object-contain"
+            />
+          </div>
         </Link>
       </div>
 
@@ -240,6 +243,7 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
         style={{
           borderTop: '1px solid var(--color-border)',
           padding: '12px 10px',
+          paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
           marginTop: 'auto',
         }}
       >
@@ -247,8 +251,8 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
           <Avatar 
             className="border"
             style={{
-              height: '26px',
-              width: '26px',
+              height: '32px',
+              width: '32px',
               backgroundColor: 'var(--color-bg-overlay)',
               color: 'var(--color-text-secondary)',
               border: '1px solid var(--color-border)',
@@ -257,7 +261,7 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
             <AvatarFallback 
               style={{
                 backgroundColor: 'transparent',
-                fontSize: '11px',
+                fontSize: '12px',
                 fontWeight: '600',
                 color: 'var(--color-text-secondary)',
               }}
@@ -268,9 +272,9 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
           <span 
             className="truncate" 
             style={{
-              fontSize: '12.5px',
+              fontSize: '13px',
               color: 'var(--color-text-muted)',
-              fontWeight: 400,
+              fontWeight: 500,
             }}
           >
             {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
@@ -282,10 +286,10 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
             await handleLogout();
           }}
           variant="ghost"
-          className="signout-btn"
+          className="signout-btn min-h-[44px] sm:min-h-0"
         >
-          <LogOut className="h-[14px] w-[14px]" />
-          <span>Sign Out</span>
+          <LogOut className="h-[16px] w-[16px]" />
+          <span className="text-[13px]">Sign Out</span>
         </Button>
       </div>
     </aside>

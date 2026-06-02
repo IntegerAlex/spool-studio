@@ -1,5 +1,5 @@
 import { countClients, listClients } from '@/repositories/clients-repository';
-import { listAssets } from '@/repositories/assets-repository';
+import { listDashboardAssetSummaries, listAssetsByIds } from '@/repositories/assets-repository';
 import { listRecentActivity } from '@/repositories/asset-activity-repository';
 import { getClients } from '@/services/clients-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
@@ -142,12 +142,12 @@ function buildRecentActivity(
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   try {
-    const [rawClientCountResult, repositoryClientsResult, serviceClientsResult, assetsResult, activityResult] =
+    const [rawClientCountResult, repositoryClientsResult, serviceClientsResult, dashboardSummaryResult, activityResult] =
       await Promise.allSettled([
         countClients(),
         listClients(),
         getClients(),
-        listAssets(),
+        listDashboardAssetSummaries(),
         listRecentActivity(undefined, { limit: 50 }),
     ]);
 
@@ -157,7 +157,8 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       repositoryClientsResult.status === 'fulfilled' ? repositoryClientsResult.value : [];
     const serviceClients =
       serviceClientsResult.status === 'fulfilled' ? serviceClientsResult.value : [];
-    const assets = assetsResult.status === 'fulfilled' ? assetsResult.value : [];
+    const dashboardSummaries =
+      dashboardSummaryResult.status === 'fulfilled' ? dashboardSummaryResult.value : [];
     const assetLogs = activityResult.status === 'fulfilled' ? activityResult.value : [];
 
     console.info('[dashboard-debug][summary]', {
@@ -165,7 +166,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       rawSupabaseCount,
       repositoryResultCount: repositoryClients.length,
       serviceResultCount: serviceClients.length,
-      assetCount: assets.length,
+      dashboardSummaryCount: dashboardSummaries.length,
       activityCount: assetLogs.length,
     });
 
@@ -174,7 +175,8 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     const nextWeek = new Date(now);
     nextWeek.setDate(now.getDate() + 7);
 
-    const activeAssets = assets.filter((asset) => asset.status !== 'archived' && asset.status !== 'failed');
+    // Use dashboard summaries for aggregate computations (smaller payload)
+    const activeAssets = (dashboardSummaries as any[]).filter((asset) => asset.status !== 'archived' && asset.status !== 'failed');
 
     let pendingApprovals = 0;
     let upcomingUploads = 0;
@@ -221,6 +223,16 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       }
     }
 
+    // Build enriched recentActivity by fetching only the small set of assets referenced in activity
+    const activityAssetIds = Array.from(new Set(assetLogs.map((a) => a.asset_id).filter(Boolean)));
+    let activityAssets: any[] = [];
+    try {
+      activityAssets = await listAssetsByIds(activityAssetIds);
+    } catch (e) {
+      // fallback to empty
+      activityAssets = [];
+    }
+
     return {
       totalAssets: activeAssets.length,
       pendingApprovals,
@@ -234,7 +246,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         { label: 'Approved', count: bucketCounts.get('Approved') ?? 0 },
         { label: 'Published', count: bucketCounts.get('Published') ?? 0 },
       ],
-      recentActivity: buildRecentActivity(assetLogs, assets, repositoryClients).slice(0, 5),
+      recentActivity: buildRecentActivity(assetLogs, activityAssets as any, repositoryClients).slice(0, 5),
     };
   } catch (error) {
     logProductionRuntimeError('dashboard-summary', error);

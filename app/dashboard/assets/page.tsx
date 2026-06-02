@@ -462,25 +462,7 @@ export default function AssetsPage() {
           color: var(--color-text-muted) !important;
           margin-top: 3px !important;
         }
-        .new-asset-btn {
-          background: #3ecf8e !important;
-          color: #000000 !important;
-          font-size: 12.5px !important;
-          font-weight: 600 !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 8px 16px !important;
-          border: none !important;
-          cursor: pointer !important;
-          box-shadow: none !important;
-          transition: all 120ms ease !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .new-asset-btn:hover {
-          opacity: 0.88 !important;
-          filter: none !important;
-        }
+
         .search-container {
           position: relative;
           width: 280px;
@@ -558,6 +540,16 @@ export default function AssetsPage() {
         <div>
           <h1 className="assets-title">Assets</h1>
           <p className="assets-subtitle">Manage and preview client content deliverables</p>
+        </div>
+
+        <div className="search-container w-full lg:hidden">
+          <Search className="search-icon" />
+          <Input
+            placeholder="Search assets..."
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            className="search-input w-full"
+          />
         </div>
 
         <div className="flex flex-wrap items-stretch gap-2 sm:items-center">
@@ -667,7 +659,7 @@ export default function AssetsPage() {
             mode="create"
             onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
             trigger={
-              <Button className="new-asset-btn">
+              <Button variant="accent" className="new-asset-btn">
                 <Plus className="mr-2 h-4 w-4" />
                 New Asset
               </Button>
@@ -676,7 +668,7 @@ export default function AssetsPage() {
         </div>
       </div>
 
-      <div className="search-container">
+      <div className="search-container hidden lg:block">
         <Search className="search-icon" />
         <Input
           placeholder="Search assets..."
@@ -696,15 +688,17 @@ export default function AssetsPage() {
             ))}
           </div>
         ) : (
-          <div className="table-list-container">
-            <div className="table-header-row">
-              <div className="flex-1 header-cell">Asset</div>
-              <div className="w-32 header-cell">Status</div>
-              <div className="w-32 header-cell">Client</div>
-              <div className="w-32 header-cell text-right">Updated</div>
-            </div>
-            <div>
-              {visibleAssets.map((asset) => renderAssetRow(asset))}
+          <div className="table-list-container overflow-x-auto w-full">
+            <div className="min-w-[800px]">
+              <div className="table-header-row">
+                <div className="flex-1 header-cell min-w-[300px]">Asset</div>
+                <div className="w-32 header-cell shrink-0">Status</div>
+                <div className="w-32 header-cell shrink-0">Client</div>
+                <div className="w-32 header-cell shrink-0 text-right">Updated</div>
+              </div>
+              <div>
+                {visibleAssets.map((asset) => renderAssetRow(asset))}
+              </div>
             </div>
           </div>
         )

@@ -42,6 +42,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       brandColor: body.brandColor,
       monthlyReelsTarget: body.monthlyReelsTarget,
       monthlyPostsTarget: body.monthlyPostsTarget,
+      monthlyGoal: body.monthlyGoal,
+      weeklyGoal: body.weeklyGoal,
+      weeklyPosterGoal: body.weeklyPosterGoal,
+      weeklyReelGoal: body.weeklyReelGoal,
     });
     return NextResponse.json({ data: client });
   } catch (error) {
