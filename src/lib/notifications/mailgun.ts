@@ -289,7 +289,7 @@ export async function sendDesignerNotification(
     `Client: ${input.clientName}`,
     `Asset: ${input.assetTitle}`,
     `Asset Type: ${input.assetType}`,
-    input.commentMessage ? \`Comment: \${input.commentMessage}\` : '',
+    input.commentMessage ? `Comment: ${input.commentMessage}` : '',
     `Status: ${statusText}`,
     `Requested By: ${requestedBy}`,
     `Time: ${timeStr}`,
@@ -297,24 +297,24 @@ export async function sendDesignerNotification(
     `Open Client: ${clientUrl}`,
   ].filter(Boolean).join('\n');
 
-  const html = \`
+  const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
-      <h2 style="margin: 0 0 16px;">\${titleText}: \${input.assetTitle}</h2>
+      <h2 style="margin: 0 0 16px;">${titleText}: ${input.assetTitle}</h2>
       <ul style="padding-left: 20px; margin: 0;">
-        <li><strong>Client:</strong> \${input.clientName}</li>
-        <li><strong>Asset:</strong> \${input.assetTitle}</li>
-        <li><strong>Asset Type:</strong> \${input.assetType}</li>
-        \${input.commentMessage ? \`<li><strong>Comment:</strong> \${input.commentMessage}</li>\` : ''}
-        <li><strong>Status:</strong> \${statusText}</li>
-        <li><strong>Requested By:</strong> \${requestedBy}</li>
-        <li><strong>Time:</strong> \${timeStr}</li>
-        <li><strong>Open Asset:</strong> <a href="\${dashboardUrl}">\${dashboardUrl}</a></li>
-        <li><strong>Open Client:</strong> <a href="\${clientUrl}">\${clientUrl}</a></li>
+        <li><strong>Client:</strong> ${input.clientName}</li>
+        <li><strong>Asset:</strong> ${input.assetTitle}</li>
+        <li><strong>Asset Type:</strong> ${input.assetType}</li>
+        ${input.commentMessage ? `<li><strong>Comment:</strong> ${input.commentMessage}</li>` : ''}
+        <li><strong>Status:</strong> ${statusText}</li>
+        <li><strong>Requested By:</strong> ${requestedBy}</li>
+        <li><strong>Time:</strong> ${timeStr}</li>
+        <li><strong>Open Asset:</strong> <a href="${dashboardUrl}">${dashboardUrl}</a></li>
+        <li><strong>Open Client:</strong> <a href="${clientUrl}">${clientUrl}</a></li>
       </ul>
     </div>
-  \`;
+  `;
 
-  // We temporarily override the configured \`to\` address with the designer's email
+  // We temporarily override the configured `to` address with the designer's email
   // Normally mailgunConfig.to is used, but for specific targeted notifications we send directly.
   const { domain, from } = getMailgunConfig();
   if (!domain || !from) {
@@ -328,7 +328,7 @@ export async function sendDesignerNotification(
     return;
   }
 
-  const subject = \`\${titleText}: \${input.assetTitle}\`;
+  const subject = `${titleText}: ${input.assetTitle}`;
   const to = input.designerEmail;
 
   console.info('[notifications][mailgun] send-start', {
@@ -375,7 +375,7 @@ export async function sendDesignerNotification(
       });
       throw error;
     }
-  }, \`mailgun:\${input.notificationType}:\${input.assetId}:\${Date.now()}\`);
+  }, `mailgun:${input.notificationType}:${input.assetId}:${Date.now()}`);
 }
 
 export interface ReferenceNotificationInput {
@@ -401,38 +401,38 @@ export async function sendReferenceNotification(
     process.env.NEXT_PUBLIC_APP_URL ??
     process.env.APP_URL ??
     process.env.SITE_URL ??
-    (process.env.VERCEL_URL ? \`https://\${process.env.VERCEL_URL}\` : 'http://localhost:3000');
-  const clientUrl = new URL(\`/dashboard/clients/\${input.clientId}\`, baseUrl).toString();
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+  const clientUrl = new URL(`/dashboard/clients/${input.clientId}`, baseUrl).toString();
 
-  const titleText = \`New Reference Added: \${input.clientName}\`;
+  const titleText = `New Reference Added: ${input.clientName}`;
 
   const text = [
     titleText,
-    \`Client: \${input.clientName}\`,
-    \`Reference Title: \${input.referenceTitle}\`,
-    \`Reference Type: \${input.referenceType}\`,
-    input.referenceDescription ? \`Reference Description: \${input.referenceDescription}\` : '',
-    \`Added By: \${addedBy}\`,
-    \`Added At: \${timeStr}\`,
-    \`Reference URL: \${input.referenceUrl}\`,
-    \`Open Client: \${clientUrl}\`,
-  ].filter(Boolean).join('\\n');
+    `Client: ${input.clientName}`,
+    `Reference Title: ${input.referenceTitle}`,
+    `Reference Type: ${input.referenceType}`,
+    input.referenceDescription ? `Reference Description: ${input.referenceDescription}` : '',
+    `Added By: ${addedBy}`,
+    `Added At: ${timeStr}`,
+    `Reference URL: ${input.referenceUrl}`,
+    `Open Client: ${clientUrl}`,
+  ].filter(Boolean).join('\n');
 
-  const html = \`
+  const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
-      <h2 style="margin: 0 0 16px;">\${titleText}</h2>
+      <h2 style="margin: 0 0 16px;">${titleText}</h2>
       <ul style="padding-left: 20px; margin: 0;">
-        <li><strong>Client:</strong> \${input.clientName}</li>
-        <li><strong>Reference Title:</strong> \${input.referenceTitle}</li>
-        <li><strong>Reference Type:</strong> \${input.referenceType}</li>
-        \${input.referenceDescription ? \`<li><strong>Description:</strong> \${input.referenceDescription}</li>\` : ''}
-        <li><strong>Added By:</strong> \${addedBy}</li>
-        <li><strong>Added At:</strong> \${timeStr}</li>
-        <li><strong>Reference URL:</strong> <a href="\${input.referenceUrl}">\${input.referenceUrl}</a></li>
-        <li><strong>Open Client:</strong> <a href="\${clientUrl}">\${clientUrl}</a></li>
+        <li><strong>Client:</strong> ${input.clientName}</li>
+        <li><strong>Reference Title:</strong> ${input.referenceTitle}</li>
+        <li><strong>Reference Type:</strong> ${input.referenceType}</li>
+        ${input.referenceDescription ? `<li><strong>Description:</strong> ${input.referenceDescription}</li>` : ''}
+        <li><strong>Added By:</strong> ${addedBy}</li>
+        <li><strong>Added At:</strong> ${timeStr}</li>
+        <li><strong>Reference URL:</strong> <a href="${input.referenceUrl}">${input.referenceUrl}</a></li>
+        <li><strong>Open Client:</strong> <a href="${clientUrl}">${clientUrl}</a></li>
       </ul>
     </div>
-  \`;
+  `;
 
   const { domain, from } = getMailgunConfig();
   if (!domain || !from) {
@@ -500,5 +500,5 @@ export async function sendReferenceNotification(
       });
       throw error;
     }
-  }, \`mailgun:reference_added:\${input.referenceId}:\${input.designerId}:\${Date.now()}\`);
+  }, `mailgun:reference_added:${input.referenceId}:${input.designerId}:${Date.now()}`);
 }

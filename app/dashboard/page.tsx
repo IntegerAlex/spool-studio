@@ -371,7 +371,7 @@ export default function DashboardPage() {
 
           setRecentActivityLocal((prev) => {
             const existing = (prev ?? []).filter((r) => r.id !== entry.id);
-            const next = [entry, ...existing];
+            const next = [entry as DashboardSummary['recentActivity'][number], ...existing];
             return next.slice(0, 8);
           });
 
@@ -428,8 +428,8 @@ export default function DashboardPage() {
         }
       };
 
-      es.addEventListener('asset.activity', handleAssetEvent as EventListener);
-      es.onmessage = handleAssetEvent;
+      es.addEventListener('asset.activity', (ev) => { void handleAssetEvent(ev as MessageEvent); });
+      es.onmessage = (ev) => { void handleAssetEvent(ev); };
 
       es.onopen = () => {
         backoffAttempt = 0;
