@@ -234,6 +234,31 @@ export default function DashboardPage() {
     return groups;
   }, [recentActivity]);
 
+  const activitySummary = useMemo(() => {
+    const source = recentActivityLocal ?? (summary?.recentActivity ?? []);
+    const todayStr = new Date().toDateString();
+    let totalToday = 0;
+    let uploads = 0;
+    let revisions = 0;
+    let approvals = 0;
+
+    for (const activity of source) {
+      const d = new Date(activity.timestamp);
+      if (d.toDateString() === todayStr) {
+        totalToday++;
+        if (activity.iconKind === 'upload') {
+          uploads++;
+        } else if (activity.iconKind === 'revision') {
+          revisions++;
+        } else if (activity.iconKind === 'approval') {
+          approvals++;
+        }
+      }
+    }
+
+    return { totalToday, uploads, revisions, approvals };
+  }, [summary, recentActivityLocal]);
+
   const assetStatusBreakdown = summary?.assetStatusBreakdown ?? [
     { label: 'Draft' as const, count: 0 },
     { label: 'Revision' as const, count: 0 },
@@ -1163,54 +1188,32 @@ export default function DashboardPage() {
             {/* Top Active Clients Section */}
             {clientPerformanceTableSection}
 
-            {/* Recent Activity */}
+            {/* Recent Activity Summary */}
             <Card className="content-panel">
               <div className="panel-header">
-                <h3 className="panel-title">Recent Activity</h3>
-                <Link href="/dashboard/assets" className="panel-link">
-                  View all
+                <h3 className="panel-title">Recent Activity Summary</h3>
+                <Link href="/dashboard/logs" className="panel-link">
+                  View Logs
                 </Link>
               </div>
 
-              <div className="space-y-1 p-2">
-                {groupedActivities.length > 0 ? (
-                  groupedActivities.map((group) => (
-                    <div key={group.label} className="mb-2">
-                      <div className="text-[12px] text-[#a1a1aa] mb-1 font-semibold">{group.label}</div>
-                      {group.items.map((item, idx) => (
-                        <Link
-                          key={item.id}
-                          href={item.href}
-                          className="relative flex h-10 items-center justify-between rounded-md px-3 text-sm transition-colors hover:bg-[rgba(255,255,255,0.03)]"
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${item.iconBgClassName}`}>
-                              {item.icon}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-[13px] font-medium text-white">{item.title}</p>
-                              <p className="truncate text-[12px] text-[#a1a1aa]">{item.detail}</p>
-                            </div>
-                          </div>
-
-                          <span className="shrink-0 text-[12px] text-[#71717a]">{formatTime(item.timestamp)}</span>
-
-                          {idx < group.items.length - 1 && (
-                            <div className="absolute inset-x-3 bottom-0 h-px bg-[rgba(255,255,255,0.05)]" aria-hidden="true" />
-                          )}
-                        </Link>
-                      ))}
-                    </div>
-                  ))
-                ) : (
-                  <div className="empty-state">
-                    <svg className="h-8 w-8 text-[var(--color-text-faint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                    </svg>
-                    <p className="text-[13px] font-normal text-[var(--color-text-muted)]">No recent activity yet</p>
-                    <p className="text-[12px] text-[var(--color-text-faint)]">Activity from your team will appear here</p>
-                  </div>
-                )}
+              <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
+                <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a1a1aa] mb-1">Total Today</p>
+                  <p className="text-2xl font-bold text-white">{activitySummary.totalToday}</p>
+                </div>
+                <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3b82f6] mb-1">Uploads</p>
+                  <p className="text-2xl font-bold text-white">{activitySummary.uploads}</p>
+                </div>
+                <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#f59e0b] mb-1">Revisions</p>
+                  <p className="text-2xl font-bold text-white">{activitySummary.revisions}</p>
+                </div>
+                <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#10b981] mb-1">Approvals</p>
+                  <p className="text-2xl font-bold text-white">{activitySummary.approvals}</p>
+                </div>
               </div>
             </Card>
           </div>

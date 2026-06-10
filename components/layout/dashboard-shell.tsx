@@ -83,7 +83,7 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
     <div className="min-h-screen overflow-x-hidden bg-[var(--background)] text-foreground">
       <Sidebar />
 
-      <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[220px] lg:w-[calc(100%-220px)]">
+      <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[280px] lg:w-[calc(100%-280px)]">
         <div className="sticky top-0 z-50 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:hidden pt-[env(safe-area-inset-top)] h-[calc(3.5rem+env(safe-area-inset-top))]">
           <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
             <div className="relative flex items-center h-full w-full ml-1">

@@ -406,7 +406,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         { label: 'Approved', count: bucketCounts.get('Approved') ?? 0 },
         { label: 'Published', count: bucketCounts.get('Published') ?? 0 },
       ],
-      recentActivity: buildRecentActivity(assetLogs, activityAssets as any, repositoryClients as any).slice(0, 8),
+      recentActivity: buildRecentActivity(assetLogs, activityAssets as any, repositoryClients as any).slice(0, 50),
       totalDeliverables,
       totalReelsPlanned,
       totalReelsPublished: totalReelsCompleted,
