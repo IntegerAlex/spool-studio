@@ -613,3 +613,8 @@ a:hover {
   outline: none !important;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08) !important;
 }
+
+/* Ensure text inside buttons inherits button text color */
+button span, .btn span, [data-slot="button"] span {
+  color: inherit !important;
+}

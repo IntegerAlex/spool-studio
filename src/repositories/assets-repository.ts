@@ -44,7 +44,7 @@ export type DbKanbanAsset = Pick<
 const assetSelect =
   'id,client_id,title,type,status,mime_type,file_size,file_extension,uploaded_at,uploaded_by,drive_file_id,drive_file_url,drive_folder_id,drive_folder_url,thumbnail_url,media_width,media_height,duration_seconds,created_by,created_at,updated_at,scheduled_at,publish_date,publish_time,scheduled_by,published_at,approved_at,approved_by,google_calendar_event_id,google_calendar_event_url,calendar_synced_at,assigned_to,current_revision_id,latest_revision_id,revision_count';
 
-const dashboardSummarySelect = 'status,publish_date,publish_time,published_at';
+const dashboardSummarySelect = 'status,publish_date,publish_time,published_at,type,client_id,created_at';
 const kanbanAssetSelect =
   'id,client_id,title,type,status,mime_type,file_extension,thumbnail_url,assigned_to,publish_date,created_at,updated_at';
 

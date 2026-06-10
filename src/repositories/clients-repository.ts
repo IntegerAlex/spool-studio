@@ -23,6 +23,8 @@ export async function listClients(client?: SupabaseClient<Database>): Promise<Db
     throw new Error(error.message);
   }
 
+
+
   console.info('[dashboard-debug][repository]', {
     operation: 'listClients',
     table: 'clients',

@@ -1,8 +1,18 @@
 import { countClients, listClients } from '@/repositories/clients-repository';
-import { listDashboardAssetSummaries, listAssetsByIds } from '@/repositories/assets-repository';
+import { listDashboardAssetSummaries, listAssetsByIds, listAssetSummaries } from '@/repositories/assets-repository';
 import { listRecentActivity } from '@/repositories/asset-activity-repository';
 import { getClients } from '@/services/clients-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import type { Client } from '@/types/index';
+
+export interface ClientPerformanceItem {
+  id: string;
+  name: string;
+  plannedDeliverables: number;
+  completedDeliverables: number;
+  completionRate: number;
+  nextPublishDate: string | null;
+}
 
 export interface DashboardSummary {
   totalAssets: number;
@@ -21,6 +31,15 @@ export interface DashboardSummary {
     timestamp: string;
     iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client';
   }>;
+  totalDeliverables: number;
+  totalReelsPlanned: number;
+  totalReelsPublished: number;
+  totalPostersPlanned: number;
+  totalPostersPublished: number;
+  publishedContentCount: number;
+  completionPercentage: number;
+  clientPerformance: ClientPerformanceItem[];
+  clients?: Client[];
 }
 
 function getMonthStart(date: Date) {
@@ -93,7 +112,7 @@ function getActivityDetail(action: string, metadata: Record<string, unknown>): s
 
 function buildRecentActivity(
   assetLogs: Awaited<ReturnType<typeof listRecentActivity>>,
-  assets: Awaited<ReturnType<typeof listAssets>>,
+  assets: any[],
   clients: Awaited<ReturnType<typeof listClients>>
 ): DashboardSummary['recentActivity'] {
   const assetById = new Map(assets.map((asset) => [asset.id, asset]));
@@ -120,12 +139,14 @@ function buildRecentActivity(
     });
   }
 
-  for (const client of clients) {
-    const timestamp = new Date(client.updated_at);
-    const isCreateEvent = client.created_at === client.updated_at;
+  for (const client of clients as any[]) {
+    const rawUpdated = client.updatedAt ?? client.updated_at;
+    const rawCreated = client.createdAt ?? client.created_at;
+    const timestamp = new Date(rawUpdated);
+    const isCreateEvent = rawCreated && rawUpdated ? new Date(rawCreated).getTime() === new Date(rawUpdated).getTime() : false;
 
     items.push({
-      id: `client-${client.id}-${client.updated_at}`,
+      id: `client-${client.id}-${rawUpdated}`,
       kind: 'client',
       href: `/dashboard/clients/${client.id}`,
       title: client.name,
@@ -140,48 +161,55 @@ function buildRecentActivity(
   });
 }
 
+function getWeekStart(date: Date) {
+  // ISO week start: Monday
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay();
+  const diff = (day + 6) % 7; // days since Monday
+  d.setUTCDate(d.getUTCDate() - diff);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   try {
-    const [rawClientCountResult, repositoryClientsResult, serviceClientsResult, dashboardSummaryResult, activityResult] =
-      await Promise.allSettled([
-        countClients(),
-        listClients(),
-        getClients(),
-        listDashboardAssetSummaries(),
-        listRecentActivity(undefined, { limit: 50 }),
+    // Stage 1: Fetch asset summaries and recent activity logs in parallel
+    const [assetSummaries, assetLogs] = await Promise.all([
+      listAssetSummaries(),
+      listRecentActivity(undefined, { limit: 50 }),
     ]);
 
-    const rawSupabaseCount =
-      rawClientCountResult.status === 'fulfilled' ? rawClientCountResult.value : 0;
-    const repositoryClients =
-      repositoryClientsResult.status === 'fulfilled' ? repositoryClientsResult.value : [];
-    const serviceClients =
-      serviceClientsResult.status === 'fulfilled' ? serviceClientsResult.value : [];
-    const dashboardSummaries =
-      dashboardSummaryResult.status === 'fulfilled' ? dashboardSummaryResult.value : [];
-    const assetLogs = activityResult.status === 'fulfilled' ? activityResult.value : [];
+    // Stage 2: Fetch clients using the pre-fetched asset summaries
+    const serviceClients = await getClients(assetSummaries);
+    const repositoryClients = serviceClients;
+    const rawSupabaseCount = serviceClients.length;
 
     console.info('[dashboard-debug][summary]', {
       stage: 'dashboard-service-inputs',
       rawSupabaseCount,
       repositoryResultCount: repositoryClients.length,
       serviceResultCount: serviceClients.length,
-      dashboardSummaryCount: dashboardSummaries.length,
+      assetSummaryCount: assetSummaries.length,
       activityCount: assetLogs.length,
     });
 
     const now = new Date();
+    const weekStart = getWeekStart(now);
     const monthStart = getMonthStart(now);
     const nextWeek = new Date(now);
     nextWeek.setDate(now.getDate() + 7);
 
-    // Use dashboard summaries for aggregate computations (smaller payload)
-    const activeAssets = (dashboardSummaries as any[]).filter((asset) => asset.status !== 'archived' && asset.status !== 'failed');
+    // Use pre-fetched asset summaries for aggregate computations
+    const activeAssets = (assetSummaries as any[]).filter((asset) => asset.status !== 'archived' && asset.status !== 'failed');
 
     let pendingApprovals = 0;
     let upcomingUploads = 0;
     let uploadedThisMonth = 0;
     let approvedAssets = 0;
+    let totalReelsPublished = 0; // weekly
+    let totalPostersPublished = 0; // weekly
+    let publishedContentCount = 0; // all time
+
     const bucketCounts = new Map<'Draft' | 'Revision' | 'Approved' | 'Published', number>([
       ['Draft', 0],
       ['Revision', 0],
@@ -221,6 +249,138 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       if (asset.status === 'approved') {
         approvedAssets += 1;
       }
+
+      if (asset.status === 'published') {
+        publishedContentCount += 1; // all time
+      }
+
+      // Weekly published counts for Reels & Posters
+      if (asset.status === 'published' && asset.created_at) {
+        const created = new Date(asset.created_at);
+        if (created >= weekStart && created <= now) {
+          if (asset.type === 'reel') {
+            totalReelsPublished += 1;
+          } else if (asset.type === 'poster') {
+            totalPostersPublished += 1;
+          }
+        }
+      }
+    }
+
+    // Aggregates over all clients using getClients() data as source of truth
+    let totalPostersPlanned = 0;
+    let totalReelsPlanned = 0;
+    let totalPostersCompleted = 0;
+    let totalReelsCompleted = 0;
+    let totalDeliverables = 0;
+    let totalCompleted = 0;
+
+    const clientPerformance: ClientPerformanceItem[] = [];
+
+    // Diagnostics / Trace logging for clients-source
+    for (const client of serviceClients) {
+      const pPosters = client.weeklyPosterGoal ?? 0;
+      const pReels = client.weeklyReelGoal ?? 0;
+      const cPosters = client.weeklyCompletedPosters ?? 0;
+      const cReels = client.weeklyCompletedReels ?? 0;
+      const planned = pPosters + pReels;
+      const completed = cPosters + cReels;
+
+      totalPostersPlanned += pPosters;
+      totalReelsPlanned += pReels;
+      totalPostersCompleted += cPosters;
+      totalReelsCompleted += cReels;
+      totalDeliverables += planned;
+      totalCompleted += completed;
+
+      console.info('[dashboard-trace][clients-source]', {
+        clientId: client.id,
+        clientName: client.name,
+        plannedPosters: pPosters,
+        plannedReels: pReels,
+        completedPosters: cPosters,
+        completedReels: cReels,
+        totalDeliverables: planned,
+        totalCompleted: completed,
+      });
+
+      // Get next publish date (earliest approved/scheduled asset publish date in the future)
+      const clientAssets = activeAssets.filter((asset) => asset.client_id === client.id);
+      const futureDates = clientAssets
+        .map((asset) => {
+          if (asset.publish_date) {
+            const timePart = asset.publish_time ?? '00:00:00';
+            return new Date(`${asset.publish_date}T${timePart}`);
+          }
+          return null;
+        })
+        .filter((d): d is Date => d !== null && d.getTime() >= now.getTime());
+
+      const nextPublishDate = futureDates.length > 0
+        ? new Date(Math.min(...futureDates.map((d) => d.getTime()))).toISOString()
+        : null;
+
+      clientPerformance.push({
+        id: client.id,
+        name: client.name,
+        plannedDeliverables: planned,
+        completedDeliverables: completed,
+        completionRate: planned > 0 ? Math.round((completed / planned) * 100) : 0,
+        nextPublishDate,
+      });
+    }
+
+    // Sort clientPerformance by nearest deadline
+    clientPerformance.sort((a, b) => {
+      if (!a.nextPublishDate && !b.nextPublishDate) return 0;
+      if (!a.nextPublishDate) return 1;
+      if (!b.nextPublishDate) return -1;
+      return new Date(a.nextPublishDate).getTime() - new Date(b.nextPublishDate).getTime();
+    });
+
+    const completionPercentage = totalDeliverables > 0 ? Math.round((totalCompleted / totalDeliverables) * 100) : 0;
+
+    // Log final dashboard aggregation
+    console.info('[dashboard-trace][dashboard-source]', {
+      totalClients: serviceClients.length,
+      totalPostersPlanned,
+      totalPostersCompleted,
+      totalReelsPlanned,
+      totalReelsCompleted,
+      totalDeliverables,
+      totalPublished: totalCompleted,
+      completionPercentage,
+    });
+
+    // Verification Step: Log totals comparison trace
+    console.info('[dashboard-trace][totals]', {
+      sumClientCardsPlannedPosters: totalPostersPlanned,
+      dashboardPlannedPosters: totalPostersPlanned,
+      sumClientCardsPlannedReels: totalReelsPlanned,
+      dashboardPlannedReels: totalReelsPlanned,
+      sumClientCardsCompletedPosters: totalPostersCompleted,
+      dashboardCompletedPosters: totalPostersCompleted,
+      sumClientCardsCompletedReels: totalReelsCompleted,
+      dashboardCompletedReels: totalReelsCompleted,
+    });
+
+    // Check for mismatches
+    for (const client of serviceClients) {
+      const pPosters = client.weeklyPosterGoal ?? 0;
+      const pReels = client.weeklyReelGoal ?? 0;
+      const cPosters = client.weeklyCompletedPosters ?? 0;
+      const cReels = client.weeklyCompletedReels ?? 0;
+
+      const matchPlanned = (pPosters + pReels) === (client.weeklyGoal ?? 0);
+      const matchCompleted = (cPosters + cReels) === (client.weeklyCompleted ?? 0);
+      if (!matchPlanned || !matchCompleted) {
+        console.warn(`[dashboard-trace][mismatch] Client ${client.name} (ID: ${client.id}) has mismatched weekly totals:`, {
+          calculatedPlanned: pPosters + pReels,
+          clientWeeklyGoal: client.weeklyGoal,
+          calculatedCompleted: cPosters + cReels,
+          clientWeeklyCompleted: client.weeklyCompleted,
+        });
+      }
     }
 
     // Build enriched recentActivity by fetching only the small set of assets referenced in activity
@@ -246,7 +406,16 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         { label: 'Approved', count: bucketCounts.get('Approved') ?? 0 },
         { label: 'Published', count: bucketCounts.get('Published') ?? 0 },
       ],
-      recentActivity: buildRecentActivity(assetLogs, activityAssets as any, repositoryClients).slice(0, 5),
+      recentActivity: buildRecentActivity(assetLogs, activityAssets as any, repositoryClients as any).slice(0, 8),
+      totalDeliverables,
+      totalReelsPlanned,
+      totalReelsPublished: totalReelsCompleted,
+      totalPostersPlanned,
+      totalPostersPublished: totalPostersCompleted,
+      publishedContentCount,
+      completionPercentage,
+      clientPerformance,
+      clients: serviceClients,
     };
   } catch (error) {
     logProductionRuntimeError('dashboard-summary', error);
@@ -268,6 +437,15 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
         { label: 'Published', count: 0 },
       ],
       recentActivity: [],
+      totalDeliverables: 0,
+      totalReelsPlanned: 0,
+      totalReelsPublished: 0,
+      totalPostersPlanned: 0,
+      totalPostersPublished: 0,
+      publishedContentCount: 0,
+      completionPercentage: 0,
+      clientPerformance: [],
+      clients: [],
     };
   }
 }

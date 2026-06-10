@@ -42,6 +42,15 @@ export interface DashboardActivityItem {
   iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client';
 }
 
+export interface ClientPerformanceItem {
+  id: string;
+  name: string;
+  plannedDeliverables: number;
+  completedDeliverables: number;
+  completionRate: number;
+  nextPublishDate: string | null;
+}
+
 export interface DashboardSummaryData {
   totalAssets: number;
   pendingApprovals: number;
@@ -51,6 +60,15 @@ export interface DashboardSummaryData {
   uploadedThisMonth: number;
   assetStatusBreakdown: Array<{ label: 'Draft' | 'Revision' | 'Approved' | 'Published'; count: number }>;
   recentActivity: DashboardActivityItem[];
+  totalDeliverables: number;
+  totalReelsPlanned: number;
+  totalReelsPublished: number;
+  totalPostersPlanned: number;
+  totalPostersPublished: number;
+  publishedContentCount: number;
+  completionPercentage: number;
+  clientPerformance: ClientPerformanceItem[];
+  clients?: Client[];
 }
 
 export function clearApiClientCache() {

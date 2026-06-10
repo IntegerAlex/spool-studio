@@ -1,0 +1,34 @@
+{
+  "operation": "getClients",
+  "serviceResultCount": 1,
+  "repositoryClientCount": 1,
+  "assetSummaryCount": 0,
+  "mappedClients": [
+    {
+      "id": "8ddbf989-277e-4dcb-a2bb-ecaf1dd1d698",
+      "name": "Testing_XYZA",
+      "slug": "dsgasjljkh",
+      "instagramHandle": "",
+      "monthlyDeliverables": 12,
+      "completedDeliverables": 0,
+      "weeklyGoal": 4,
+      "weeklyCompleted": 0,
+      "weeklyRemaining": 4,
+      "assignedTeamMembers": [],
+      "driveFolderId": "1WdT3hZGmPGJ6KMAvG9HJmyPEsKp3qXN8",
+      "driveFolderUrl": "https://drive.google.com/drive/folders/1WdT3hZGmPGJ6KMAvG9HJmyPEsKp3qXN8",
+      "createdAt": "2026-06-10T14:16:45.669Z",
+      "updatedAt": "2026-06-10T14:16:53.979Z",
+      "monthlyReelsTarget": 8,
+      "monthlyPostsTarget": 4,
+      "completedReels": 0,
+      "completedPosters": 0,
+      "pendingApprovals": 0,
+      "pendingRevisions": 0,
+      "weeklyPosterGoal": 2,
+      "weeklyReelGoal": 2,
+      "weeklyCompletedReels": 0,
+      "weeklyCompletedPosters": 0
+    }
+  ]
+}

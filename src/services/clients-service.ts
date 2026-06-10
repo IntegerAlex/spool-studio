@@ -194,7 +194,7 @@ function mapClient(
   }
 
   const monthlyDeliverables = client.monthly_goal ?? ((client.monthly_reels_target ?? 0) + (client.monthly_posts_target ?? 0));
-  
+
   const weeklyPosterGoal = client.weekly_poster_goal ?? 0;
   const weeklyReelGoal = client.weekly_reel_goal ?? 0;
   let weeklyGoal = weeklyPosterGoal + weeklyReelGoal;
@@ -233,20 +233,20 @@ function mapClient(
   };
 }
 
-export async function getClients(): Promise<Client[]> {
+export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Client[]> {
   try {
     const mig = await checkClientGoalsMigration().catch(() => ({ ok: false }));
 
     const [clients, assetSummaries, weeklyCounts] = await Promise.all([
       listClients(),
-      listAssetSummaries(),
+      preFetchedAssetSummaries ? Promise.resolve(preFetchedAssetSummaries) : listAssetSummaries(),
       mig.ok
         ? getWeeklyCountsGroupedByClient(new Date(new Date().setDate(new Date().getDate() - 7)).toISOString())
         : Promise.resolve([] as { client_id: string; weekly_count: number }[]),
     ]);
 
     const weeklyMap = new Map<string, number>(weeklyCounts.map((r) => [r.client_id, Number(r.weekly_count)]));
-    
+
     const now = new Date();
     const metricsMap = buildClientMetricsMap(assetSummaries, getMonthStart(now), getWeekStart(now), now);
 
@@ -307,6 +307,7 @@ export async function getClientDetail(clientId: string): Promise<Client | null> 
 }
 
 export async function createClient(input: ClientInput): Promise<Client> {
+  console.log("[client-create][payload]", input);
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
@@ -318,21 +319,26 @@ export async function createClient(input: ClientInput): Promise<Client> {
   }
 
   const calculatedWeeklyGoal = (input.weeklyPosterGoal ?? 0) + (input.weeklyReelGoal ?? 0);
+  const monthlyGoal = input.monthlyGoal ?? ((input.monthlyReelsTarget ?? 0) + (input.monthlyPostsTarget ?? 0));
+
+  const insertData = {
+    name: input.name,
+    slug: normalizeSlug(input.slug),
+    instagram_handle: input.instagramHandle ?? null,
+    brand_color: input.brandColor ?? null,
+    monthly_reels_target: input.monthlyReelsTarget ?? 0,
+    monthly_posts_target: input.monthlyPostsTarget ?? 0,
+    monthly_goal: monthlyGoal,
+    weekly_goal: calculatedWeeklyGoal || input.weeklyGoal || 0,
+    weekly_poster_goal: input.weeklyPosterGoal ?? 0,
+    weekly_reel_goal: input.weeklyReelGoal ?? 0,
+    created_by: user.id,
+  };
+
+  console.log("[client-create][insert]", insertData);
 
   const record = await insertClient(
-    {
-      name: input.name,
-      slug: normalizeSlug(input.slug),
-      instagram_handle: input.instagramHandle ?? null,
-      brand_color: input.brandColor ?? null,
-      monthly_reels_target: input.monthlyReelsTarget ?? 0,
-      monthly_posts_target: input.monthlyPostsTarget ?? 0,
-      monthly_goal: input.monthlyGoal ?? null,
-      weekly_goal: calculatedWeeklyGoal || input.weeklyGoal || 0,
-      weekly_poster_goal: input.weeklyPosterGoal ?? 0,
-      weekly_reel_goal: input.weeklyReelGoal ?? 0,
-      created_by: user.id,
-    },
+    insertData,
     supabase
   );
 
@@ -406,15 +412,26 @@ export async function updateClient(
   if (input.monthlyPostsTarget !== undefined) {
     updates.monthly_posts_target = input.monthlyPostsTarget;
   }
-  if (input.monthlyGoal !== undefined) updates.monthly_goal = input.monthlyGoal;
   if (input.weeklyGoal !== undefined) updates.weekly_goal = input.weeklyGoal;
   if (input.weeklyPosterGoal !== undefined) updates.weekly_poster_goal = input.weeklyPosterGoal;
   if (input.weeklyReelGoal !== undefined) updates.weekly_reel_goal = input.weeklyReelGoal;
 
+  if (input.monthlyReelsTarget !== undefined || input.monthlyPostsTarget !== undefined || input.monthlyGoal !== undefined) {
+    const currentClient = await getClientById(clientId);
+    if (currentClient) {
+      const mReels = input.monthlyReelsTarget !== undefined ? input.monthlyReelsTarget : (currentClient.monthly_reels_target ?? 0);
+      const mPosts = input.monthlyPostsTarget !== undefined ? input.monthlyPostsTarget : (currentClient.monthly_posts_target ?? 0);
+      updates.monthly_goal = input.monthlyGoal !== undefined ? input.monthlyGoal : (mReels + mPosts);
+    }
+  }
+
   if (input.weeklyPosterGoal !== undefined || input.weeklyReelGoal !== undefined) {
-    const pGoal = input.weeklyPosterGoal ?? (updates.weekly_poster_goal as number) ?? 0;
-    const rGoal = input.weeklyReelGoal ?? (updates.weekly_reel_goal as number) ?? 0;
-    updates.weekly_goal = pGoal + rGoal;
+    const currentClient = await getClientById(clientId);
+    if (currentClient) {
+      const pGoal = input.weeklyPosterGoal !== undefined ? input.weeklyPosterGoal : (currentClient.weekly_poster_goal ?? 0);
+      const rGoal = input.weeklyReelGoal !== undefined ? input.weeklyReelGoal : (currentClient.weekly_reel_goal ?? 0);
+      updates.weekly_goal = pGoal + rGoal;
+    }
   }
 
   const record = await updateClientRow(

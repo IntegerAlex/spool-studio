@@ -161,3 +161,31 @@ export async function deleteCalendarEvent(
     throw new Error("Failed to delete calendar event");
   }
 }
+
+export async function getApprovedAssets(): Promise<any[]> {
+  const { getAssets } = await import("@/services/assets-service");
+  const allAssets = await getAssets();
+  return allAssets.filter(asset => asset.status === 'approved');
+}
+
+export async function getScheduledAssets(): Promise<any[]> {
+  const { getAssets } = await import("@/services/assets-service");
+  const allAssets = await getAssets();
+  return allAssets.filter(asset => asset.status === 'scheduled');
+}
+
+export function getAssetPublishDate(asset: any): string | null {
+  if (asset.publishDate) return asset.publishDate;
+  if (asset.scheduledAt) {
+    return new Date(asset.scheduledAt).toISOString().slice(0, 10);
+  }
+  return null;
+}
+
+export function getAssetPublishTime(asset: any): string | null {
+  if (asset.publishTime) return asset.publishTime;
+  if (asset.scheduledAt) {
+    return new Date(asset.scheduledAt).toISOString().slice(11, 19);
+  }
+  return null;
+}
