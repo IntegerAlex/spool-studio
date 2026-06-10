@@ -18,6 +18,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 
 type DashboardSummary = Awaited<ReturnType<typeof dashboardApi.getSummary>>;
@@ -32,6 +33,9 @@ function getActivityIcon(entry: ActivityItem): React.ReactNode {
   }
   if (entry.iconKind === 'approval') {
     return <CheckCircle2 className="h-4 w-4 text-[#10b981]" />;
+  }
+  if (entry.iconKind === 'publish') {
+    return <Globe className="h-4 w-4 text-[#3b82f6]" />;
   }
   if (entry.iconKind === 'upload') {
     return <Upload className="h-4 w-4 text-[#3b82f6]" />;
@@ -49,6 +53,9 @@ function getActivityBg(entry: ActivityItem): string {
   }
   if (entry.iconKind === 'approval') {
     return 'bg-[rgba(16,185,129,0.14)]';
+  }
+  if (entry.iconKind === 'publish') {
+    return 'bg-[rgba(59,130,246,0.14)]';
   }
   if (entry.iconKind === 'upload') {
     return 'bg-[rgba(59,130,246,0.14)]';
@@ -329,11 +336,11 @@ export default function LogsPage() {
                 className="logs-select"
               >
                 <option value="all">All Activities</option>
-                <option value="upload">Uploads</option>
-                <option value="revision">Revisions</option>
-                <option value="approval">Approvals</option>
-                <option value="status">Status Changes</option>
-                <option value="client">Client Actions</option>
+                <option value="upload">Upload</option>
+                <option value="revision">Revision</option>
+                <option value="approval">Approval</option>
+                <option value="publish">Publish</option>
+                <option value="client">Client</option>
               </select>
             </div>
 

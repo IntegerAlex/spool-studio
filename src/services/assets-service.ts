@@ -479,6 +479,11 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
   }
 
   try {
+    console.log('[activity-log][create]', {
+      assetId: mapped.id,
+      currentStatus: mapped.status,
+      eventType: 'asset_created'
+    });
     await logAssetActivity({
       assetId: mapped.id,
       action: 'asset_created',
@@ -705,16 +710,24 @@ export async function finalizeAssetUpload(
         );
 
         try {
-          await logAssetActivity({
+          console.log('[activity-log][revision]', {
             assetId,
-            action: 'revision_created',
-            metadata: {
-              assetId,
-              revisionId: revisionData.id,
-              revisionNumber: versionNumber,
-              driveFileId: input.uploadResult.driveFileId,
-            },
+            currentStatus: asset.status,
+            eventType: 'revision_created'
           });
+          const shouldLogRevision = asset.status === 'revision_requested' || isRevisionUpload;
+          if (shouldLogRevision) {
+            await logAssetActivity({
+              assetId,
+              action: 'revision_created',
+              metadata: {
+                assetId,
+                revisionId: revisionData.id,
+                revisionNumber: versionNumber,
+                driveFileId: input.uploadResult.driveFileId,
+              },
+            });
+          }
         } catch (_err) {
           // non-blocking
         }
@@ -735,6 +748,11 @@ export async function finalizeAssetUpload(
   }
 
   try {
+    console.log('[activity-log][upload]', {
+      assetId,
+      currentStatus: mapped.status,
+      eventType: 'file_uploaded'
+    });
     await logAssetActivity({
       assetId,
       action: 'file_uploaded',
@@ -1009,16 +1027,24 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           );
 
           try {
-            await logAssetActivity({
+            console.log('[activity-log][revision]', {
               assetId,
-              action: 'revision_created',
-              metadata: {
-                assetId,
-                revisionId: revisionData.id,
-                revisionNumber: versionNumber,
-                driveFileId: uploadResult.driveFileId,
-              },
+              currentStatus: asset.status,
+              eventType: 'revision_created'
             });
+            const shouldLogRevision = asset.status === 'revision_requested' || isRevisionUpload;
+            if (shouldLogRevision) {
+              await logAssetActivity({
+                assetId,
+                action: 'revision_created',
+                metadata: {
+                  assetId,
+                  revisionId: revisionData.id,
+                  revisionNumber: versionNumber,
+                  driveFileId: uploadResult.driveFileId,
+                },
+              });
+            }
           } catch (_err) {
             // non-blocking
           }
@@ -1035,6 +1061,11 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
     }
 
     try {
+      console.log('[activity-log][upload]', {
+        assetId,
+        currentStatus: mapped.status,
+        eventType: 'file_uploaded'
+      });
       await logAssetActivity({
         assetId,
         action: 'file_uploaded',

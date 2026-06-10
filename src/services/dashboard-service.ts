@@ -29,7 +29,7 @@ export interface DashboardSummary {
     title: string;
     detail: string;
     timestamp: string;
-    iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client';
+    iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client' | 'publish';
   }>;
   totalDeliverables: number;
   totalReelsPlanned: number;
@@ -70,16 +70,19 @@ function getStatusBucket(status: string): 'Draft' | 'Revision' | 'Approved' | 'P
 function getActivityIconKind(
   action: string,
   metadata: Record<string, unknown>
-): 'upload' | 'revision' | 'approval' | 'status' {
+): 'upload' | 'revision' | 'approval' | 'status' | 'publish' {
   if (action === 'asset_created' || action === 'file_uploaded') {
     return 'upload';
   }
-  if (action === 'revision_created' || action === 'revision_activated') {
+  if (action === 'revision_created' || action === 'revision_activated' || action === 'revision_requested') {
     return 'revision';
   }
   if (action === 'status_changed') {
     const to = typeof metadata.to === 'string' ? metadata.to : null;
-    if (to === 'approved' || to === 'published') {
+    if (to === 'published') {
+      return 'publish';
+    }
+    if (to === 'approved' || to === 'scheduled') {
       return 'approval';
     }
   }

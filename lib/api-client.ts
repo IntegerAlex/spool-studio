@@ -39,7 +39,7 @@ export interface DashboardActivityItem {
   title: string;
   detail: string;
   timestamp: Date;
-  iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client';
+  iconKind: 'upload' | 'revision' | 'approval' | 'status' | 'client' | 'publish';
 }
 
 export interface ClientPerformanceItem {
