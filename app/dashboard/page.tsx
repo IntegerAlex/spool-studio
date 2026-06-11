@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { clientsApi, dashboardApi, assetsApi } from '@/lib/api-client';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { Client } from '@/types/index';
+import { cn } from '@/lib/utils';
 import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import {
   Clock3,
@@ -405,55 +406,77 @@ export default function DashboardPage() {
     });
   }, [clients, timeframe, summary]);
 
-  const deliverablesOverviewSection = useMemo(() => {
+  const reelsOverviewCard = useMemo(() => {
     return (
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card className="content-panel p-4">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h4 className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider">Reels Overview</h4>
-              <p className="text-xl font-bold text-white mt-1">
-                {deliverablesStats.reels.completed} / {deliverablesStats.reels.planned}
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.1)] text-[#34d399]">
+      <Card className="content-panel p-5">
+        <h4 className="text-[11.5px] font-semibold text-[#a1a1aa] uppercase tracking-wider text-center mb-4">Reels Overview</h4>
+        
+        <div className="px-2 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-bold text-white leading-none">
+              {deliverablesStats.reels.completed} / {deliverablesStats.reels.planned}
+            </span>
+            <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.14)] text-[#34d399]">
               {deliverablesStats.reels.pct}% Done
             </span>
           </div>
-          <div className="space-y-2">
-            <div className="h-2 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-              <div style={{ width: `${deliverablesStats.reels.pct}%` }} className="h-full bg-[linear-gradient(90deg,#10b981,#34d399)] transition-all duration-300" />
-            </div>
-            <div className="flex justify-between text-[11px] text-[#71717a]">
-              <span>Planned: {deliverablesStats.reels.planned}</span>
-              <span>Remaining: {deliverablesStats.reels.remaining}</span>
-            </div>
+          <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+            <div style={{ width: `${deliverablesStats.reels.pct}%` }} className="h-full bg-[linear-gradient(90deg,#10b981,#34d399)] transition-all duration-300" />
           </div>
-        </Card>
+        </div>
 
-        <Card className="content-panel p-4">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h4 className="text-xs font-semibold text-[#a1a1aa] uppercase tracking-wider">Posters Overview</h4>
-              <p className="text-xl font-bold text-white mt-1">
-                {deliverablesStats.posters.completed} / {deliverablesStats.posters.planned}
-              </p>
-            </div>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.1)] text-[#34d399]">
+        <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-[rgba(255,255,255,0.02)] mt-4 px-2">
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-white leading-none">{deliverablesStats.reels.planned}</span>
+            <span className="text-[9.5px] font-semibold text-[#71717a] uppercase tracking-wider mt-1">Planned</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-white leading-none">{deliverablesStats.reels.completed}</span>
+            <span className="text-[9.5px] font-semibold text-[#71717a] uppercase tracking-wider mt-1">Published</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-white leading-none">{deliverablesStats.reels.remaining}</span>
+            <span className="text-[9.5px] font-semibold text-[#71717a] uppercase tracking-wider mt-1">Remaining</span>
+          </div>
+        </div>
+      </Card>
+    );
+  }, [deliverablesStats]);
+
+  const postersOverviewCard = useMemo(() => {
+    return (
+      <Card className="content-panel p-5">
+        <h4 className="text-[11.5px] font-semibold text-[#a1a1aa] uppercase tracking-wider text-center mb-4">Posters Overview</h4>
+        
+        <div className="px-2 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-bold text-white leading-none">
+              {deliverablesStats.posters.completed} / {deliverablesStats.posters.planned}
+            </span>
+            <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(16,185,129,0.14)] text-[#34d399]">
               {deliverablesStats.posters.pct}% Done
             </span>
           </div>
-          <div className="space-y-2">
-            <div className="h-2 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-              <div style={{ width: `${deliverablesStats.posters.pct}%` }} className="h-full bg-[linear-gradient(90deg,#10b981,#34d399)] transition-all duration-300" />
-            </div>
-            <div className="flex justify-between text-[11px] text-[#71717a]">
-              <span>Planned: {deliverablesStats.posters.planned}</span>
-              <span>Remaining: {deliverablesStats.posters.remaining}</span>
-            </div>
+          <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+            <div style={{ width: `${deliverablesStats.posters.pct}%` }} className="h-full bg-[linear-gradient(90deg,#10b981,#34d399)] transition-all duration-300" />
           </div>
-        </Card>
-      </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center pt-3 border-t border-[rgba(255,255,255,0.02)] mt-4 px-2">
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-white leading-none">{deliverablesStats.posters.planned}</span>
+            <span className="text-[9.5px] font-semibold text-[#71717a] uppercase tracking-wider mt-1">Planned</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-white leading-none">{deliverablesStats.posters.completed}</span>
+            <span className="text-[9.5px] font-semibold text-[#71717a] uppercase tracking-wider mt-1">Published</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-bold text-white leading-none">{deliverablesStats.posters.remaining}</span>
+            <span className="text-[9.5px] font-semibold text-[#71717a] uppercase tracking-wider mt-1">Remaining</span>
+          </div>
+        </div>
+      </Card>
     );
   }, [deliverablesStats]);
 
@@ -463,48 +486,57 @@ export default function DashboardPage() {
         <div className="panel-header">
           <h3 className="panel-title">Top Active Clients</h3>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[320px]">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky-header">
               <tr className="border-b border-[rgba(255,255,255,0.05)] text-[10px] font-semibold uppercase tracking-wider text-[#a1a1aa]">
-                <th className="py-2.5 px-4">Client Name</th>
-                <th className="py-2.5 px-4 text-center">Goal</th>
-                <th className="py-2.5 px-4 text-center">Completed</th>
-                <th className="py-2.5 px-4 text-center">Remaining</th>
-                <th className="py-2.5 px-4 text-center">Completion %</th>
-                <th className="py-2.5 px-4 text-right">Next Publish Date</th>
+                <th className="py-2 px-3">Client Name</th>
+                <th className="py-2 px-3 text-center">Goal</th>
+                <th className="py-2 px-3 text-center">Completed</th>
+                <th className="py-2 px-3 text-center">Remaining</th>
+                <th className="py-2 px-3 text-center">Completion %</th>
+                <th className="py-2 px-3 text-right">Next Publish Date</th>
               </tr>
             </thead>
             <tbody>
               {clientPerformance.length > 0 ? (
-                clientPerformance.map((item) => (
-                  <tr key={item.id} className="border-b border-[rgba(255,255,255,0.02)] last:border-b-0 hover:bg-[rgba(255,255,255,0.01)] text-xs text-[#e4e4e7] transition-colors">
-                    <td className="py-2.5 px-4 font-semibold text-white">
-                      <Link href={`/dashboard/clients/${item.id}`} className="hover:underline">
-                        {item.name}
-                      </Link>
-                    </td>
-                    <td className="py-2.5 px-4 text-center font-medium">{item.goal}</td>
-                    <td className="py-2.5 px-4 text-center text-[#34d399] font-medium">{item.completed}</td>
-                    <td className="py-2.5 px-4 text-center font-medium">{item.remaining}</td>
-                    <td className="py-2.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="font-semibold">{item.pct}%</span>
-                        <div className="h-1.5 w-12 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden hidden sm:block">
-                          <div style={{ width: `${item.pct}%` }} className="h-full bg-[#10b981]" />
+                clientPerformance.map((item) => {
+                  const pctBadgeClass = item.pct >= 75 
+                    ? 'bg-[rgba(16,185,129,0.12)] text-[#34d399]' 
+                    : item.pct >= 40 
+                      ? 'bg-[rgba(245,158,11,0.12)] text-[#fbbf24]' 
+                      : 'bg-[rgba(239,68,68,0.12)] text-[#f87171]';
+                  return (
+                    <tr key={item.id} className="border-b border-[rgba(255,255,255,0.02)] last:border-b-0 hover:bg-[rgba(255,255,255,0.01)] text-xs text-[#e4e4e7] transition-colors">
+                      <td className="py-2 px-3 font-semibold text-[13.5px] text-white">
+                        <Link href={`/dashboard/clients/${item.id}`} className="hover:underline">
+                          {item.name}
+                        </Link>
+                      </td>
+                      <td className="py-2 px-3 text-center font-medium">{item.goal}</td>
+                      <td className="py-2 px-3 text-center text-[#34d399] font-medium">{item.completed}</td>
+                      <td className="py-2 px-3 text-center font-medium">{item.remaining}</td>
+                      <td className="py-2 px-3 text-center">
+                        <div className="flex items-center justify-center gap-3">
+                          <span className={cn('px-2.5 py-0.5 rounded-full text-[11px] font-semibold', pctBadgeClass)}>
+                            {item.pct}%
+                          </span>
+                          <div className="h-1 w-12 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden hidden sm:block">
+                            <div style={{ width: `${item.pct}%` }} className={cn('h-full', item.pct >= 75 ? 'bg-[#10b981]' : item.pct >= 40 ? 'bg-[#fbbf24]' : 'bg-[#ef4444]')} />
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-4 text-right text-[#a1a1aa]">
-                      {item.nextPublishDate ? new Date(item.nextPublishDate).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      }) : <span className="text-[#52525b]">None scheduled</span>}
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-2 px-3 text-right text-[#a1a1aa]">
+                        {item.nextPublishDate ? new Date(item.nextPublishDate).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        }) : <span className="text-[#52525b]">None scheduled</span>}
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-[#71717a]">
@@ -554,7 +586,7 @@ export default function DashboardPage() {
         <div className="panel-header">
           <h3 className="panel-title">{timeframe === 'weekly' ? 'Weekly Goals' : 'Monthly Goals'}</h3>
         </div>
-        <div className="p-4 space-y-3">
+        <div className="p-3 space-y-2">
           {clients.length > 0 ? (
             clients
               .slice(0, 8)
@@ -563,14 +595,12 @@ export default function DashboardPage() {
                 const done = timeframe === 'weekly' ? (client.weeklyCompleted ?? 0) : (client.completedDeliverables ?? 0);
                 const pct = goal > 0 ? Math.round((Math.min(done, goal) / goal) * 100) : 0;
                 return (
-                  <div key={client.id} className="mb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-[13px] font-medium text-white truncate max-w-[14rem]">{client.name}</div>
-                      <div className="text-[12px] text-[#71717a]">{done}/{goal}</div>
-                    </div>
-                    <div className="mt-2 h-2 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                  <div key={client.id} className="flex items-center justify-between gap-3 py-1">
+                    <div className="text-[12.5px] font-medium text-white truncate w-24 shrink-0">{client.name}</div>
+                    <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden mx-1">
                       <div style={{ width: `${pct}%` }} className="h-full bg-[linear-gradient(90deg,#10b981,#34d399)]" />
                     </div>
+                    <div className="text-[11.5px] font-medium text-[#71717a] w-12 text-right shrink-0">{done}/{goal}</div>
                   </div>
                 );
               })
@@ -857,7 +887,7 @@ export default function DashboardPage() {
 
   return (
     <ErrorBoundary>
-      <div className="space-y-6 dashboard-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <div className="space-y-6 dashboard-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '0', padding: '16px 24px 24px 24px' }}>
         <style>{`
         .dashboard-container {
           background-color: var(--color-bg-app);
@@ -881,7 +911,7 @@ export default function DashboardPage() {
           background-color: var(--color-bg-surface) !important;
           border: 1px solid var(--color-border) !important;
           border-radius: var(--radius-lg) !important;
-          padding: 20px 22px !important;
+          padding: 8px 12px !important;
           transition: border-color 150ms ease !important;
           position: relative;
           overflow: hidden;
@@ -895,31 +925,31 @@ export default function DashboardPage() {
           border-color: var(--color-border-strong) !important;
         }
         .stat-card-label {
-          font-size: 11px !important;
+          font-size: 10.5px !important;
           font-weight: 500 !important;
-          letter-spacing: 0.06em !important;
+          letter-spacing: 0.05em !important;
           color: var(--color-text-muted) !important;
           text-transform: uppercase !important;
         }
         .stat-card-number {
           font-size: 28px !important;
-          font-weight: 600 !important;
+          font-weight: 700 !important;
           color: var(--color-text-primary) !important;
           letter-spacing: -0.03em !important;
-          line-height: 1.1 !important;
-          margin-top: 6px !important;
+          line-height: 1.0 !important;
+          margin-top: 4px !important;
         }
         .stat-trend-text {
-          font-size: 11.5px !important;
+          font-size: 11px !important;
           color: var(--color-text-muted) !important;
-          margin-top: 6px !important;
+          margin-top: 4px !important;
           display: flex;
           align-items: center;
           gap: 4px;
         }
         .stat-card-icon-container {
-          width: 28px !important;
-          height: 28px !important;
+          width: 22px !important;
+          height: 22px !important;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -927,32 +957,36 @@ export default function DashboardPage() {
           flex-shrink: 0;
         }
         .stat-card-icon {
-          width: 14px !important;
-          height: 14px !important;
+          width: 11px !important;
+          height: 11px !important;
           color: var(--color-text-faint) !important;
         }
         .quick-action-row {
           background-color: var(--color-bg-surface) !important;
           border: 1px solid var(--color-border) !important;
           border-radius: var(--radius-lg) !important;
-          padding: 14px 20px !important;
+          padding: 6px 12px !important;
           box-shadow: none !important;
         }
         .quick-action-btn {
           background-color: transparent !important;
           border: 1px solid var(--color-border) !important;
           border-radius: var(--radius-sm) !important;
-          padding: 7px 14px !important;
+          padding: 8px 16px !important;
           font-size: 12.5px !important;
           color: var(--color-text-muted) !important;
-          gap: 7px !important;
+          gap: 8px !important;
           transition: all 120ms ease !important;
-          height: auto !important;
+          height: 38px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
         .quick-action-btn:hover {
           background-color: var(--color-bg-hover) !important;
-          border-color: var(--color-border-strong) !important;
-          color: var(--color-text-secondary) !important;
+          border-color: rgba(255, 255, 255, 0.2) !important;
+          box-shadow: 0 0 6px rgba(255, 255, 255, 0.08) !important;
+          color: var(--color-text-primary) !important;
         }
         .quick-action-icon {
           width: 13px !important;
@@ -967,7 +1001,7 @@ export default function DashboardPage() {
           box-shadow: none !important;
         }
         .panel-header {
-          padding: 16px 20px !important;
+          padding: 12px 16px !important;
           border-bottom: 1px solid var(--color-border) !important;
           display: flex;
           justify-content: space-between;
@@ -989,15 +1023,15 @@ export default function DashboardPage() {
           text-decoration: underline !important;
         }
         .empty-state {
-          padding: 48px 20px !important;
+          padding: 32px 16px !important;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 10px !important;
         }
         .breakdown-row {
-          padding: 11px 20px !important;
-          border-bottom: 1px solid var(--color-border) !important;
+          padding: 8px 16px !important;
+          border-bottom: none !important;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -1016,17 +1050,17 @@ export default function DashboardPage() {
           border-radius: 50% !important;
         }
         .breakdown-label {
-          font-size: 13px !important;
+          font-size: 12.5px !important;
           color: var(--color-text-secondary) !important;
         }
         .breakdown-number {
-          font-size: 13px !important;
+          font-size: 12.5px !important;
           font-weight: 500 !important;
           color: var(--color-text-primary) !important;
         }
         .section-heading-container {
-          padding-top: 28px !important;
-          margin-bottom: 14px !important;
+          padding-top: 20px !important;
+          margin-bottom: 10px !important;
         }
         .section-heading {
           font-size: 14px !important;
@@ -1065,6 +1099,13 @@ export default function DashboardPage() {
           border-radius: 4px !important;
           padding: 2px 7px !important;
           font-weight: 400 !important;
+        }
+        .sticky-header th {
+          position: sticky !important;
+          top: 0 !important;
+          background-color: var(--color-bg-surface) !important;
+          z-index: 10 !important;
+          box-shadow: inset 0 -1px 0 var(--color-border);
         }
       `}</style>
 
@@ -1119,7 +1160,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {statCards.map((card, index) => (
             <Card key={card.title} className="stat-card">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 h-full">
                 <div className="min-w-0">
                   <p className="stat-card-label">{card.title}</p>
                   <p className="stat-card-number">{card.value}</p>
@@ -1143,52 +1184,63 @@ export default function DashboardPage() {
         </div>
 
         <Card className="quick-action-row">
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 w-full">
             <AssetFormDialog
               mode="create"
               onSaved={() => {
                 void refreshDashboard();
               }}
               trigger={
-                <Button variant="accent" className="quick-action-btn flex items-center">
-                  <Plus className="quick-action-icon" />
+                <Button variant="accent" className="quick-action-btn w-full">
+                  <Plus className="quick-action-icon mr-2" />
                   <span>New Asset</span>
                 </Button>
               }
             />
 
-            <Button asChild variant="ghost" className="quick-action-btn flex items-center">
+            <Button asChild variant="ghost" className="quick-action-btn w-full">
               <Link href="/dashboard/assets">
-                <Upload className="quick-action-icon" />
+                <Upload className="quick-action-icon mr-2" />
                 <span>Upload Files</span>
               </Link>
             </Button>
 
-            <Button asChild variant="ghost" className="quick-action-btn flex items-center">
+            <Button asChild variant="ghost" className="quick-action-btn w-full">
               <Link href="/dashboard/clients">
-                <FolderPlus className="quick-action-icon" />
+                <FolderPlus className="quick-action-icon mr-2" />
                 <span>Add Client</span>
               </Link>
             </Button>
 
-            <Button asChild variant="ghost" className="quick-action-btn flex items-center">
+            <Button asChild variant="ghost" className="quick-action-btn w-full">
               <Link href="/dashboard/kanban">
-                <KanbanSquare className="quick-action-icon" />
+                <KanbanSquare className="quick-action-icon mr-2" />
                 <span>View Kanban</span>
               </Link>
             </Button>
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="xl:col-span-2 space-y-6">
-            {/* Deliverables Overview Section */}
-            {deliverablesOverviewSection}
+        {/* Row 3: Reels Overview, Posters Overview, Asset Status Breakdown */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 items-start">
+          {reelsOverviewCard}
+          {postersOverviewCard}
+          {productionPipelineSection}
+        </div>
 
-            {/* Top Active Clients Section */}
+        {/* Row 4: Top Active Clients & Monthly Goals */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
             {clientPerformanceTableSection}
+          </div>
+          <div>
+            {goalsSection}
+          </div>
+        </div>
 
-            {/* Recent Activity Summary */}
+        {/* Row 5: Recent Activity Summary & Client Workspaces */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
             <Card className="content-panel">
               <div className="panel-header">
                 <h3 className="panel-title">Recent Activity Summary</h3>
@@ -1199,52 +1251,44 @@ export default function DashboardPage() {
 
               <div className="grid grid-cols-2 gap-4 p-5 sm:grid-cols-4">
                 <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#a1a1aa] mb-1">Total Today</p>
-                  <p className="text-2xl font-bold text-white">{activitySummary.totalToday}</p>
-                </div>
-                <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3b82f6] mb-1">Uploads</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#3b82f6] mb-1">Today's Uploads</p>
                   <p className="text-2xl font-bold text-white">{activitySummary.uploads}</p>
                 </div>
                 <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#f59e0b] mb-1">Revisions</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#f59e0b] mb-1">Today's Revisions</p>
                   <p className="text-2xl font-bold text-white">{activitySummary.revisions}</p>
                 </div>
                 <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#10b981] mb-1">Approvals</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#10b981] mb-1">Approvals Today</p>
                   <p className="text-2xl font-bold text-white">{activitySummary.approvals}</p>
+                </div>
+                <div className="rounded-lg bg-[rgba(255,255,255,0.02)] p-4 border border-[rgba(255,255,255,0.04)] text-center">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#ef4444] mb-1">Pending Reviews</p>
+                  <p className="text-2xl font-bold text-white text-[#ef4444]">{pendingApprovals}</p>
                 </div>
               </div>
             </Card>
           </div>
-
-          <div className="space-y-6">
-            {/* Production Pipeline Section */}
-            {productionPipelineSection}
-
-            {/* Goals Section */}
-            {goalsSection}
+          <div>
+            <div className="section-heading-container" style={{ paddingTop: '0', marginTop: '0' }}>
+              <h3 className="section-heading">Clients</h3>
+              <p className="section-sublabel">Quick access to active client workspaces</p>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3 pb-1">
+              {clientChips.map((client) => (
+                <Link
+                  key={client.id}
+                  href={`/dashboard/clients/${client.id}`}
+                  className="client-chip"
+                >
+                  <span className="client-chip-name max-w-[10rem] truncate">{client.name}</span>
+                  <span className="client-chip-badge">
+                    {client.completedDeliverables}/{client.monthlyDeliverables}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-
-        <div className="section-heading-container">
-          <h3 className="section-heading">Clients</h3>
-          <p className="section-sublabel">Quick access to active client workspaces</p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
-          {clientChips.map((client) => (
-            <Link
-              key={client.id}
-              href={`/dashboard/clients/${client.id}`}
-              className="client-chip"
-            >
-              <span className="client-chip-name max-w-[10rem] truncate">{client.name}</span>
-              <span className="client-chip-badge">
-                {client.completedDeliverables}/{client.monthlyDeliverables}
-              </span>
-            </Link>
-          ))}
         </div>
       </div>
     </ErrorBoundary>

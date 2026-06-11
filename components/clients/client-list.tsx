@@ -207,14 +207,22 @@ export function ClientList({ clients, onCreated }: ClientListProps) {
           const pendingApprovals = client.pendingApprovals ?? 0;
           const pendingRevisions = client.pendingRevisions ?? 0;
 
-          let statusLabel = 'On Track';
+          let statusLabel = 'ON TRACK';
           let statusColorClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
-          if (overallPct < 70) {
-            statusLabel = 'Behind';
-            statusColorClass = 'bg-red-500/10 text-red-400 border border-red-500/20';
-          } else if (overallPct < 90) {
-            statusLabel = 'Attention';
-            statusColorClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+          if (weeklyPosterGoal === 0 && weeklyReelGoal === 0) {
+            statusLabel = 'NOT CONFIGURED';
+            statusColorClass = 'bg-[rgba(255,255,255,0.06)] text-[#a1a1aa] border border-[rgba(255,255,255,0.1)]';
+          } else {
+            if (weeklyProgress < 80) {
+              statusLabel = 'BEHIND';
+              statusColorClass = 'bg-red-500/10 text-red-400 border border-red-500/20';
+            } else if (weeklyProgress < 100) {
+              statusLabel = 'ON TRACK';
+              statusColorClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+            } else {
+              statusLabel = 'COMPLETED';
+              statusColorClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+            }
           }
 
           return (

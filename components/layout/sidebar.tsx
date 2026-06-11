@@ -154,7 +154,7 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
   const baseAsideClassName = cn(
     'flex h-full min-w-0 flex-col overflow-hidden',
     variant === 'desktop'
-      ? 'hidden lg:fixed lg:left-0 lg:top-0 lg:flex lg:h-screen lg:w-[280px]'
+      ? 'hidden lg:fixed lg:left-0 lg:top-0 lg:flex lg:h-screen lg:w-[240px]'
       : 'w-full'
   );
 
@@ -175,7 +175,7 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
           gap: 10px;
           padding: 8px 12px;
           border-radius: var(--radius-sm);
-          font-size: 13px;
+          font-size: 12.5px;
           font-weight: 400;
           color: var(--color-text-muted) !important;
           cursor: pointer;
@@ -193,7 +193,8 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
         .nav-item.active {
           background-color: var(--color-bg-active) !important;
           color: var(--color-text-primary) !important;
-          font-weight: 500;
+          font-weight: 600;
+          box-shadow: inset 3px 0 0 0 var(--color-text-primary);
         }
         .nav-icon {
           height: 15px !important;
@@ -232,31 +233,30 @@ export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
       `}</style>
 
       <div 
-        className="flex items-center px-6" 
+        className="flex items-center justify-center px-4" 
         style={{ 
-          height: '80px', 
+          height: '96px', 
           borderBottom: '1px solid var(--color-border)',
           backgroundColor: '#0f0f0f',
-          paddingTop: 'env(safe-area-inset-top)'
         }}
       >
-        <Link href="/dashboard" className="flex min-w-0 items-center h-full w-full">
-          <div className="relative flex items-center h-full w-full">
+        <Link href="/dashboard" className="flex min-w-0 items-center justify-center h-full w-full">
+          <div className="relative flex items-center justify-center h-full w-full">
             <Image
               src="/asset_flow.png"
               alt="Asset Flow"
               width={260}
               height={78}
               priority
-              className="h-[52px] w-auto shrink-0 object-contain"
+              className="h-[76px] w-auto shrink-0 object-contain"
             />
           </div>
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-[14px] py-6 min-w-0 space-y-6">
+      <nav className="flex-1 overflow-y-auto px-[14px] py-4 min-w-0 space-y-4">
         {navigationSections.map((section) => (
-          <div key={section.title} className="space-y-1.5">
+          <div key={section.title} className="space-y-1">
             <h4 className="px-3 text-[10px] font-semibold tracking-wider text-[var(--color-text-faint)] uppercase opacity-75">
               {section.title}
             </h4>

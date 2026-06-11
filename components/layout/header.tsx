@@ -75,7 +75,7 @@ export function Header({ title, className }: HeaderProps) {
 
   return (
     <header 
-      className={cn('fixed left-[220px] right-0 top-0 z-40 hidden items-center justify-between border-b px-6 lg:flex lg:w-[calc(100%-220px)]', className)}
+      className={cn('fixed left-[240px] right-0 top-0 z-40 hidden items-center justify-between border-b px-6 lg:flex lg:w-[calc(100%-240px)]', className)}
       style={{
         height: '57px',
         backgroundColor: '#0f0f0f',
