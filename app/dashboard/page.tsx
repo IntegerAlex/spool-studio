@@ -144,15 +144,25 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly'>('monthly');
   const eventSourceRef = useRef<EventSource | null>(null);
+  const isRefreshingRef = useRef(false);
+  const lastRefreshTimeRef = useRef(0);
 
   const refreshDashboard = async () => {
+    const now = Date.now();
+    if (isRefreshingRef.current || now - lastRefreshTimeRef.current < 2000) {
+      return;
+    }
     try {
+      isRefreshingRef.current = true;
       const summaryData = await dashboardApi.getSummary();
       setClients(summaryData.clients ?? []);
       setSummary(summaryData);
       setRecentActivityLocal(summaryData.recentActivity ?? []);
+      lastRefreshTimeRef.current = Date.now();
     } catch (err) {
       console.error('Failed to refresh dashboard summary', err);
+    } finally {
+      isRefreshingRef.current = false;
     }
   };
 
@@ -628,187 +638,17 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    // SSE with reconnection/backoff/jitter and authoritative reconciliation
     if (typeof window === 'undefined') return;
-    if (eventSourceRef.current) return;
 
-    const RECONCILE_AFTER_EVENTS = 5;
-    const RECONCILE_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+    // Refresh dashboard summary and recent activity every 60 seconds
+    const POLL_INTERVAL_MS = 60 * 1000;
 
-    const sseEventCountRef = { current: 0 } as { current: number };
-    let lastReconcileAt = Date.now();
-
-    let backoffAttempt = 0;
-    let reconnectTimer: number | null = null;
-
-    function hasActivityId(id?: string) {
-      if (!id) return false;
-      const src = recentActivityLocal ?? (summary?.recentActivity ?? []);
-      return src.some((a) => a.id === id);
-    }
-
-    async function reconcileIfNeeded(force = false) {
-      const now = Date.now();
-      const since = now - lastReconcileAt;
-      if (!force && sseEventCountRef.current < RECONCILE_AFTER_EVENTS && since < RECONCILE_INTERVAL_MS) {
-        return;
-      }
-      try {
-        const full = await dashboardApi.getSummary();
-        setSummary(full);
-        setRecentActivityLocal(full.recentActivity ?? []);
-        sseEventCountRef.current = 0;
-        lastReconcileAt = Date.now();
-        backoffAttempt = 0;
-      } catch (err) {
-        // log and keep trying later
-        console.warn('[dashboard][reconcile][failed]', err instanceof Error ? err.message : String(err));
-      }
-    }
-
-    function connect() {
-      if (eventSourceRef.current) return;
-      const es = new EventSource('/api/events/stream');
-      eventSourceRef.current = es;
-
-      const handleAssetEvent = async (ev: MessageEvent) => {
-        try {
-          const payload = JSON.parse(ev.data);
-          const activityId = payload.id as string | undefined;
-          const assetId = payload.assetId ?? payload.asset_id;
-          const action = payload.action ?? payload.type;
-          if (!assetId) return;
-
-          // dedupe using stable activity id
-          if (activityId && hasActivityId(activityId)) {
-            return;
-          }
-
-          // fetch lightweight asset summary (best-effort)
-          let assetSummary = null;
-          try {
-            assetSummary = await assetsApi.getSummaryById(assetId);
-          } catch (_err) {
-            assetSummary = null;
-          }
-
-          const entry = {
-            id: activityId ?? `asset-${assetId}-${Date.now()}`,
-            kind: 'asset' as const,
-            href: `/dashboard/assets/${assetId}`,
-            title: assetSummary?.title ?? `Asset ${assetId}`,
-            detail: `${(action ?? '').toString().replace(/_/g, ' ')} • ${assetSummary?.type ?? ''} asset`,
-            timestamp: new Date(payload.createdAt ?? payload.created_at ?? new Date().toISOString()),
-            iconKind:
-              action === 'revision_created' || action === 'revision_activated'
-                ? 'revision'
-                : action === 'asset_created' || action === 'file_uploaded'
-                  ? 'upload'
-                  : action === 'status_changed' && payload.metadata && (payload.metadata.to === 'approved' || payload.metadata.to === 'published')
-                    ? 'approval'
-                    : 'status',
-          };
-
-          setRecentActivityLocal((prev) => {
-            const existing = (prev ?? []).filter((r) => r.id !== entry.id);
-            const next = [entry as DashboardSummary['recentActivity'][number], ...existing];
-            return next.slice(0, 8);
-          });
-
-          // minimal delta updates
-          setSummary((prev) => {
-            if (!prev) return prev;
-            const next = { ...prev } as DashboardSummary;
-            if (action === 'asset_created') {
-              next.totalAssets = (next.totalAssets ?? 0) + 1;
-              const status = payload.metadata?.status ?? assetSummary?.status;
-              if (status && ['draft', 'in_design', 'ready_for_review', 'revision_requested'].includes(status)) {
-                next.pendingApprovals = Math.max(0, (next.pendingApprovals ?? 0) + 1);
-              }
-            }
-
-            if (action === 'status_changed') {
-              const to = typeof payload.metadata?.to === 'string' ? payload.metadata.to : null;
-              if (to === 'approved') {
-                next.approvedAssets = Math.max(0, (next.approvedAssets ?? 0) + 1);
-                next.pendingApprovals = Math.max(0, (next.pendingApprovals ?? 0) - 1);
-              }
-              if (to === 'published') {
-                try {
-                  const publishedAt = assetSummary?.publishedAt ? new Date(assetSummary.publishedAt) : null;
-                  if (publishedAt) {
-                    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-                    if (publishedAt >= monthStart) {
-                      next.uploadedThisMonth = (next.uploadedThisMonth ?? 0) + 1;
-                    }
-                  }
-                } catch (_e) {
-                  // ignore
-                }
-              }
-            }
-
-            return next;
-          });
-
-          // reconciliation triggers
-          sseEventCountRef.current++;
-          const isCritical = action === 'asset_created' || (action === 'status_changed' && payload.metadata && (payload.metadata.to === 'approved' || payload.metadata.to === 'published'));
-          if (isCritical) {
-            // immediate authoritative reconciliation
-            void reconcileIfNeeded(true);
-          } else {
-            // schedule reconcile if threshold reached
-            if (sseEventCountRef.current >= RECONCILE_AFTER_EVENTS) {
-              void reconcileIfNeeded(false);
-            }
-          }
-        } catch (_err) {
-          // parse error - ignore
-        }
-      };
-
-      es.addEventListener('asset.activity', (ev) => { void handleAssetEvent(ev as MessageEvent); });
-      es.onmessage = (ev) => { void handleAssetEvent(ev); };
-
-      es.onopen = () => {
-        backoffAttempt = 0;
-      };
-
-      es.onerror = () => {
-        try {
-          es.close();
-        } catch (_e) { }
-        eventSourceRef.current = null;
-        // schedule reconnect with exponential backoff + jitter
-        backoffAttempt = Math.min(10, backoffAttempt + 1);
-        const base = 500; // ms
-        const backoff = Math.min(60000, base * Math.pow(2, backoffAttempt));
-        const jitter = 0.5 + Math.random();
-        const delay = Math.round(backoff * jitter);
-        if (reconnectTimer) clearTimeout(reconnectTimer);
-        reconnectTimer = window.setTimeout(() => {
-          reconnectTimer = null;
-          connect();
-        }, delay) as unknown as number;
-      };
-    }
-
-    connect();
-
-    // periodic reconciliation
-    const periodic = window.setInterval(() => {
-      void reconcileIfNeeded(false);
-    }, RECONCILE_INTERVAL_MS);
+    const intervalId = window.setInterval(() => {
+      void refreshDashboard();
+    }, POLL_INTERVAL_MS);
 
     return () => {
-      try {
-        if (eventSourceRef.current) eventSourceRef.current.close();
-      } catch (_e) { }
-      eventSourceRef.current = null;
-      try {
-        clearInterval(periodic);
-      } catch (_e) { }
+      window.clearInterval(intervalId);
     };
   }, []);
 

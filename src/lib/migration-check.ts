@@ -1,6 +1,12 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
+let cachedMigrationResult: { ok: boolean; missing?: string[] } | null = null;
+
 export async function checkClientGoalsMigration(): Promise<{ ok: boolean; missing?: string[] }> {
+  if (cachedMigrationResult?.ok) {
+    return cachedMigrationResult;
+  }
+
   try {
     const supabase = await createServerSupabaseClient();
     // check columns existence by attempting to select them
@@ -20,7 +26,9 @@ export async function checkClientGoalsMigration(): Promise<{ ok: boolean; missin
       return { ok: false, missing: ['clients_weekly_counts function missing'] };
     }
 
-    return { ok: true };
+    const res = { ok: true };
+    cachedMigrationResult = res;
+    return res;
   } catch (err) {
     return { ok: false, missing: [(err as Error).message] };
   }
