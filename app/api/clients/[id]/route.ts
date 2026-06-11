@@ -46,6 +46,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       weeklyGoal: body.weeklyGoal,
       weeklyPosterGoal: body.weeklyPosterGoal,
       weeklyReelGoal: body.weeklyReelGoal,
+      contractStartDate: body.contractStartDate,
+      contractEndDate: body.contractEndDate,
     });
     return NextResponse.json({ data: client });
   } catch (error) {

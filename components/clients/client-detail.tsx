@@ -671,25 +671,53 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
           </div>
         </Card>
 
-        <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-          <h2 className="text-[13px] font-medium text-white">Assigned Team</h2>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {team.map((member) => (
-              <div key={member.id} className="flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5">
-                <Avatar className="size-7 border border-[rgba(255,255,255,0.08)]">
-                  <AvatarImage src={member.avatar} alt={member.name} />
-                  <AvatarFallback className="bg-[#1c1c1c] text-[11px] font-semibold text-white">
-                    {member.name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="pr-1">
-                  <p className="text-[12px] font-medium text-white">{member.name}</p>
-                  <p className="text-[11px] text-[#71717a] capitalize">{member.role}</p>
+        <div className="space-y-6">
+          <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
+            <h2 className="text-[13px] font-medium text-white">Assigned Team</h2>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {team.map((member) => (
+                <div key={member.id} className="flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5">
+                  <Avatar className="size-7 border border-[rgba(255,255,255,0.08)]">
+                    <AvatarImage src={member.avatar} alt={member.name} />
+                    <AvatarFallback className="bg-[#1c1c1c] text-[11px] font-semibold text-white">
+                      {member.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="pr-1">
+                    <p className="text-[12px] font-medium text-white">{member.name}</p>
+                    <p className="text-[11px] text-[#71717a] capitalize">{member.role}</p>
+                  </div>
                 </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
+            <h2 className="text-[13px] font-medium text-white">Contract Information</h2>
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract Start</p>
+                <p className="text-[13px] font-medium text-white mt-1">
+                  {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString(undefined, {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  }) : 'Not specified'}
+                </p>
               </div>
-            ))}
-          </div>
-        </Card>
+              <div>
+                <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract End</p>
+                <p className="text-[13px] font-medium text-white mt-1">
+                  {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString(undefined, {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  }) : 'Not specified'}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
 
       <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-5 shadow-none">

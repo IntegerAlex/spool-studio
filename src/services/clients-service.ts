@@ -24,6 +24,8 @@ export interface ClientInput {
   weeklyGoal?: number;
   weeklyPosterGoal?: number;
   weeklyReelGoal?: number;
+  contractStartDate?: string;
+  contractEndDate?: string;
 }
 
 function normalizeInstagramHandle(handle?: string | null): string {
@@ -230,6 +232,8 @@ function mapClient(
     weeklyReelGoal,
     weeklyCompletedReels: metrics.weeklyCompletedReels,
     weeklyCompletedPosters: metrics.weeklyCompletedPosters,
+    contractStartDate: client.contract_start_date ? new Date(client.contract_start_date) : undefined,
+    contractEndDate: client.contract_end_date ? new Date(client.contract_end_date) : undefined,
   };
 }
 
@@ -333,6 +337,8 @@ export async function createClient(input: ClientInput): Promise<Client> {
     weekly_poster_goal: input.weeklyPosterGoal ?? 0,
     weekly_reel_goal: input.weeklyReelGoal ?? 0,
     created_by: user.id,
+    contract_start_date: input.contractStartDate ?? null,
+    contract_end_date: input.contractEndDate ?? null,
   };
 
   console.log("[client-create][insert]", insertData);
@@ -415,6 +421,8 @@ export async function updateClient(
   if (input.weeklyGoal !== undefined) updates.weekly_goal = input.weeklyGoal;
   if (input.weeklyPosterGoal !== undefined) updates.weekly_poster_goal = input.weeklyPosterGoal;
   if (input.weeklyReelGoal !== undefined) updates.weekly_reel_goal = input.weeklyReelGoal;
+  if (input.contractStartDate !== undefined) updates.contract_start_date = input.contractStartDate;
+  if (input.contractEndDate !== undefined) updates.contract_end_date = input.contractEndDate;
 
   if (input.monthlyReelsTarget !== undefined || input.monthlyPostsTarget !== undefined || input.monthlyGoal !== undefined) {
     const currentClient = await getClientById(clientId);

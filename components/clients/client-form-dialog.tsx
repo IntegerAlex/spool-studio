@@ -37,6 +37,16 @@ const formSchema = z.object({
   monthlyPostsTarget: z.string().optional(),
   weeklyPosterGoal: z.string().optional(),
   weeklyReelGoal: z.string().optional(),
+  contractStartDate: z.string().optional(),
+  contractEndDate: z.string().optional(),
+}).refine((data) => {
+  if (data.contractStartDate && data.contractEndDate) {
+    return new Date(data.contractEndDate) >= new Date(data.contractStartDate);
+  }
+  return true;
+}, {
+  message: "End Date must be greater than or equal to Start Date",
+  path: ["contractEndDate"]
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -74,6 +84,8 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
       monthlyPostsTarget: '',
       weeklyPosterGoal: '',
       weeklyReelGoal: '',
+      contractStartDate: '',
+      contractEndDate: '',
     },
   });
 
@@ -102,6 +114,8 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
           monthlyPostsTarget: client.monthlyPostsTarget !== undefined ? client.monthlyPostsTarget.toString() : '',
           weeklyPosterGoal: client.weeklyPosterGoal !== undefined ? client.weeklyPosterGoal.toString() : '',
           weeklyReelGoal: client.weeklyReelGoal !== undefined ? client.weeklyReelGoal.toString() : '',
+          contractStartDate: client.contractStartDate ? new Date(client.contractStartDate).toISOString().split('T')[0] : '',
+          contractEndDate: client.contractEndDate ? new Date(client.contractEndDate).toISOString().split('T')[0] : '',
         });
       } else {
         form.reset({
@@ -113,6 +127,8 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
           monthlyPostsTarget: '',
           weeklyPosterGoal: '',
           weeklyReelGoal: '',
+          contractStartDate: '',
+          contractEndDate: '',
         });
       }
       setApiError(null);
@@ -132,6 +148,8 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
         monthlyPostsTarget: toNumber(values.monthlyPostsTarget),
         weeklyPosterGoal: toNumber(values.weeklyPosterGoal),
         weeklyReelGoal: toNumber(values.weeklyReelGoal),
+        contractStartDate: values.contractStartDate || undefined,
+        contractEndDate: values.contractEndDate || undefined,
       };
       console.info('[client-form] api request', payload);
 
@@ -270,6 +288,36 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
                     <FormLabel>Monthly Posts (Posters)</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="contractStartDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contract Start Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="contractEndDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contract End Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

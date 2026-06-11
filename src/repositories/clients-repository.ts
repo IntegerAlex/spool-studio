@@ -5,7 +5,7 @@ import type { Database } from '@/types/database';
 export type DbClient = Database['public']['Tables']['clients']['Row'];
 
 const clientSelect =
-  'id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,monthly_goal,weekly_goal,weekly_poster_goal,weekly_reel_goal,drive_folder_id,drive_folder_url,created_by,created_at,updated_at';
+  'id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,monthly_goal,weekly_goal,weekly_poster_goal,weekly_reel_goal,drive_folder_id,drive_folder_url,created_by,created_at,updated_at,contract_start_date,contract_end_date';
 const clientOptionSelect = 'id,name';
 
 async function getClient(client?: SupabaseClient<Database>) {

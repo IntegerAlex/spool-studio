@@ -378,6 +378,8 @@ export const clientsApi = {
     weeklyGoal?: number;
     weeklyPosterGoal?: number;
     weeklyReelGoal?: number;
+    contractStartDate?: string;
+    contractEndDate?: string;
   }): Promise<Client> => {
     const created = await fetchJson<Client>('/api/clients', {
       method: 'POST',
@@ -399,6 +401,8 @@ export const clientsApi = {
       weeklyGoal?: number;
       weeklyPosterGoal?: number;
       weeklyReelGoal?: number;
+      contractStartDate?: string;
+      contractEndDate?: string;
     }>
   ): Promise<Client> => {
     const updated = await fetchJson<Client>(`/api/clients/${id}`, {

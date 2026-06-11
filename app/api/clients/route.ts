@@ -29,6 +29,8 @@ export async function POST(request: Request) {
       weeklyGoal: body.weeklyGoal,
       weeklyPosterGoal: body.weeklyPosterGoal,
       weeklyReelGoal: body.weeklyReelGoal,
+      contractStartDate: body.contractStartDate,
+      contractEndDate: body.contractEndDate,
     });
     return NextResponse.json({ data: client }, { status: 201 });
   } catch (error) {

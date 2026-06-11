@@ -37,6 +37,8 @@ export interface Client {
   weeklyReelGoal?: number;
   weeklyCompletedReels?: number;
   weeklyCompletedPosters?: number;
+  contractStartDate?: Date;
+  contractEndDate?: Date;
 }
 
 export interface KanbanClientOption {

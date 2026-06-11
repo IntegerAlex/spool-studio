@@ -56,6 +56,8 @@ export interface Database {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          contract_start_date: string | null;
+          contract_end_date: string | null;
         };
         Relationships: [];
         Insert: {
@@ -75,6 +77,8 @@ export interface Database {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          contract_start_date?: string | null;
+          contract_end_date?: string | null;
         };
         Update: {
           name?: string;
@@ -92,6 +96,8 @@ export interface Database {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          contract_start_date?: string | null;
+          contract_end_date?: string | null;
         };
       };
       content_assets: {
