@@ -81,7 +81,7 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[var(--background)] text-foreground">
-      <Sidebar />
+      <Sidebar user={user} />
 
       <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[240px] lg:w-[calc(100%-240px)]">
         <div className="sticky top-0 z-50 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:hidden pt-[env(safe-area-inset-top)] h-[calc(3.5rem+env(safe-area-inset-top))]">
@@ -123,14 +123,14 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
                   <SheetDescription className="text-left text-[#a1a1aa]">Jump between sections and manage your workspace.</SheetDescription>
                 </SheetHeader>
                 <div className="h-[calc(100%-5rem)] overflow-y-auto">
-                  <Sidebar variant="drawer" onNavigate={() => setMobileNavOpen(false)} />
+                  <Sidebar variant="drawer" onNavigate={() => setMobileNavOpen(false)} user={user} />
                 </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
 
-        <Header title={routeTitle} className="hidden lg:flex" />
+        <Header title={routeTitle} className="hidden lg:flex" user={user} />
 
         <main className={cn('flex-1 w-full max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:pt-20')}> 
           <div className="mx-auto w-full max-w-[1900px] lg:w-[90%] min-w-0">

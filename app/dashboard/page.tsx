@@ -22,6 +22,8 @@ import {
   LayoutGrid,
   Plus,
   Sparkles,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 type TrendDirection = 'up' | 'down' | 'neutral';
@@ -143,9 +145,10 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState<'weekly' | 'monthly'>('monthly');
-  const eventSourceRef = useRef<EventSource | null>(null);
   const isRefreshingRef = useRef(false);
   const lastRefreshTimeRef = useRef(0);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshDashboard = async () => {
     const now = Date.now();
@@ -154,15 +157,18 @@ export default function DashboardPage() {
     }
     try {
       isRefreshingRef.current = true;
+      setIsRefreshing(true);
       const summaryData = await dashboardApi.getSummary();
       setClients(summaryData.clients ?? []);
       setSummary(summaryData);
       setRecentActivityLocal(summaryData.recentActivity ?? []);
       lastRefreshTimeRef.current = Date.now();
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Failed to refresh dashboard summary', err);
     } finally {
       isRefreshingRef.current = false;
+      setIsRefreshing(false);
     }
   };
 
@@ -180,6 +186,7 @@ export default function DashboardPage() {
         setClients(summaryData.clients ?? []);
         setSummary(summaryData);
         setRecentActivityLocal(summaryData.recentActivity ?? []);
+        setLastUpdated(new Date());
       } catch (err) {
         if (!isActive) {
           return;
@@ -637,20 +644,6 @@ export default function DashboardPage() {
     return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   }
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // Refresh dashboard summary and recent activity every 60 seconds
-    const POLL_INTERVAL_MS = 60 * 1000;
-
-    const intervalId = window.setInterval(() => {
-      void refreshDashboard();
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, []);
 
   if (isLoading) {
     return (
@@ -956,9 +949,29 @@ export default function DashboardPage() {
               <p className="mt-1 breadcrumb-text">
                 Dashboard
               </p>
+              {lastUpdated && (
+                <p className="mt-0.5 text-[11px] text-[#52525b]">
+                  Last updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
             </div>
 
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void refreshDashboard()}
+                disabled={isRefreshing}
+                className="h-8 px-3 text-xs text-[#a1a1aa] hover:text-white hover:bg-[rgba(255,255,255,0.05)]"
+              >
+                {isRefreshing ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                )}
+                Refresh
+              </Button>
+
               {/* Timeframe Selector */}
               <div className="flex items-center gap-1 rounded-lg bg-[rgba(255,255,255,0.04)] p-0.5 border border-[rgba(255,255,255,0.05)] mr-2">
                 <button

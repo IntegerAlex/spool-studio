@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -87,39 +87,12 @@ const navigationSections = [
 interface SidebarProps {
   variant?: 'desktop' | 'drawer';
   onNavigate?: () => void;
+  user?: User | null;
 }
 
-export function Sidebar({ variant = 'desktop', onNavigate }: SidebarProps) {
+export function Sidebar({ variant = 'desktop', onNavigate, user = null }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-    const supabase = createBrowserSupabaseClient();
-
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (isActive) {
-        setUser(data.user ?? null);
-      }
-    };
-
-    void loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isActive) {
-        setUser(session?.user ?? null);
-      }
-    });
-
-    return () => {
-      isActive = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const displayName = useMemo(() => {
     return user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';

@@ -1,50 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { Bell, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   title: string;
   className?: string;
+  user?: User | null;
 }
 
-export function Header({ title, className }: HeaderProps) {
+export function Header({ title, className, user = null }: HeaderProps) {
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    let isActive = true;
-    const supabase = createBrowserSupabaseClient();
-
-    const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (isActive) {
-        setUser(data.user ?? null);
-      }
-    };
-
-    void loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isActive) {
-        setUser(session?.user ?? null);
-      }
-    });
-
-    return () => {
-      isActive = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   const displayName =
     user?.user_metadata?.full_name ||
