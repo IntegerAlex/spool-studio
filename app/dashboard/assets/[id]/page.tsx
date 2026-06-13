@@ -10,6 +10,7 @@ import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import { StatusBadge } from '@/components/assets/status-badge';
 import { assetsApi, clientsApi, usersApi, authApi, clearApiClientCache } from '@/lib/api-client';
 import { Asset, Client, User } from '@/types/index';
+import { mutate } from 'swr';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -385,6 +386,7 @@ export default function AssetDetailPage() {
                     asset={asset}
                     onSaved={(updated) => {
                       setAsset(updated);
+                      mutate('/api/assets');
                       clientsApi.getById(updated.clientId).then(setClient).catch(() => undefined);
                     }}
                     trigger={
@@ -414,6 +416,7 @@ export default function AssetDetailPage() {
                       asset={asset}
                       onSaved={(updated) => {
                         setAsset(updated);
+                        mutate('/api/assets');
                         clientsApi.getById(updated.clientId).then(setClient).catch(() => undefined);
                       }}
                       trigger={
@@ -782,6 +785,7 @@ export default function AssetDetailPage() {
                 try {
                   await assetsApi.delete(asset.id);
                   toast({ title: 'Asset deleted' });
+                  mutate('/api/assets');
                   clearApiClientCache();
                   router.refresh();
                   router.push('/dashboard/assets');

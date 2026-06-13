@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import useSWR, { mutate } from 'swr';
 import Link from 'next/link';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { AssetCard } from '@/components/assets/asset-card';
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/empty';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { assetsApi, clientsApi, usersApi } from '@/lib/api-client';
+import { usersApi } from '@/lib/api-client';
 import { assetStatusLabels, assetStatusValues } from '@/lib/asset-workflow';
 import { cn } from '@/lib/utils';
 import { Asset, AssetStatus, AssetType, Client, User } from '@/types/index';
@@ -42,6 +43,35 @@ import {
 } from '@/lib/asset-discovery';
 import { Filter, Grid2X2, List, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { formatRelativeTime, getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Request failed');
+  const envelope = await response.json() as { data?: T; error?: string };
+  if (envelope.error) throw new Error(envelope.error);
+  return envelope.data as T;
+}
+
+function hydrateAssetDates(asset: Asset): Asset {
+  return {
+    ...asset,
+    createdAt: new Date(asset.createdAt),
+    updatedAt: new Date(asset.updatedAt),
+    uploadedAt: asset.uploadedAt ? new Date(asset.uploadedAt) : null,
+    scheduledAt: asset.scheduledAt ? new Date(asset.scheduledAt) : null,
+    publishedAt: asset.publishedAt ? new Date(asset.publishedAt) : null,
+    approvedAt: asset.approvedAt ? new Date(asset.approvedAt) : null,
+    calendarSyncedAt: asset.calendarSyncedAt ? new Date(asset.calendarSyncedAt) : null,
+  };
+}
+
+function hydrateClientDates(client: Client): Client {
+  return {
+    ...client,
+    createdAt: client.createdAt ? new Date(client.createdAt as unknown as string) : undefined,
+    updatedAt: client.updatedAt ? new Date(client.updatedAt as unknown as string) : undefined,
+  };
+}
 
 const assetTypes: AssetType[] = ['reel', 'poster'];
 const statusOptions: AssetStatus[] = [...assetStatusValues];
@@ -86,11 +116,24 @@ function formatUserLabel(user: User | undefined): string {
 }
 
 export default function AssetsPage() {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const { data: rawAssets, error: assetsError, isLoading: assetsLoading } = useSWR<Asset[]>('/api/assets', fetchJson);
+  const { data: rawClients, error: clientsError, isLoading: clientsLoading } = useSWR<Client[]>('/api/clients', fetchJson);
   const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [usersLoading, setUsersLoading] = useState(true);
+
+  const assets = useMemo(() => (rawAssets ?? []).map(hydrateAssetDates), [rawAssets]);
+  const clients = useMemo(() => (rawClients ?? []).map(hydrateClientDates), [rawClients]);
+  const isLoading = assetsLoading || clientsLoading || usersLoading;
+  const error = assetsError?.message ?? clientsError?.message ?? null;
+
+  useEffect(() => {
+    let isActive = true;
+    usersApi.getAll()
+      .then((data) => { if (isActive) setUsers(data); })
+      .catch(() => {})
+      .finally(() => { if (isActive) setUsersLoading(false); });
+    return () => { isActive = false; };
+  }, []);
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<AssetStatus | 'all'>(defaultStatus);
@@ -104,45 +147,6 @@ export default function AssetsPage() {
   const [sortMode, setSortMode] = useState<AssetSortMode>(defaultSortMode);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  useEffect(() => {
-    let isActive = true;
-
-    const loadData = async () => {
-      try {
-        setError(null);
-        const [assetsData, clientsData, usersData] = await Promise.all([
-          assetsApi.getAll(),
-          clientsApi.getAll(),
-          usersApi.getAll(),
-        ]);
-
-        if (!isActive) {
-          return;
-        }
-
-        setAssets(assetsData);
-        setClients(clientsData);
-        setUsers(usersData);
-      } catch (err) {
-        if (!isActive) {
-          return;
-        }
-        const message = err instanceof Error ? err.message : 'Failed to load assets';
-        setError(message);
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void loadData();
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -657,7 +661,10 @@ export default function AssetsPage() {
 
           <AssetFormDialog
             mode="create"
-            onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
+            onSaved={(saved) => {
+              mutate('/api/assets', (current) => [saved, ...(current ?? [])], false);
+              mutate('/api/assets');
+            }}
             trigger={
               <Button variant="accent" className="new-asset-btn">
                 <Plus className="mr-2 h-4 w-4" />

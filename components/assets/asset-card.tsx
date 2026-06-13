@@ -21,6 +21,7 @@ import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
 import { authApi, assetsApi, clearApiClientCache } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { mutate } from 'swr';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -342,6 +343,7 @@ function AssetCardImpl({ asset }: AssetCardProps) {
                   await assetsApi.delete(asset.id);
                   toast({ title: 'Asset deleted successfully' });
                   setShowDeleteDialog(false);
+                  mutate('/api/assets');
                   clearApiClientCache();
                   router.refresh();
                 } catch (err) {
