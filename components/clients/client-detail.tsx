@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { AssetCard } from '@/components/assets/asset-card';
 import { cn } from '@/lib/utils';
 import { ClientFormDialog } from '@/components/clients/client-form-dialog';
+import { ClientReport } from './client-report';
 
 interface ClientDetailProps {
   client: Client;
@@ -266,6 +267,7 @@ interface ClientDetailProps {
 
 export function ClientDetail({ client: initialClient, assets }: ClientDetailProps) {
   const [client, setClient] = useState<Client>(initialClient);
+  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'reports'>('overview');
 
   useEffect(() => {
     setClient(initialClient);
@@ -544,351 +546,402 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none xl:col-span-2">
-          <div className="flex items-center justify-between gap-4 border-b border-[rgba(255,255,255,0.05)] pb-4 mb-4">
-            <div>
-              <h2 className="text-[13px] font-medium text-white">Delivery Progress</h2>
-              <p className="mt-1 text-[12px] text-[#71717a]">Weekly & Monthly targets at a glance.</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className={cn('text-[10px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 uppercase tracking-wider', statusColorClass)}>
-                {statusLabel}
-              </span>
-              <div className="text-right">
-                <span className="text-[18px] font-medium text-white">{monthlyProgressPct}%</span>
-                <span className="text-[11px] text-[#71717a] ml-1">Complete</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Monthly Targets Section */}
-            <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
-              <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Monthly Targets</h3>
-                
-                {monthlyTarget === 0 ? (
-                  <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
-                    ⚠️ Goals Not Configured
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Posters Split */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-medium">
-                        <span className="text-[#a1a1aa]">Posters</span>
-                        <span className="text-white font-mono">{completedPosters} / {monthlyPostsTarget}</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                        <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyPosterProgress)}%` }} />
-                      </div>
-                    </div>
-
-                    {/* Reels Split */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-medium">
-                        <span className="text-[#a1a1aa]">Reels</span>
-                        <span className="text-white font-mono">{completedReels} / {monthlyReelsTarget}</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                        <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyReelProgress)}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Monthly KPI Summary */}
-              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
-                <div>
-                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Target</p>
-                  <p className="text-xs font-semibold text-white mt-0.5">{monthlyTarget}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
-                  <p className="text-xs font-semibold text-[#10b981] mt-0.5">{monthlyCompleted}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
-                  <p className="text-xs font-semibold text-white mt-0.5">{monthlyRemaining}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Weekly Targets Section */}
-            <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
-              <div>
-                <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Weekly Targets</h3>
-                
-                {weeklyGoal === 0 ? (
-                  <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
-                    ⚠️ Goals Not Configured
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Posters Split */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-medium">
-                        <span className="text-[#a1a1aa]">Posters</span>
-                        <span className="text-white font-mono">{weeklyCompletedPosters} / {weeklyPosterGoal}</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                        <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyPosterProgress)}%` }} />
-                      </div>
-                    </div>
-
-                    {/* Reels Split */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-medium">
-                        <span className="text-[#a1a1aa]">Reels</span>
-                        <span className="text-white font-mono">{weeklyCompletedReels} / {weeklyReelGoal}</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                        <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyReelProgress)}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Weekly KPI Summary */}
-              <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
-                <div>
-                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Goal</p>
-                  <p className="text-xs font-semibold text-white mt-0.5">{weeklyGoal}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
-                  <p className="text-xs font-semibold text-[#10b981] mt-0.5">{weeklyCompleted}</p>
-                </div>
-                <div>
-                  <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
-                  <p className="text-xs font-semibold text-white mt-0.5">{weeklyRemaining}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <div className="space-y-6">
-          <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-            <h2 className="text-[13px] font-medium text-white">Assigned Team</h2>
-            <div className="mt-4 flex flex-wrap gap-3">
-              {team.map((member) => (
-                <div key={member.id} className="flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5">
-                  <Avatar className="size-7 border border-[rgba(255,255,255,0.08)]">
-                    <AvatarImage src={member.avatar} alt={member.name} />
-                    <AvatarFallback className="bg-[#1c1c1c] text-[11px] font-semibold text-white">
-                      {member.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="pr-1">
-                    <p className="text-[12px] font-medium text-white">{member.name}</p>
-                    <p className="text-[11px] text-[#71717a] capitalize">{member.role}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-            <h2 className="text-[13px] font-medium text-white">Contract Information</h2>
-            <div className="mt-4 space-y-4">
-              <div>
-                <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract Start</p>
-                <p className="text-[13px] font-medium text-white mt-1">
-                  {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString(undefined, {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric'
-                  }) : 'Not specified'}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract End</p>
-                <p className="text-[13px] font-medium text-white mt-1">
-                  {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString(undefined, {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric'
-                  }) : 'Not specified'}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
+      {/* Navigation tabs */}
+      <div className="flex border-b border-[rgba(255,255,255,0.08)] gap-1 mb-2">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={cn(
+            "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all cursor-pointer",
+            activeTab === 'overview'
+              ? "border-[var(--primary)] text-white font-semibold"
+              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]"
+          )}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('assets')}
+          className={cn(
+            "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all cursor-pointer",
+            activeTab === 'assets'
+              ? "border-[var(--primary)] text-white font-semibold"
+              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]"
+          )}
+        >
+          Assets
+        </button>
+        <button
+          onClick={() => setActiveTab('reports')}
+          className={cn(
+            "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all cursor-pointer",
+            activeTab === 'reports'
+              ? "border-[var(--primary)] text-white font-semibold"
+              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]"
+          )}
+        >
+          Reports
+        </button>
       </div>
 
-      <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-5 shadow-none">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-[13px] font-medium text-white">References</h2>
-            <p className="mt-1 text-[12px] text-[#71717a]">Brand links, inspiration, social pages, and creative examples.</p>
+      {activeTab === 'overview' && (
+        <>
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none xl:col-span-2">
+              <div className="flex items-center justify-between gap-4 border-b border-[rgba(255,255,255,0.05)] pb-4 mb-4">
+                <div>
+                  <h2 className="text-[13px] font-medium text-white">Delivery Progress</h2>
+                  <p className="mt-1 text-[12px] text-[#71717a]">Weekly & Monthly targets at a glance.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className={cn('text-[10px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 uppercase tracking-wider', statusColorClass)}>
+                    {statusLabel}
+                  </span>
+                  <div className="text-right">
+                    <span className="text-[18px] font-medium text-white">{monthlyProgressPct}%</span>
+                    <span className="text-[11px] text-[#71717a] ml-1">Complete</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Monthly Targets Section */}
+                <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
+                  <div>
+                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Monthly Targets</h3>
+                    
+                    {monthlyTarget === 0 ? (
+                      <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
+                        ⚠️ Goals Not Configured
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Posters Split */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-medium">
+                            <span className="text-[#a1a1aa]">Posters</span>
+                            <span className="text-white font-mono">{completedPosters} / {monthlyPostsTarget}</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                            <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyPosterProgress)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* Reels Split */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-medium">
+                            <span className="text-[#a1a1aa]">Reels</span>
+                            <span className="text-white font-mono">{completedReels} / {monthlyReelsTarget}</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                            <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyReelProgress)}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Monthly KPI Summary */}
+                  <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
+                    <div>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Target</p>
+                      <p className="text-xs font-semibold text-white mt-0.5">{monthlyTarget}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
+                      <p className="text-xs font-semibold text-[#10b981] mt-0.5">{monthlyCompleted}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
+                      <p className="text-xs font-semibold text-white mt-0.5">{monthlyRemaining}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Weekly Targets Section */}
+                <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
+                  <div>
+                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Weekly Targets</h3>
+                    
+                    {weeklyGoal === 0 ? (
+                      <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
+                        ⚠️ Goals Not Configured
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Posters Split */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-medium">
+                            <span className="text-[#a1a1aa]">Posters</span>
+                            <span className="text-white font-mono">{weeklyCompletedPosters} / {weeklyPosterGoal}</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                            <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyPosterProgress)}%` }} />
+                          </div>
+                        </div>
+
+                        {/* Reels Split */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] font-medium">
+                            <span className="text-[#a1a1aa]">Reels</span>
+                            <span className="text-white font-mono">{weeklyCompletedReels} / {weeklyReelGoal}</span>
+                          </div>
+                          <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                            <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyReelProgress)}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Weekly KPI Summary */}
+                  <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
+                    <div>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Goal</p>
+                      <p className="text-xs font-semibold text-white mt-0.5">{weeklyGoal}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
+                      <p className="text-xs font-semibold text-[#10b981] mt-0.5">{weeklyCompleted}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
+                      <p className="text-xs font-semibold text-white mt-0.5">{weeklyRemaining}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <div className="space-y-6">
+              <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
+                <h2 className="text-[13px] font-medium text-white">Assigned Team</h2>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {team.map((member) => (
+                    <div key={member.id} className="flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5">
+                      <Avatar className="size-7 border border-[rgba(255,255,255,0.08)]">
+                        <AvatarImage src={member.avatar} alt={member.name} />
+                        <AvatarFallback className="bg-[#1c1c1c] text-[11px] font-semibold text-white">
+                          {member.name.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="pr-1">
+                        <p className="text-[12px] font-medium text-white">{member.name}</p>
+                        <p className="text-[11px] text-[#71717a] capitalize">{member.role}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
+                <h2 className="text-[13px] font-medium text-white">Contract Information</h2>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract Start</p>
+                    <p className="text-[13px] font-medium text-white mt-1">
+                      {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                      }) : 'Not specified'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract End</p>
+                    <p className="text-[13px] font-medium text-white mt-1">
+                      {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric'
+                      }) : 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
           </div>
 
-          <Button
-            onClick={() => {
-              console.log('[references][dialog-open]');
-              setEditingReference(null);
-              setIsReferenceDialogOpen(true);
-            }}
-            className="h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Reference
-          </Button>
-        </div>
+          <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-5 shadow-none">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-[13px] font-medium text-white">References</h2>
+                <p className="mt-1 text-[12px] text-[#71717a]">Brand links, inspiration, social pages, and creative examples.</p>
+              </div>
 
-        <div className="mt-4 space-y-3">
-          {referencesLoading ? (
-            <div className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] px-4 py-5 text-[13px] text-[#71717a]">
-              Loading references...
-            </div>
-          ) : sortedReferences.length === 0 ? (
-            <div className="rounded-[10px] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center text-[13px] text-[#71717a]">
-              <p>No references yet. Add links to brand pages, moodboards, competitors, or inspiration.</p>
               <Button
                 onClick={() => {
                   console.log('[references][dialog-open]');
                   setEditingReference(null);
                   setIsReferenceDialogOpen(true);
                 }}
-                className="mt-4 h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
+                className="h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Add Reference
               </Button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
-              {sortedReferences.map((reference) => {
-                const meta = getReferenceTypeMeta(reference.type);
-                const TypeIcon = meta.icon;
 
-                return (
-                  <Card
-                    key={reference.id}
-                    className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] p-4 shadow-none transition-colors hover:border-[rgba(255,255,255,0.12)]"
+            <div className="mt-4 space-y-3">
+              {referencesLoading ? (
+                <div className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] px-4 py-5 text-[13px] text-[#71717a]">
+                  Loading references...
+                </div>
+              ) : sortedReferences.length === 0 ? (
+                <div className="rounded-[10px] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center text-[13px] text-[#71717a]">
+                  <p>No references yet. Add links to brand pages, moodboards, competitors, or inspiration.</p>
+                  <Button
+                    onClick={() => {
+                      console.log('[references][dialog-open]');
+                      setEditingReference(null);
+                      setIsReferenceDialogOpen(true);
+                    }}
+                    className="mt-4 h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
-                        <TypeIcon className={cn('h-4 w-4', meta.toneClassName)} />
-                      </div>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Reference
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
+                  {sortedReferences.map((reference) => {
+                    const meta = getReferenceTypeMeta(reference.type);
+                    const TypeIcon = meta.icon;
 
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <h3 className="truncate text-[14px] font-medium text-white">{reference.title}</h3>
-                            <p className="mt-1 text-[11px] text-[#71717a]">{getReferenceHost(reference)}</p>
+                    return (
+                      <Card
+                        key={reference.id}
+                        className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#1a1a1a] p-4 shadow-none transition-colors hover:border-[rgba(255,255,255,0.12)]"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
+                            <TypeIcon className={cn('h-4 w-4', meta.toneClassName)} />
                           </div>
-                          <Badge variant="secondary" className="shrink-0">
-                            {meta.label}
-                          </Badge>
-                        </div>
 
-                        {reference.description && (
-                          <p className="text-[13px] leading-5 text-[#a1a1aa]">{reference.description}</p>
-                        )}
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="truncate text-[14px] font-medium text-white">{reference.title}</h3>
+                                <p className="mt-1 text-[11px] text-[#71717a]">{getReferenceHost(reference)}</p>
+                              </div>
+                              <Badge variant="secondary" className="shrink-0">
+                                {meta.label}
+                              </Badge>
+                            </div>
 
-                        <a
-                          href={reference.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block break-all text-[13px] text-[var(--primary)] hover:text-[#818cf8]"
-                        >
-                          {formatReferenceUrl(reference.url)}
-                        </a>
+                            {reference.description && (
+                              <p className="text-[13px] leading-5 text-[#a1a1aa]">{reference.description}</p>
+                            )}
 
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
-                            asChild
-                          >
-                            <a href={reference.url} target="_blank" rel="noreferrer">
-                              <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                              Open
+                            <a
+                              href={reference.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block break-all text-[13px] text-[var(--primary)] hover:text-[#818cf8]"
+                            >
+                              {formatReferenceUrl(reference.url)}
                             </a>
-                          </Button>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleCopyReferenceLink(reference)}
-                            className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
-                          >
-                            <Copy className="mr-2 h-3.5 w-3.5" />
-                            Copy
-                          </Button>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                                asChild
+                              >
+                                <a href={reference.url} target="_blank" rel="noreferrer">
+                                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                                  Open
+                                </a>
+                              </Button>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              console.log('[references][dialog-open]');
-                              setEditingReference(reference);
-                              setIsReferenceDialogOpen(true);
-                            }}
-                            className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
-                          >
-                            <Edit2 className="mr-2 h-3.5 w-3.5" />
-                            Edit
-                          </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCopyReferenceLink(reference)}
+                                className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                              >
+                                <Copy className="mr-2 h-3.5 w-3.5" />
+                                Copy
+                              </Button>
 
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteReference(reference)}
-                            className="h-8 border-[rgba(239,68,68,0.16)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.08)] hover:text-[#fecaca]"
-                          >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" />
-                            Delete
-                          </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  console.log('[references][dialog-open]');
+                                  setEditingReference(reference);
+                                  setIsReferenceDialogOpen(true);
+                                }}
+                                className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
+                              >
+                                <Edit2 className="mr-2 h-3.5 w-3.5" />
+                                Edit
+                              </Button>
+
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteReference(reference)}
+                                className="h-8 border-[rgba(239,68,68,0.16)] bg-transparent px-3 text-[12px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.08)] hover:text-[#fecaca]"
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+          </Card>
+
+          {client.brandColor && (
+            <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
+              <h2 className="text-[13px] font-medium text-white">Brand Identity</h2>
+              <div className="mt-4 flex items-center gap-3">
+                <div
+                  className="size-10 rounded-[10px] border border-[rgba(255,255,255,0.07)]"
+                  style={{ backgroundColor: client.brandColor }}
+                />
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Brand Color</p>
+                  <p className="mt-1 text-[13px] font-mono text-white">{client.brandColor}</p>
+                </div>
+              </div>
+            </Card>
           )}
-        </div>
-      </Card>
+        </>
+      )}
 
-      <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-medium text-white">Assets</h2>
-          <Link href="/dashboard/assets" className="text-[13px] font-medium text-[var(--primary)] hover:text-[#818cf8]">
-            View all
-          </Link>
-        </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {assets.map((asset) => (
-            <AssetCard key={asset.id} asset={asset} />
-          ))}
-        </div>
-      </Card>
-
-      {client.brandColor && (
+      {activeTab === 'assets' && (
         <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-          <h2 className="text-[13px] font-medium text-white">Brand Identity</h2>
-          <div className="mt-4 flex items-center gap-3">
-            <div
-              className="size-10 rounded-[10px] border border-[rgba(255,255,255,0.07)]"
-              style={{ backgroundColor: client.brandColor }}
-            />
-            <div>
-              <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Brand Color</p>
-              <p className="mt-1 text-[13px] font-mono text-white">{client.brandColor}</p>
-            </div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-[13px] font-medium text-white">Assets</h2>
+            <Link href="/dashboard/assets" className="text-[13px] font-medium text-[var(--primary)] hover:text-[#818cf8]">
+              View all
+            </Link>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {assets.map((asset) => (
+              <AssetCard key={asset.id} asset={asset} />
+            ))}
           </div>
         </Card>
+      )}
+
+      {activeTab === 'reports' && (
+        <ClientReport
+          clientId={client.id}
+          contractStartDate={client.contractStartDate}
+          contractEndDate={client.contractEndDate}
+        />
       )}
 
       <ReferenceEditorDialog
