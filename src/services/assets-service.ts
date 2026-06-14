@@ -1302,7 +1302,7 @@ export async function updateAsset(
   return mapped;
 }
 
-const approvalEligibleStatuses = new Set<AssetStatus>(['draft', 'ready_for_review']);
+const approvalEligibleStatuses = new Set<AssetStatus>(['draft', 'ready_for_review', 'revision_requested']);
 
 export async function approveAsset(assetId: string, userId: string): Promise<Asset> {
   const supabase = await createServerSupabaseClient();
