@@ -19,6 +19,7 @@ import {
   insertAsset,
   listAssets,
   listAssetsByClientId,
+  listAssetsByStatuses,
   updateAsset as updateAssetRow,
   listRevisionsByAssetId,
 } from '@/repositories/assets-repository';
@@ -283,6 +284,18 @@ export async function getAssets(): Promise<Asset[]> {
       .filter((asset): asset is Asset => Boolean(asset));
   } catch (error) {
     logProductionRuntimeError('assets-loader', error);
+    return [];
+  }
+}
+
+export async function getAssetsByStatuses(statuses: readonly AssetStatus[]): Promise<Asset[]> {
+  try {
+    const rows = await listAssetsByStatuses(statuses);
+    return rows
+      .map((asset) => mapAsset(asset))
+      .filter((asset): asset is Asset => Boolean(asset));
+  } catch (error) {
+    logProductionRuntimeError('assets-by-statuses-loader', error);
     return [];
   }
 }

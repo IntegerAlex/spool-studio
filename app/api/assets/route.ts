@@ -1,14 +1,26 @@
 import { NextResponse } from 'next/server';
-import { createAsset, getAssets, getAssetsByClientId } from '@/services/assets-service';
+import { createAsset, getAssets, getAssetsByClientId, getAssetsByStatuses } from '@/services/assets-service';
 import { assetStatusValues } from '@/lib/asset-workflow';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import type { AssetStatus } from '@/types/index';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const clientId = searchParams.get('clientId');
+    const statusesParam = searchParams.get('statuses');
 
-    const assets = clientId ? await getAssetsByClientId(clientId) : await getAssets();
+    let assets;
+    if (statusesParam) {
+      const statuses = statusesParam.split(',').filter(
+        (s): s is AssetStatus => assetStatusValues.includes(s as AssetStatus)
+      );
+      assets = await getAssetsByStatuses(statuses);
+    } else if (clientId) {
+      assets = await getAssetsByClientId(clientId);
+    } else {
+      assets = await getAssets();
+    }
     return NextResponse.json({ data: assets });
   } catch (error) {
     logProductionRuntimeError('api-assets-get', error);

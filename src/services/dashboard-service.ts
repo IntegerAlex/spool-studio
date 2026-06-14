@@ -205,6 +205,19 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     // Use pre-fetched asset summaries for aggregate computations
     const activeAssets = (assetSummaries as any[]).filter((asset) => asset.status !== 'archived' && asset.status !== 'failed');
 
+    // Pre-group assets by client_id for O(1) lookups in the client loop
+    const assetsByClientId = new Map<string, any[]>();
+    for (const asset of activeAssets) {
+      const cid = asset.client_id;
+      if (!cid) continue;
+      const list = assetsByClientId.get(cid);
+      if (list) {
+        list.push(asset);
+      } else {
+        assetsByClientId.set(cid, [asset]);
+      }
+    }
+
     let pendingApprovals = 0;
     let upcomingUploads = 0;
     let uploadedThisMonth = 0;
@@ -308,7 +321,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       });
 
       // Get next publish date (earliest approved/scheduled asset publish date in the future)
-      const clientAssets = activeAssets.filter((asset) => asset.client_id === client.id);
+      const clientAssets = assetsByClientId.get(client.id) ?? [];
       const futureDates = clientAssets
         .map((asset) => {
           if (asset.publish_date) {

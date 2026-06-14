@@ -474,6 +474,13 @@ export const assetsApi = {
     return assets.map(hydrateAsset);
   },
 
+  getByStatuses: async (statuses: string[]): Promise<Asset[]> => {
+    const assets = await fetchJsonDeduped<Asset[]>(
+      `/api/assets?statuses=${encodeURIComponent(statuses.join(','))}`
+    );
+    return assets.map(hydrateAsset);
+  },
+
   getById: async (id: string): Promise<Asset | null> => {
     const asset = await fetchJsonNullableDeduped<Asset>(`/api/assets/${id}`);
     return asset ? hydrateAsset(asset) : null;

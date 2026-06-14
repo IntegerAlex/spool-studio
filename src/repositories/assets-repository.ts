@@ -66,6 +66,24 @@ export async function listAssets(client?: SupabaseClient<Database>): Promise<DbA
   return data ?? [];
 }
 
+export async function listAssetsByStatuses(
+  statuses: readonly string[],
+  client?: SupabaseClient<Database>
+): Promise<DbAsset[]> {
+  const supabase = await getClient(client);
+  const { data, error } = await supabase
+    .from('content_assets')
+    .select(assetSelect)
+    .in('status', statuses as string[])
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
 export async function listAssetSummaries(
   client?: SupabaseClient<Database>
 ): Promise<DbAssetSummary[]> {
