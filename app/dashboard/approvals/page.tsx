@@ -24,17 +24,13 @@ export default function ApprovalsPage() {
       try {
         setError(null);
         const [assetsData, clientsData] = await Promise.all([
-          assetsApi.getAll(),
+          assetsApi.getByStatuses(['draft', 'ready_for_review', 'revision_requested']),
           clientsApi.getAll(),
         ]);
 
         const clientMap = new Map(clientsData.map((c) => [c.id, c]));
         setClients(clientMap);
-
-        const approvalsAssets = assetsData.filter(
-          (a) => a.status === 'draft' || a.status === 'ready_for_review' || a.status === 'revision_requested'
-        );
-        setAssets(approvalsAssets);
+        setAssets(assetsData);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load approvals';
         setError(message);
