@@ -8,8 +8,6 @@ import {
   updateClient as updateClientRow,
 } from '@/repositories/clients-repository';
 import { listAssetSummaries, listAssetsByClientId } from '@/repositories/assets-repository';
-import { getWeeklyCountsGroupedByClient } from '@/repositories/assets-repository';
-import { checkClientGoalsMigration } from '@/lib/migration-check';
 import { createClientDriveFolders } from '@/integrations/google-drive/folder-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
@@ -239,17 +237,10 @@ function mapClient(
 
 export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Client[]> {
   try {
-    const mig = await checkClientGoalsMigration().catch(() => ({ ok: false }));
-
-    const [clients, assetSummaries, weeklyCounts] = await Promise.all([
+    const [clients, assetSummaries] = await Promise.all([
       listClients(),
       preFetchedAssetSummaries ? Promise.resolve(preFetchedAssetSummaries) : listAssetSummaries(),
-      mig.ok
-        ? getWeeklyCountsGroupedByClient(new Date(new Date().setDate(new Date().getDate() - 7)).toISOString())
-        : Promise.resolve([] as { client_id: string; weekly_count: number }[]),
     ]);
-
-    const weeklyMap = new Map<string, number>(weeklyCounts.map((r) => [r.client_id, Number(r.weekly_count)]));
 
     const now = new Date();
     const metricsMap = buildClientMetricsMap(assetSummaries, getMonthStart(now), getWeekStart(now), now);
@@ -258,9 +249,7 @@ export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Clie
       .map((client) => {
         const mapped = mapClient(client, assetSummaries, metricsMap);
         if (!mapped) return null;
-        const dbCount = weeklyMap.get(client.id) ?? mapped.weeklyCompleted ?? 0;
-        mapped.weeklyCompleted = dbCount;
-        mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - dbCount);
+        mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - mapped.weeklyCompleted);
         return mapped;
       })
       .filter((client): client is Client => Boolean(client));
@@ -287,21 +276,13 @@ export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Clie
 export async function getClientDetail(clientId: string): Promise<Client | null> {
   try {
     const [client, assetSummaries] = await Promise.all([getClientById(clientId), listAssetSummaries()]);
-    const mapped = mapClient(client, assetSummaries);
+
+    const now = new Date();
+    const metricsMap = buildClientMetricsMap(assetSummaries, getMonthStart(now), getWeekStart(now), now);
+    const mapped = mapClient(client, assetSummaries, metricsMap);
     if (!mapped) return null;
 
-    try {
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - 7);
-      const counts = await getWeeklyCountsGroupedByClient(weekStart.toISOString());
-      const found = counts.find((c) => c.client_id === clientId);
-      if (found) {
-        mapped.weeklyCompleted = Number(found.weekly_count);
-        mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - mapped.weeklyCompleted);
-      }
-    } catch (_e) {
-      // fallback to computed value
-    }
+    mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - mapped.weeklyCompleted);
 
     return mapped;
   } catch (error) {
