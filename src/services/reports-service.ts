@@ -4,6 +4,16 @@ import { listClientAssetsForReport } from '@/repositories/reports-repository';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 
+export interface ReportOptions {
+  clientId: string;
+  startDate: Date;
+  endDate: Date;
+  isMonthly?: boolean;
+  month?: number;
+  year?: number;
+  client?: SupabaseClient<Database>;
+}
+
 export interface MonthlyReportPayload {
   client: {
     id: string;
@@ -14,11 +24,13 @@ export interface MonthlyReportPayload {
     contractEndDate?: string | null;
   };
   period: {
-    month: string;
-    monthNumber: number;
-    year: number;
+    mode: 'monthly' | 'custom';
+    displayLabel: string;
     startDate: string;
     endDate: string;
+    month?: string;
+    monthNumber?: number;
+    year?: number;
   };
   summary: {
     postersDelivered: number;
@@ -26,6 +38,7 @@ export interface MonthlyReportPayload {
     totalDelivered: number;
     monthlyTarget: number;
     completionRate: number;
+    targetLabel: string;
   };
   assets: Array<{
     id: string;
@@ -54,29 +67,37 @@ const MONTH_NAMES = [
   'December',
 ];
 
-export async function generateMonthlyReport(
-  clientId: string,
-  month: number,
-  year: number,
-  client?: SupabaseClient<Database>
+function formatShortDate(date: Date): string {
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const monthIndex = date.getUTCMonth();
+  const year = date.getUTCFullYear();
+  const monthAbbr = MONTH_NAMES[monthIndex].substring(0, 3);
+  return `${day} ${monthAbbr} ${year}`;
+}
+
+export async function generateReport(
+  options: ReportOptions
 ): Promise<MonthlyReportPayload | null> {
+  const { clientId, startDate, endDate, isMonthly = false, month, year, client } = options;
+
+  // For custom ranges, normalize endDate to end-of-day so the entire final day is included.
+  // Monthly ranges already compute end-of-month (23:59:59.999) in generateMonthlyReport().
+  const effectiveEndDate = new Date(endDate);
+  if (!isMonthly) {
+    effectiveEndDate.setUTCHours(23, 59, 59, 999);
+  }
+
   const clientRecord = await getClientById(clientId, client);
   if (!clientRecord) {
     return null;
   }
 
-  // Define date range in UTC to cover the requested calendar month
-  const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-  const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
-
-  // Query published assets within date range from repository
-  const dbAssets = await listClientAssetsForReport(clientId, startDate, endDate, client);
+  const dbAssets = await listClientAssetsForReport(clientId, startDate, effectiveEndDate, client);
 
   const postersDelivered = dbAssets.filter((asset) => asset.type === 'poster').length;
   const reelsDelivered = dbAssets.filter((asset) => asset.type === 'reel').length;
   const totalDelivered = postersDelivered + reelsDelivered;
 
-  // monthlyTarget = monthly_goal, fallback to reels target + posts target
   const monthlyTarget =
     clientRecord.monthly_goal && clientRecord.monthly_goal > 0
       ? clientRecord.monthly_goal
@@ -85,10 +106,7 @@ export async function generateMonthlyReport(
   const completionRate =
     monthlyTarget > 0 ? Math.round((totalDelivered / monthlyTarget) * 100) : 0;
 
-  const monthName = MONTH_NAMES[month - 1] || String(month);
-
   const assets = dbAssets.map((asset) => {
-    // Map dates properly resolving legacy fallback if published_at is not present
     let resolvedPublishTime: string | null = null;
     if (asset.published_at) {
       resolvedPublishTime = new Date(asset.published_at).toISOString();
@@ -111,29 +129,70 @@ export async function generateMonthlyReport(
     };
   });
 
+  let period: MonthlyReportPayload['period'];
+
+  if (isMonthly && month != null && year != null) {
+    const monthName = MONTH_NAMES[month - 1] || String(month);
+    period = {
+      mode: 'monthly',
+      displayLabel: `${monthName} ${year}`,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      month: monthName,
+      monthNumber: month,
+      year,
+    };
+  } else {
+    const startFormatted = formatShortDate(startDate);
+    const endFormatted = formatShortDate(effectiveEndDate);
+    period = {
+      mode: 'custom',
+      displayLabel: `${startFormatted} – ${endFormatted}`,
+      startDate: startDate.toISOString(),
+      endDate: effectiveEndDate.toISOString(),
+    };
+  }
+
   return {
     client: {
       id: clientRecord.id,
       name: clientRecord.name,
-      instagramHandle: clientRecord.instagram_handle ? `@${clientRecord.instagram_handle.replace(/^@/, '')}` : '',
+      instagramHandle: clientRecord.instagram_handle
+        ? `@${clientRecord.instagram_handle.replace(/^@/, '')}`
+        : '',
       brandColor: clientRecord.brand_color || undefined,
       contractStartDate: clientRecord.contract_start_date,
       contractEndDate: clientRecord.contract_end_date,
     },
-    period: {
-      month: monthName,
-      monthNumber: month,
-      year,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-    },
+    period,
     summary: {
       postersDelivered,
       reelsDelivered,
       totalDelivered,
       monthlyTarget,
       completionRate,
+      targetLabel: isMonthly ? 'Monthly Target' : 'Monthly Target (per month)',
     },
     assets,
   };
+}
+
+export async function generateMonthlyReport(
+  clientId: string,
+  month: number,
+  year: number,
+  client?: SupabaseClient<Database>
+): Promise<MonthlyReportPayload | null> {
+  const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+  const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+
+  return generateReport({
+    clientId,
+    startDate,
+    endDate,
+    isMonthly: true,
+    month,
+    year,
+    client,
+  });
 }

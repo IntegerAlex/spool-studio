@@ -5,7 +5,9 @@ import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 export async function GET() {
   try {
     const clients = await getClients();
-    return NextResponse.json({ data: clients });
+    const response = NextResponse.json({ data: clients });
+    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    return response;
   } catch (error) {
     logProductionRuntimeError('api-clients-get', error);
     return NextResponse.json({ data: [] });

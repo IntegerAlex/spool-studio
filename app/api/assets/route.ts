@@ -21,7 +21,9 @@ export async function GET(request: Request) {
     } else {
       assets = await getAssets();
     }
-    return NextResponse.json({ data: assets });
+    const response = NextResponse.json({ data: assets });
+    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    return response;
   } catch (error) {
     logProductionRuntimeError('api-assets-get', error);
     return NextResponse.json({ data: [] });

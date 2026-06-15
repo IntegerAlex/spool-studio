@@ -254,10 +254,12 @@ export function MonthlyReportPDFDocument({ report }: PDFDocumentProps) {
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.reportTitle}>Monthly Delivery Report</Text>
+          <Text style={styles.reportTitle}>
+            {report.period.mode === 'custom' ? 'Custom Delivery Report' : 'Monthly Delivery Report'}
+          </Text>
           <Text style={styles.clientName}>{report.client.name}</Text>
           <Text style={styles.periodText}>
-            Reporting Period: {report.period.month} {report.period.year}
+            Reporting Period: {report.period.displayLabel}
           </Text>
           <Text style={styles.contractText}>
             Contract Period: {contractStartStr} to {contractEndStr}

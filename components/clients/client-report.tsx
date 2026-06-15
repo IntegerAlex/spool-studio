@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, FileText, CheckCircle2, Video, FileImage, ArrowUpRight, FolderHeart, Info, Download, Loader2 } from 'lucide-react';
 import { MonthlyReportPayload } from '@/services/reports-service';
@@ -66,24 +68,45 @@ function formatTimelineDate(isoString: string | null): string {
 
 export function ClientReport({ clientId, contractStartDate, contractEndDate }: ClientReportProps) {
   const now = new Date();
+  const [reportMode, setReportMode] = useState<'monthly' | 'custom'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
   const [report, setReport] = useState<MonthlyReportPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
 
+  const isCustomRangeValid =
+    reportMode === 'custom' &&
+    customStartDate !== '' &&
+    customEndDate !== '' &&
+    customStartDate <= customEndDate;
+
+  const buildReportUrl = (base: string) => {
+    if (reportMode === 'custom') {
+      return `${base}?startDate=${customStartDate}&endDate=${customEndDate}`;
+    }
+    return `${base}?month=${selectedMonth}&year=${selectedYear}`;
+  };
+
   useEffect(() => {
     let active = true;
+
+    if (reportMode === 'custom' && !isCustomRangeValid) {
+      setReport(null);
+      setError(null);
+      setIsLoading(false);
+      return () => { active = false; };
+    }
 
     const fetchReport = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch(
-          `/api/clients/${clientId}/report?month=${selectedMonth}&year=${selectedYear}`
-        );
+        const res = await fetch(buildReportUrl(`/api/clients/${clientId}/report`));
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || 'Failed to load report data');
@@ -108,14 +131,12 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
     return () => {
       active = false;
     };
-  }, [clientId, selectedMonth, selectedYear]);
+  }, [clientId, reportMode, selectedMonth, selectedYear, customStartDate, customEndDate, isCustomRangeValid]);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
     try {
-      const response = await fetch(
-        `/api/clients/${clientId}/report/pdf?month=${selectedMonth}&year=${selectedYear}`
-      );
+      const response = await fetch(buildReportUrl(`/api/clients/${clientId}/report/pdf`));
       
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -128,7 +149,12 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
       a.href = url;
       
       const disposition = response.headers.get('content-disposition');
-      let filename = `Monthly-Report-${report?.client.name || 'Client'}-${selectedMonth}-${selectedYear}.pdf`;
+      let filename: string;
+      if (reportMode === 'custom') {
+        filename = `Report-${report?.client.name || 'Client'}-${customStartDate}-to-${customEndDate}.pdf`;
+      } else {
+        filename = `Monthly-Report-${report?.client.name || 'Client'}-${selectedMonth}-${selectedYear}.pdf`;
+      }
       if (disposition && disposition.indexOf('attachment') !== -1) {
         const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
         const matches = filenameRegex.exec(disposition);
@@ -154,72 +180,133 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
   };
 
   const selectedMonthLabel = MONTHS.find((m) => m.value === selectedMonth)?.label || '';
+  const periodLabel = report?.period?.displayLabel || (reportMode === 'custom'
+    ? (customStartDate && customEndDate
+        ? `${new Date(customStartDate + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} – ${new Date(customEndDate + 'T00:00:00Z').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+        : 'Select dates')
+    : `${selectedMonthLabel} ${selectedYear}`);
 
   return (
     <div className="space-y-6">
       {/* Report Cover Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-6">
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">Monthly Delivery Report</p>
-          <h2 className="text-[20px] font-bold text-white leading-tight">
-            {report?.client.name || 'Client Report'}
-          </h2>
-          <p className="text-[13px] text-[#71717a]">
-            Reporting Period: <span className="text-white font-medium">{selectedMonthLabel} {selectedYear}</span>
-          </p>
+      <div className="flex flex-col gap-4 rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--primary)]">Delivery Report</p>
+            <h2 className="text-[20px] font-bold text-white leading-tight">
+              {report?.client.name || 'Client Report'}
+            </h2>
+            <p className="text-[13px] text-[#71717a]">
+              Reporting Period: <span className="text-white font-medium">{periodLabel}</span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <Button
+              onClick={handleDownloadPDF}
+              disabled={isDownloading || !report || (reportMode === 'custom' && !isCustomRangeValid)}
+              variant="outline"
+              className="h-9 px-3 rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white hover:bg-[#27272a] hover:text-white"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin text-[var(--primary)]" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <Select
-            value={String(selectedMonth)}
-            onValueChange={(val) => setSelectedMonth(parseInt(val, 10))}
+        {/* Mode Toggle + Period Selectors */}
+        <div className="flex flex-col gap-3 border-t border-[rgba(255,255,255,0.05)] pt-4">
+          <ToggleGroup
+            type="single"
+            value={reportMode}
+            onValueChange={(val) => { if (val) setReportMode(val as 'monthly' | 'custom'); }}
+            className="justify-start"
           >
-            <SelectTrigger className="w-[130px] h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m) => (
-                <SelectItem key={m.value} value={String(m.value)}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <ToggleGroupItem
+              value="monthly"
+              className="h-8 px-3 rounded-md text-[12px] font-medium border border-[rgba(255,255,255,0.1)] data-[state=on]:bg-[var(--primary)] data-[state=on]:text-white data-[state=on]:border-[var(--primary)]"
+            >
+              Monthly
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="custom"
+              className="h-8 px-3 rounded-md text-[12px] font-medium border border-[rgba(255,255,255,0.1)] data-[state=on]:bg-[var(--primary)] data-[state=on]:text-white data-[state=on]:border-[var(--primary)]"
+            >
+              Custom Range
+            </ToggleGroupItem>
+          </ToggleGroup>
 
-          <Select
-            value={String(selectedYear)}
-            onValueChange={(val) => setSelectedYear(parseInt(val, 10))}
-          >
-            <SelectTrigger className="w-[90px] h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {YEARS.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={isDownloading || !report}
-            variant="outline"
-            className="h-9 px-3 rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white hover:bg-[#27272a] hover:text-white"
-          >
-            {isDownloading ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {reportMode === 'monthly' ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin text-[var(--primary)]" />
-                Generating...
+                <Select
+                  value={String(selectedMonth)}
+                  onValueChange={(val) => setSelectedMonth(parseInt(val, 10))}
+                >
+                  <SelectTrigger className="w-[130px] h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((m) => (
+                      <SelectItem key={m.value} value={String(m.value)}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={String(selectedYear)}
+                  onValueChange={(val) => setSelectedYear(parseInt(val, 10))}
+                >
+                  <SelectTrigger className="w-[90px] h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {YEARS.map((y) => (
+                      <SelectItem key={y} value={String(y)}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </>
             ) : (
               <>
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] text-[#71717a]">From</span>
+                  <Input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="h-9 w-[160px] rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] text-[#71717a]">To</span>
+                  <Input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    min={customStartDate || undefined}
+                    className="h-9 w-[160px] rounded-md border border-[rgba(255,255,255,0.1)] bg-[#1a1a1a] text-[13px] text-white"
+                  />
+                </div>
+                {customStartDate && customEndDate && customStartDate > customEndDate && (
+                  <p className="text-[11px] text-red-400">Start date must be before end date</p>
+                )}
               </>
             )}
-          </Button>
+          </div>
         </div>
       </div>
 
@@ -230,6 +317,10 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
       ) : error ? (
         <div className="text-center py-12 rounded-[10px] border border-red-500/20 bg-red-500/5">
           <p className="text-red-400 text-[13px]">{error}</p>
+        </div>
+      ) : reportMode === 'custom' && !isCustomRangeValid ? (
+        <div className="text-center py-12 rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)]">
+          <p className="text-[#71717a] text-[13px]">Select a start and end date to view the report.</p>
         </div>
       ) : report ? (
         <>
@@ -247,7 +338,9 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
                 <p className="text-[14px] font-semibold text-white">
                   Delivered: <span className="text-emerald-400">{report.summary.totalDelivered}</span> / {report.summary.monthlyTarget}
                 </p>
-                <p className="text-[12px] text-[#71717a]">Completion: {report.summary.completionRate}%</p>
+                <p className="text-[12px] text-[#71717a]">
+                  {report.summary.targetLabel || 'Monthly Target'} — Completion: {report.summary.completionRate}%
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-[11px] text-[#71717a] uppercase">Contract Period</p>
@@ -324,7 +417,7 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
                 <FolderHeart className="h-8 w-8 text-[#71717a]" />
                 <h4 className="text-[14px] font-semibold text-white">No Published Content</h4>
                 <p className="text-[13px] text-[#71717a] max-w-[280px]">
-                  No assets were published during the selected reporting period.
+                  No assets were published during {periodLabel}.
                 </p>
               </div>
             </Card>

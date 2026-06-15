@@ -10,7 +10,7 @@ export async function GET() {
       totalClients: summary.totalClients,
     });
     const response = NextResponse.json({ data: summary });
-    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     return response;
   } catch (error) {
     logProductionRuntimeError('api-dashboard-summary', error);
