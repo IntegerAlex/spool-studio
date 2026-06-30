@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getAssetDetail } from '@/services/assets-service';
 import { canUploadFromStatus, canUploadRevisionFromStatus } from '@/lib/asset-workflow';
-import { resolveAssetDriveFolder } from '@/services/assets-service';
-import { createDriveResumableUploadSession } from '@/integrations/google-drive/drive-service';
+import { getPresignedUploadUrl } from '@/integrations/r2/r2-service';
+import { getAssetR2Key } from '@/services/assets-service';
+import { getCurrentUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +11,7 @@ const MAX_UPLOAD_BYTES = 524288000;
 
 interface UploadSessionBody {
   assetId?: string;
+  clientId?: string;
   fileName?: string;
   mimeType?: string;
   fileSize?: number;
@@ -21,19 +22,16 @@ export async function POST(request: Request) {
   let clientId = 'unknown';
   let fileName = 'unknown';
   let mimeType = 'application/octet-stream';
-  let parentFolderId: string | null = null;
 
   try {
-    const supabase = await createServerSupabaseClient();
-    const [userResult, sessionResult] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
-    const user = userResult.data.user;
-
-    if (userResult.error || !user || !sessionResult.data.session) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = (await request.json()) as UploadSessionBody;
     assetId = body.assetId?.trim() ?? 'unknown';
+    clientId = body.clientId?.trim() ?? 'unknown';
     fileName = body.fileName?.trim() ?? 'unknown';
     mimeType = body.mimeType?.trim() || 'application/octet-stream';
     const fileSize = typeof body.fileSize === 'number' ? body.fileSize : Number(body.fileSize);
@@ -66,51 +64,44 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Upload not allowed for the current asset state' }, { status: 409 });
     }
 
-    const folder = await resolveAssetDriveFolder(asset.type, asset.clientId);
-    if (!folder) {
-      return NextResponse.json({ success: false, error: 'Drive folder not found for asset' }, { status: 404 });
-    }
+    const r2Key = getAssetR2Key(clientId, assetId, fileName);
 
-    parentFolderId = folder.id;
-
-    const session = await createDriveResumableUploadSession({
-      folderId: folder.id,
-      fileName,
-      mimeType,
-      fileSize,
+    const { uploadUrl, key } = await getPresignedUploadUrl({
+      key: r2Key,
+      contentType: mimeType,
+      expiresIn: 3600,
     });
 
-    console.info('[drive-resumable-upload]', {
+    console.info('[r2-presigned-upload]', {
       assetId,
-      uploadSessionCreated: true,
+      presignedUrlGenerated: true,
     });
 
     return NextResponse.json(
       {
         success: true,
         data: {
-          uploadUrl: session.uploadUrl,
-          driveFileId: session.driveFileId,
-          uploadType: 'resumable',
+          uploadUrl,
+          key,
+          uploadType: 'presigned',
           assetId,
           fileName,
           mimeType,
           fileSize,
         },
-        uploadUrl: session.uploadUrl,
-        driveFileId: session.driveFileId,
-        uploadType: 'resumable',
+        uploadUrl,
+        key,
+        uploadType: 'presigned',
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error('[google-resumable-session]', {
+    console.error('[r2-presigned-session]', {
       step: 'create-session',
       assetId,
       clientId,
       mimeType,
       fileName,
-      parentFolderId,
       message: error instanceof Error ? error.message : 'unknown',
       stack: error instanceof Error ? error.stack ?? null : null,
     });
@@ -118,7 +109,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create Google resumable upload session',
+        error: error instanceof Error ? error.message : 'Failed to create R2 presigned upload URL',
       },
       { status: 500 }
     );
