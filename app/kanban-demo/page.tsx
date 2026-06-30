@@ -204,7 +204,7 @@ export default function KanbanDemoPage() {
           </Card>
           <Card className="p-3 bg-muted border-border">
             <p className="text-xs font-medium text-muted-foreground mb-1">Review</p>
-            <p className="text-2xl font-bold text-amber-500">{filteredAssets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === 'review').length}</p>
+            <p className="text-2xl font-bold text-amber-500">{filteredAssets.filter((asset) => getKanbanWorkflowColumnId(asset.status) === 'revision').length}</p>
           </Card>
           <Card className="p-3 bg-muted border-border">
             <p className="text-xs font-medium text-muted-foreground mb-1">Approved</p>

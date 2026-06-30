@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { finalizeAssetUpload, uploadAssetFile } from '@/services/assets-service';
-import { fetchDriveFileMetadata } from '@/integrations/google-drive/drive-service';
+import { getFileMetadata } from '@/integrations/r2/r2-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export const runtime = 'nodejs';
@@ -77,36 +77,33 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (contentType?.toLowerCase().includes('application/json')) {
       const body = (await request.json()) as {
-        driveFileId?: string;
+        r2Key?: string;
+        key?: string;
         fileName?: string;
       };
 
-      if (!body.driveFileId) {
-        return NextResponse.json({ success: false, error: 'driveFileId is required' }, { status: 400 });
+      const fileKey = body.r2Key ?? body.key;
+      if (!fileKey) {
+        return NextResponse.json({ success: false, error: 'r2Key is required' }, { status: 400 });
       }
 
       if (!body.fileName) {
         return NextResponse.json({ success: false, error: 'fileName is required' }, { status: 400 });
       }
 
-      const driveMetadata = await fetchDriveFileMetadata(body.driveFileId);
+      const r2Metadata = await getFileMetadata(fileKey);
       const result = await finalizeAssetUpload(assetId, {
         fileName: body.fileName,
         uploadResult: {
-          driveFileId: driveMetadata.driveFileId,
-          driveFileUrl: driveMetadata.driveFileUrl,
-          mimeType: driveMetadata.mimeType,
-          fileSize: driveMetadata.fileSize,
+          key: r2Metadata.key,
+          url: `${process.env.R2_PUBLIC_BASE_URL ?? ''}/${r2Metadata.key}`,
+          mimeType: r2Metadata.contentType,
+          fileSize: r2Metadata.size,
           uploadStatus: 'uploaded',
-          thumbnailLink: driveMetadata.thumbnailLink,
-          mediaWidth: driveMetadata.mediaWidth,
-          mediaHeight: driveMetadata.mediaHeight,
-          durationSeconds: driveMetadata.durationSeconds,
-          parents: driveMetadata.parents,
-          driveId: driveMetadata.driveId,
-          owners: driveMetadata.owners,
-          permissions: driveMetadata.permissions,
-          webViewLink: driveMetadata.webViewLink,
+          thumbnailLink: null,
+          mediaWidth: null,
+          mediaHeight: null,
+          durationSeconds: null,
         },
       });
 

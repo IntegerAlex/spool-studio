@@ -104,111 +104,6 @@ export default function QueuePage() {
 
   return (
     <div className="space-y-6 queue-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
-      <style>{`
-        .queue-page-container {
-          background-color: var(--color-bg-app);
-          max-width: none !important;
-        }
-        .queue-title {
-          font-size: 20px !important;
-          font-weight: 600 !important;
-          color: var(--color-text-primary) !important;
-          letter-spacing: -0.025em !important;
-          line-height: 1.25 !important;
-        }
-        .queue-subtitle {
-          font-size: 12.5px !important;
-          color: var(--color-text-muted) !important;
-          margin-top: 3px !important;
-        }
-        .upload-drop-zone {
-          background-color: var(--color-bg-surface) !important;
-          border: 2px dashed var(--color-border) !important;
-          border-radius: var(--radius-lg) !important;
-          padding: 48px 32px !important;
-          text-align: center !important;
-          transition: border-color 150ms ease, background-color 150ms ease !important;
-          cursor: pointer;
-        }
-        .upload-drop-zone:hover {
-          border-color: var(--color-border-strong) !important;
-          background-color: var(--color-bg-overlay) !important;
-        }
-        .upload-icon {
-          width: 36px;
-          height: 36px;
-          color: var(--color-text-faint) !important;
-        }
-        .upload-zone-heading {
-          font-size: 14px !important;
-          font-weight: 500 !important;
-          color: var(--color-text-primary) !important;
-          margin-top: 12px !important;
-        }
-        .upload-zone-subtext {
-          font-size: 12.5px !important;
-          color: var(--color-text-muted) !important;
-          margin-top: 4px !important;
-        }
-        .browse-btn {
-          background: #3ecf8e !important;
-          color: #000000 !important;
-          font-size: 12.5px !important;
-          font-weight: 600 !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 8px 16px !important;
-          border: none !important;
-          cursor: pointer !important;
-          box-shadow: none !important;
-          transition: all 120ms ease !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          height: auto !important;
-        }
-        .browse-btn:hover {
-          opacity: 0.88 !important;
-        }
-        .table-list-container {
-          background-color: var(--color-bg-surface) !important;
-          border: 1px solid var(--color-border) !important;
-          border-radius: var(--radius-lg) !important;
-          overflow: hidden;
-        }
-        .table-header-row {
-          background-color: var(--color-bg-overlay) !important;
-          border-bottom: 1px solid var(--color-border) !important;
-          padding: 10px 20px !important;
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-        .header-cell {
-          font-size: 11px !important;
-          font-weight: 600 !important;
-          letter-spacing: 0.07em !important;
-          text-transform: uppercase !important;
-          color: var(--color-text-faint) !important;
-        }
-        .table-row-item {
-          padding: 12px 20px !important;
-          border-bottom: 1px solid var(--color-border) !important;
-          font-size: 13px !important;
-          color: var(--color-text-secondary) !important;
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          text-decoration: none !important;
-          transition: background-color 100ms ease !important;
-        }
-        .table-row-item:last-child {
-          border-bottom: none !important;
-        }
-        .table-row-item:hover {
-          background-color: var(--color-bg-hover) !important;
-        }
-      `}</style>
-
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Upload Queue' }]} />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -307,15 +202,7 @@ export default function QueuePage() {
                         <DropdownMenuItem asChild>
                           <a href={asset.driveFileUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
                             <ExternalLink className="mr-2 h-4 w-4" />
-                            Open in Drive
-                          </a>
-                        </DropdownMenuItem>
-                      )}
-                      {asset?.driveFolderUrl && (
-                        <DropdownMenuItem asChild>
-                          <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer" className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
-                            <Folder className="mr-2 h-4 w-4" />
-                            Open folder
+                            Open File
                           </a>
                         </DropdownMenuItem>
                       )}

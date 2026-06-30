@@ -375,7 +375,7 @@ export default function AssetsPage() {
             }}
             className={cn(
               'h-7 rounded-full border border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-[#a1a1aa] shadow-none hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white',
-              isActive && 'border-[rgba(99,102,241,0.4)] bg-[rgba(99,102,241,0.15)] text-[#818cf8] hover:bg-[rgba(99,102,241,0.15)]'
+              isActive && 'border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.15)] text-emerald-400 hover:bg-[rgba(16,185,129,0.15)]'
             )}
           >
             {isAll ? 'All' : assetQuickFilterLabels[quickFilter]}
@@ -666,7 +666,7 @@ export default function AssetsPage() {
               mutate('/api/assets');
             }}
             trigger={
-              <Button variant="accent" className="new-asset-btn">
+              <Button variant="accent">
                 <Plus className="mr-2 h-4 w-4" />
                 New Asset
               </Button>

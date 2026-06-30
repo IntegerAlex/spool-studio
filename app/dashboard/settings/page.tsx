@@ -52,16 +52,7 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [workspaceName, setWorkspaceName] = useState('');
   const [activeSection, setActiveSection] = useState<(typeof sections)[number]['id']>('workspace');
-  const [integrationStatus, setIntegrationStatus] = useState<{
-    connected: boolean;
-    userId: string | null;
-    googleEmail: string | null;
-  }>({
-    connected: false,
-    userId: null,
-    googleEmail: null,
-  });
-  const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(true);
+
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -84,26 +75,7 @@ export default function SettingsPage() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    const loadIntegrations = async () => {
-      try {
-        const response = await fetch('/api/google/integration', {
-          headers: { 'Content-Type': 'application/json' },
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.error ?? 'Failed to load integration');
-        }
-        setIntegrationStatus(payload.data);
-      } catch {
-        setIntegrationStatus({ connected: false, userId: null, googleEmail: null });
-      } finally {
-        setIsLoadingIntegrations(false);
-      }
-    };
 
-    loadIntegrations();
-  }, []);
 
   const handleSaveWorkspace = async () => {
     if (workspace) {
@@ -403,18 +375,7 @@ export default function SettingsPage() {
                 </Button>
               )}
 
-              {activeSection === 'integrations' && (
-                <Button
-                  className="submit-btn"
-                  disabled={isLoadingIntegrations || !integrationStatus.userId}
-                  onClick={() => {
-                    if (!integrationStatus.userId) return;
-                    window.location.href = `/api/google/auth?userId=${integrationStatus.userId}`;
-                  }}
-                >
-                  {integrationStatus.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-                </Button>
-              )}
+
 
               {activeSection === 'team' && (
                 <Button className="submit-btn">
@@ -475,43 +436,7 @@ export default function SettingsPage() {
             </Card>
           )}
 
-          {activeSection === 'integrations' && (
-            <Card className="content-card">
-              <div className="content-card-header">
-                <div>
-                  <h4 className="content-card-title">Google Calendar</h4>
-                  <p className="content-card-description">Connect your Google Calendar to sync approved publishing schedules.</p>
-                </div>
-              </div>
 
-              <div className="content-card-body">
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="text-[13px] font-semibold text-white">
-                      {integrationStatus.connected ? 'Google Calendar Connected ✅' : 'Google Calendar Not Connected'}
-                    </p>
-                    <p className="text-[11.5px] text-[var(--color-text-muted)] mt-1">
-                      {integrationStatus.connected
-                        ? integrationStatus.googleEmail
-                          ? `Connected as ${integrationStatus.googleEmail}`
-                          : 'Connection active'
-                        : 'Connect to enable manual calendar sync.'}
-                    </p>
-                  </div>
-                  <Button
-                    className="submit-btn md:self-center"
-                    disabled={isLoadingIntegrations || !integrationStatus.userId}
-                    onClick={() => {
-                      if (!integrationStatus.userId) return;
-                      window.location.href = `/api/google/auth?userId=${integrationStatus.userId}`;
-                    }}
-                  >
-                    {integrationStatus.connected ? 'Reconnect Google Calendar' : 'Connect Google Calendar'}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          )}
 
           {activeSection === 'team' && (
             <Card className="content-card">

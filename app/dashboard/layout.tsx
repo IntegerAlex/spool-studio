@@ -1,5 +1,5 @@
 import { DashboardShell } from '@/components/layout/dashboard-shell';
-import { requireUser } from '@/lib/supabase/auth';
+import { requireUser } from '@/lib/auth';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { redirect } from 'next/navigation';
 

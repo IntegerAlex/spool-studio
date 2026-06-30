@@ -18,8 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
-import type { User } from '@supabase/supabase-js';
+import type { AuthUser } from '@/lib/auth';
 
 const navigationSections = [
   {
@@ -87,7 +86,7 @@ const navigationSections = [
 interface SidebarProps {
   variant?: 'desktop' | 'drawer';
   onNavigate?: () => void;
-  user?: User | null;
+  user?: AuthUser | null;
 }
 
 export function Sidebar({ variant = 'desktop', onNavigate, user = null }: SidebarProps) {
@@ -95,7 +94,7 @@ export function Sidebar({ variant = 'desktop', onNavigate, user = null }: Sideba
   const router = useRouter();
 
   const displayName = useMemo(() => {
-    return user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+    return user?.name || user?.email?.split('@')[0] || 'User';
   }, [user]);
 
   const initials = useMemo(() => {
@@ -109,7 +108,7 @@ export function Sidebar({ variant = 'desktop', onNavigate, user = null }: Sideba
   }, [displayName]);
 
   const userRole = useMemo(() => {
-    const rawRole = user?.user_metadata?.role || user?.app_metadata?.role;
+    const rawRole = user?.role;
     if (rawRole) {
       return rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
     }
@@ -118,8 +117,7 @@ export function Sidebar({ variant = 'desktop', onNavigate, user = null }: Sideba
   }, [user]);
 
   const handleLogout = async () => {
-    const supabase = createBrowserSupabaseClient();
-    await supabase.auth.signOut();
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.replace('/login');
     router.refresh();
   };
@@ -141,70 +139,6 @@ export function Sidebar({ variant = 'desktop', onNavigate, user = null }: Sideba
         height: '100vh',
       }}
     >
-      <style>{`
-        .nav-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 12px;
-          border-radius: var(--radius-sm);
-          font-size: 12.5px;
-          font-weight: 400;
-          color: var(--color-text-muted) !important;
-          cursor: pointer;
-          transition: all 120ms ease;
-          background: transparent !important;
-          border: none !important;
-          width: 100%;
-          text-align: left;
-          height: auto;
-        }
-        .nav-item:hover {
-          background-color: var(--color-bg-hover) !important;
-          color: var(--color-text-secondary) !important;
-        }
-        .nav-item.active {
-          background-color: var(--color-bg-active) !important;
-          color: var(--color-text-primary) !important;
-          font-weight: 600;
-          box-shadow: inset 3px 0 0 0 var(--color-text-primary);
-        }
-        .nav-icon {
-          height: 15px !important;
-          width: 15px !important;
-          color: inherit;
-          opacity: 0.7;
-          transition: all 120ms ease;
-        }
-        .nav-item:hover .nav-icon {
-          opacity: 1;
-        }
-        .nav-item.active .nav-icon {
-          color: var(--color-text-primary);
-          opacity: 1;
-        }
-        .signout-btn {
-          font-size: 12.5px !important;
-          color: var(--color-text-muted) !important;
-          transition: all 120ms ease !important;
-          padding: 8px 12px !important;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          width: 100%;
-          justify-content: center;
-          cursor: pointer;
-          border: 1px solid var(--color-border) !important;
-          border-radius: var(--radius-sm) !important;
-          background-color: transparent !important;
-        }
-        .signout-btn:hover {
-          color: var(--color-text-primary) !important;
-          background-color: var(--color-bg-hover) !important;
-          border-color: var(--color-border-strong) !important;
-        }
-      `}</style>
-
       <div 
         className="flex items-center justify-center px-4" 
         style={{ 
@@ -213,7 +147,7 @@ export function Sidebar({ variant = 'desktop', onNavigate, user = null }: Sideba
           backgroundColor: '#0f0f0f',
         }}
       >
-        <Link href="/dashboard" className="flex min-w-0 items-center justify-center h-full w-full">
+        <Link href="/dashboard" prefetch={true} className="flex min-w-0 items-center justify-center h-full w-full">
           <div className="relative flex items-center justify-center h-full w-full">
             <Image
               src="/asset_flow.png"
@@ -239,7 +173,7 @@ export function Sidebar({ variant = 'desktop', onNavigate, user = null }: Sideba
                 const isActive = pathname === item.href;
 
                 return (
-                  <Link key={item.href} href={item.href}>
+                  <Link key={item.href} href={item.href} prefetch={true}>
                     <div
                       className={cn('nav-item', isActive && 'active')}
                       onClick={onNavigate}

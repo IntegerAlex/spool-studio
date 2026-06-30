@@ -6,8 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Menu, Bell } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import type { AuthUser } from '@/lib/auth';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
@@ -36,37 +35,30 @@ function getRouteTitle(pathname: string, fallback: string): string {
 export function DashboardShell({ title, children }: DashboardShellProps) {
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     let isActive = true;
-    const supabase = createBrowserSupabaseClient();
 
     const loadUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (isActive) {
-        setUser(data.user ?? null);
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok && isActive) {
+          const data = await res.json();
+          setUser(data.user ?? data ?? null);
+        } else if (isActive) {
+          setUser(null);
+        }
+      } catch {
+        if (isActive) setUser(null);
       }
     };
 
     void loadUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (isActive) {
-        setUser(session?.user ?? null);
-      }
-    });
-
-    return () => {
-      isActive = false;
-      subscription.unsubscribe();
-    };
   }, []);
 
-  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'User';
-  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const displayName = user?.name || user?.email || 'User';
+  const avatarUrl = user?.avatarUrl;
   const initials = useMemo(() => {
     return displayName
       .split(/\s+/)
@@ -105,7 +97,7 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
             </Button>
 
             <Avatar className="size-8 border border-[rgba(255,255,255,0.08)] bg-[var(--surface-elevated)]">
-              <AvatarImage src={avatarUrl} alt={displayName} />
+              <AvatarImage src={avatarUrl ?? undefined} alt={displayName} />
               <AvatarFallback className="bg-[var(--surface-elevated)] text-[12px] font-semibold text-white">
                 {initials}
               </AvatarFallback>

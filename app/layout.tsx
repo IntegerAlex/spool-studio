@@ -1,10 +1,13 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
-import { logGoogleEnvCheck, logMailgunEnvCheck, logSupabaseEnvCheck } from '@/lib/runtime-diagnostics'
+import { logMailgunEnvCheck } from '@/lib/runtime-diagnostics'
 import './globals.css'
 import PerfClient from '@/components/perf/client-perf'
+import { SWRProvider } from '@/lib/swr-config'
+import { LoadingBar } from '@/components/layout/loading-bar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -36,24 +39,27 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  logSupabaseEnvCheck()
-  logGoogleEnvCheck()
   logMailgunEnvCheck()
 
   return (
     <html lang="en" className="bg-background text-foreground">
       <body className={`${inter.className} bg-background text-foreground antialiased`}>
-        <div className="global-loader-overlay">
-          <div className="global-loader-content">
-            <div className="global-loader-logo">AF</div>
-            <div className="global-loader-bar-container">
-              <div className="global-loader-bar-fill"></div>
+        <SWRProvider>
+          <Suspense fallback={null}>
+            <LoadingBar />
+          </Suspense>
+          <div className="global-loader-overlay">
+            <div className="global-loader-content">
+              <div className="global-loader-logo">AF</div>
+              <div className="global-loader-bar-container">
+                <div className="global-loader-bar-fill"></div>
+              </div>
+              <div className="global-loader-text">Loading your workspace...</div>
             </div>
-            <div className="global-loader-text">Loading your workspace...</div>
           </div>
-        </div>
-        {children}
-        <Toaster />
+          {children}
+          <Toaster />
+        </SWRProvider>
         {process.env.NEXT_PUBLIC_PERF_DIAG === '1' && <PerfClient />}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

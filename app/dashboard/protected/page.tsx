@@ -1,5 +1,5 @@
 import { Card } from '@/components/ui/card';
-import { requireUser } from '@/lib/supabase/auth';
+import { requireUser } from '@/lib/auth';
 
 export default async function ProtectedDashboardPage() {
   const user = await requireUser();

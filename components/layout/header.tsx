@@ -5,24 +5,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
-import type { User } from '@supabase/supabase-js';
+import type { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   title: string;
   className?: string;
-  user?: User | null;
+  user?: AuthUser | null;
 }
 
 export function Header({ title, className, user = null }: HeaderProps) {
   const pathname = usePathname();
 
   const displayName =
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
+    user?.name ||
     user?.email ||
     'User';
-  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarUrl = user?.avatarUrl;
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -54,80 +53,6 @@ export function Header({ title, className, user = null }: HeaderProps) {
         boxShadow: 'none',
       }}
     >
-      <style>{`
-        .topbar-breadcrumb {
-          font-size: 12.5px;
-          color: var(--color-text-muted);
-          display: flex;
-          align-items: center;
-        }
-        .topbar-breadcrumb-separator {
-          color: var(--color-text-faint);
-          margin: 0 8px;
-        }
-        .topbar-breadcrumb-current {
-          color: var(--color-text-secondary);
-          font-weight: 500;
-        }
-        .topbar-search-container {
-          position: relative;
-          width: 220px;
-        }
-        .topbar-search-icon {
-          position: absolute;
-          left: 10px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 13px;
-          height: 13px;
-          color: var(--color-text-faint) !important;
-          pointer-events: none;
-        }
-        .topbar-search-input {
-          background-color: var(--color-bg-overlay) !important;
-          border: 1px solid var(--color-border) !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 6px 12px 6px 30px !important;
-          font-size: 13px !important;
-          color: var(--color-text-secondary) !important;
-          width: 100% !important;
-          height: 30px !important;
-          transition: all 120ms ease;
-        }
-        .topbar-search-input::placeholder {
-          color: var(--color-text-faint) !important;
-        }
-        .topbar-search-input:focus {
-          border-color: var(--color-border-strong) !important;
-          outline: none !important;
-          box-shadow: 0 0 0 2px rgba(255,255,255,0.04) !important;
-        }
-        .topbar-bell {
-          color: var(--color-text-muted) !important;
-          transition: color 120ms ease !important;
-        }
-        .topbar-bell:hover {
-          color: var(--color-text-primary) !important;
-          background-color: transparent !important;
-        }
-        .topbar-avatar {
-          height: 28px !important;
-          width: 28px !important;
-          border-radius: 50% !important;
-          background-color: var(--color-bg-overlay) !important;
-          border: 1px solid var(--color-border) !important;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .topbar-avatar-fallback {
-          font-size: 11px !important;
-          font-weight: 600 !important;
-          color: var(--color-text-secondary) !important;
-          background-color: transparent !important;
-        }
-      `}</style>
-
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0 topbar-breadcrumb">
           <span>Home</span>
@@ -150,7 +75,7 @@ export function Header({ title, className, user = null }: HeaderProps) {
         </Button>
 
         <Avatar className="topbar-avatar">
-          <AvatarImage src={avatarUrl} alt={displayName} />
+          <AvatarImage src={avatarUrl ?? undefined} alt={displayName} />
           <AvatarFallback className="topbar-avatar-fallback">
             {initials}
           </AvatarFallback>

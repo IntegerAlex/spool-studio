@@ -108,7 +108,7 @@ export async function GET(request: Request, context: RouteContext) {
     let buffer: Buffer;
     try {
       buffer = await renderToBuffer(
-        React.createElement(MonthlyReportPDFDocument, { report })
+        React.createElement(MonthlyReportPDFDocument, { report }) as any
       );
     } catch (pdfError) {
       logProductionRuntimeError('pdf-generation-render-error', pdfError);
