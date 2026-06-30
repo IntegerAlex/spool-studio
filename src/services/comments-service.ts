@@ -15,6 +15,7 @@ import { sendDesignerNotification } from '@/lib/notifications/mailgun';
 import { getAssetById } from '@/repositories/assets-repository';
 import { getClientById } from '@/repositories/clients-repository';
 import { getUserById } from '@/repositories/users-repository';
+import { getCurrentUser } from '@/lib/auth';
 export interface CommentInput {
   assetId: string;
   type: Database['public']['Enums']['comment_type'];
@@ -68,15 +69,12 @@ export async function getCommentsWithUsers(
 }
 
 export async function createComment(input: CommentInput): Promise<AssetComment> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   await getOrCreateCurrentUserProfile();
 
@@ -128,10 +126,10 @@ export async function createComment(input: CommentInput): Promise<AssetComment> 
           commentMessage: mapped.message,
           designerId: assignedDesigner.id,
           designerEmail: assignedDesigner.email,
-          designerName: assignedDesigner.full_name || assignedDesigner.name || null,
+          designerName: assignedDesigner.full_name || null,
           requestedBy: {
             email: user.email,
-            name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+            name: user.name || null,
           },
           timestamp: mapped.createdAt,
         });
@@ -145,15 +143,12 @@ export async function createComment(input: CommentInput): Promise<AssetComment> 
 }
 
 export async function resolveRevision(commentId: string): Promise<AssetComment> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   const existing = await getCommentById(commentId, supabase);
   if (!existing) {

@@ -13,6 +13,7 @@ import { sendReferenceNotification } from '@/lib/notifications/mailgun';
 import { listAssetsByClientId } from '@/repositories/assets-repository';
 import { getUserById } from '@/repositories/users-repository';
 import { getClientById } from '@/repositories/clients-repository';
+import { getCurrentUser } from '@/lib/auth';
 
 const allowedProtocols = new Set(['http:', 'https:']);
 
@@ -96,15 +97,12 @@ export async function getClientReferences(clientId: string): Promise<ClientRefer
 }
 
 export async function createClientReference(input: ClientReferenceInput): Promise<ClientReference> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   const title = normalizeText(input.title);
   if (!title) {
@@ -155,7 +153,7 @@ export async function createClientReference(input: ClientReferenceInput): Promis
             referenceUrl: mapped.url,
             addedBy: {
               email: user.email,
-              name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+              name: user.name || null,
             },
             timestamp: mapped.createdAt,
             designerEmail: designer.email,
@@ -175,15 +173,12 @@ export async function updateClientReference(
   referenceId: string,
   input: Partial<Omit<ClientReferenceInput, 'clientId'>>
 ): Promise<ClientReference> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   const updates: Database['public']['Tables']['client_references']['Update'] = {};
 
@@ -217,15 +212,11 @@ export async function updateClientReference(
 }
 
 export async function removeClientReference(referenceId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
 
+  const supabase = await createServerSupabaseClient();
   await deleteClientReferenceRow(referenceId, supabase);
 }

@@ -143,11 +143,11 @@ export const assetEditorStatusLabels: Partial<Record<AssetStatus, string>> = {
 };
 
 export function isUserSelectableStatus(status: AssetStatus): boolean {
-  return userSelectableStatusValues.includes(status);
+  return (userSelectableStatusValues as readonly AssetStatus[]).includes(status);
 }
 
 export function isSystemControlledStatus(status: AssetStatus): boolean {
-  return systemControlledStatusValues.includes(status);
+  return (systemControlledStatusValues as readonly AssetStatus[]).includes(status);
 }
 
 export function getUserSelectableStatuses(): AssetStatus[] {

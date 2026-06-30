@@ -117,8 +117,6 @@ export interface Asset {
   publishedAt?: Date | null;
   approvedAt?: Date | null;
   approvedBy?: string | null;
-  googleCalendarEventId?: string | null;
-  googleCalendarEventUrl?: string | null;
   calendarSyncedAt?: Date | null;
   assignedTo: string[];
   revisions: AssetRevision[];

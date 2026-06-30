@@ -429,7 +429,7 @@ export async function extractAssetMetadata(
   return {
     updates,
     mediaType,
-    extractedFields,
+    extractedFields: extractedFields as Record<string, string | number | null>,
     extractionDurationMs,
     partialFailures,
   };

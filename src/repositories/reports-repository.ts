@@ -1,10 +1,9 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 
 export type DbAsset = Database['public']['Tables']['content_assets']['Row'];
 
-async function getClient(client?: SupabaseClient<Database>) {
+async function getClient(client?: any) {
   return client ?? (await createServerSupabaseClient());
 }
 
@@ -19,7 +18,7 @@ export async function listClientAssetsForReport(
   clientId: string,
   startDate: Date,
   endDate: Date,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAsset[]> {
   const supabase = await getClient(client);
 
@@ -35,7 +34,7 @@ export async function listClientAssetsForReport(
 
   const assets = data ?? [];
 
-  return assets.filter((asset) => {
+  return assets.filter((asset: any) => {
     let resolvedDate: Date;
 
     if (asset.published_at) {

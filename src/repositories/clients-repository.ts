@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 
@@ -8,11 +7,11 @@ const clientSelect =
   'id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,monthly_goal,weekly_goal,weekly_poster_goal,weekly_reel_goal,drive_folder_id,drive_folder_url,created_by,created_at,updated_at,contract_start_date,contract_end_date';
 const clientOptionSelect = 'id,name';
 
-async function getClient(client?: SupabaseClient<Database>) {
+async function getClient(client?: any) {
   return client ?? (await createServerSupabaseClient());
 }
 
-export async function listClients(client?: SupabaseClient<Database>): Promise<DbClient[]> {
+export async function listClients(client?: any): Promise<DbClient[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('clients')
@@ -35,7 +34,7 @@ export async function listClients(client?: SupabaseClient<Database>): Promise<Db
 }
 
 export async function listClientOptions(
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<Pick<DbClient, 'id' | 'name'>[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -50,7 +49,7 @@ export async function listClientOptions(
   return data ?? [];
 }
 
-export async function countClients(client?: SupabaseClient<Database>): Promise<number> {
+export async function countClients(client?: any): Promise<number> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('clients')
@@ -77,7 +76,7 @@ export async function countClients(client?: SupabaseClient<Database>): Promise<n
 
 export async function getClientById(
   clientId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClient | null> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -95,7 +94,7 @@ export async function getClientById(
 
 export async function insertClient(
   payload: Database['public']['Tables']['clients']['Insert'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClient> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -114,7 +113,7 @@ export async function insertClient(
 export async function updateClient(
   clientId: string,
   updates: Database['public']['Tables']['clients']['Update'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClient> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -133,7 +132,7 @@ export async function updateClient(
 
 export async function deleteClient(
   clientId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<void> {
   const supabase = await getClient(client);
   const { error } = await supabase.from('clients').delete().eq('id', clientId);

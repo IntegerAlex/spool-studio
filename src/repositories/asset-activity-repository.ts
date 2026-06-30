@@ -1,17 +1,16 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 
 export type DbAssetActivity = Database['public']['Tables']['asset_activity_logs']['Row'];
 const activitySelect = 'id,asset_id,user_id,action,metadata,created_at';
 
-async function getClient(client?: SupabaseClient<Database>) {
+async function getClient(client?: any) {
   return client ?? (await createServerSupabaseClient());
 }
 
 export async function listActivityByAssetId(
   assetId: string,
-  client?: SupabaseClient<Database>,
+  client?: any,
   options?: { limit?: number }
 ): Promise<DbAssetActivity[]> {
   const supabase = await getClient(client);
@@ -35,7 +34,7 @@ export async function listActivityByAssetId(
 }
 
 export async function listRecentActivity(
-  client?: SupabaseClient<Database>,
+  client?: any,
   options?: { limit?: number }
 ): Promise<DbAssetActivity[]> {
   const supabase = await getClient(client);
@@ -59,7 +58,7 @@ export async function listRecentActivity(
 
 export async function insertActivity(
   payload: Database['public']['Tables']['asset_activity_logs']['Insert'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAssetActivity> {
   const supabase = await getClient(client);
   const { data, error } = await supabase

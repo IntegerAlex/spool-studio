@@ -3,8 +3,8 @@ import { canTransitionStatus } from '@/lib/asset-workflow';
 import type { Asset, AssetStatus } from '@/types/index';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { logAssetActivity } from '@/services/activity-service';
-import { getAssetDriveFolder } from '@/integrations/google-drive/folder-service';
-import { uploadFileToFolder, type DriveUploadResult } from '@/integrations/google-drive/drive-service';
+import { uploadFile, generatePublicUrl, getFileMetadata } from '@/integrations/r2/r2-service';
+import type { R2UploadResult } from '@/integrations/r2/types';
 import { extractAssetMetadata } from '@/lib/asset-metadata';
 import {
   sendAssetUploadNotification,
@@ -26,6 +26,7 @@ import {
 import { getClientById } from '@/repositories/clients-repository';
 import { getUserById } from '@/repositories/users-repository';
 import type { Database } from '@/types/database';
+import { getCurrentUser } from '@/lib/auth';
 
 export interface AssetInput {
   clientId: string;
@@ -118,9 +119,6 @@ function mapAsset(asset: Awaited<ReturnType<typeof getAssetById>>): Asset | null
     publishedAt: asset.published_at ? new Date(asset.published_at) : null,
     approvedAt: asset.approved_at ? new Date(asset.approved_at) : null,
     approvedBy: asset.approved_by ?? null,
-    googleCalendarEventId: asset.google_calendar_event_id ?? null,
-    googleCalendarEventUrl: asset.google_calendar_event_url ?? null,
-    calendarSyncedAt: asset.calendar_synced_at ? new Date(asset.calendar_synced_at) : null,
     assignedTo: asset.assigned_to ? [asset.assigned_to] : [],
     revisions: [],
     currentRevisionId: asset.current_revision_id ?? undefined,
@@ -200,80 +198,8 @@ async function transitionAssetStatus(
   await updateAssetRow(assetId, { status: nextStatus }, supabase);
 }
 
-export async function resolveAssetDriveFolder(
-  assetType: Database['public']['Enums']['asset_type'],
-  clientId: string
-): Promise<Awaited<ReturnType<typeof getAssetDriveFolder>> | null> {
-  try {
-    const supabase = await createServerSupabaseClient();
-    const client = await getClientById(clientId, supabase);
-
-    if (!client?.drive_folder_id) {
-      return null;
-    }
-
-    return getAssetDriveFolder(client.drive_folder_id, assetType);
-  } catch (error) {
-    logProductionRuntimeError('asset-drive-folder', error, {
-      assetType,
-      clientId,
-    });
-    return null;
-  }
-}
-
-async function resolveDriveFolderMetadata(
-  clientId: string,
-  assetType: Database['public']['Enums']['asset_type'],
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  assetId?: string
-): Promise<Pick<Database['public']['Tables']['content_assets']['Update'], 'drive_folder_id' | 'drive_folder_url'> | null> {
-  const client = await getClientById(clientId, supabase);
-  if (!client) {
-    console.warn('[assets-service] Drive folder lookup skipped: client not found', {
-      assetId,
-      clientId,
-      assetType,
-    });
-    return null;
-  }
-
-  if (!client.drive_folder_id) {
-    console.warn('[assets-service] Drive folder lookup skipped: client root folder missing', {
-      assetId,
-      clientId,
-      assetType,
-    });
-    return null;
-  }
-
-  try {
-    const folder = await getAssetDriveFolder(client.drive_folder_id, assetType);
-    if (!folder) {
-      console.warn('[assets-service] Drive folder lookup skipped: destination folder missing', {
-        assetId,
-        clientId,
-        assetType,
-        clientDriveFolderId: client.drive_folder_id,
-      });
-      return null;
-    }
-
-    return {
-      drive_folder_id: folder.id,
-      drive_folder_url: folder.url,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to resolve Drive folder';
-    console.error('[assets-service] Drive folder lookup failed', {
-      assetId,
-      clientId,
-      assetType,
-      clientDriveFolderId: client.drive_folder_id,
-      error: message,
-    });
-    return null;
-  }
+export function getAssetR2Key(clientId: string, assetId: string, fileName: string): string {
+  return `clients/${clientId}/assets/${assetId}/${fileName}`;
 }
 
 export async function getAssets(): Promise<Asset[]> {
@@ -405,15 +331,12 @@ export async function setAssetCurrentRevision(assetId: string, revisionId: strin
 }
 
 export async function createAsset(input: AssetInput): Promise<Asset> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   await getOrCreateCurrentUserProfile();
 
@@ -454,37 +377,6 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
   );
 
   let storedRecord = record;
-  const driveFolderMetadata = await resolveDriveFolderMetadata(input.clientId, input.type, supabase, record.id);
-
-  if (
-    driveFolderMetadata &&
-    (record.drive_folder_id !== driveFolderMetadata.drive_folder_id ||
-      record.drive_folder_url !== driveFolderMetadata.drive_folder_url)
-  ) {
-    try {
-      storedRecord = await updateAssetRow(record.id, driveFolderMetadata, supabase);
-      const persistedRecord = await getAssetById(record.id, supabase);
-      if (persistedRecord) {
-        storedRecord = persistedRecord;
-      }
-
-      console.info('[assets-service] Drive folder metadata persistence succeeded', {
-        assetId: record.id,
-        clientId: input.clientId,
-        assetType: input.type,
-        driveFolderId: storedRecord.drive_folder_id,
-        driveFolderUrl: storedRecord.drive_folder_url,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to persist Drive folder metadata';
-      console.error('[assets-service] Drive folder metadata persistence failed', {
-        assetId: record.id,
-        clientId: input.clientId,
-        assetType: input.type,
-        error: message,
-      });
-    }
-  }
 
   const mapped = mapAsset(storedRecord);
   if (!mapped) {
@@ -516,29 +408,42 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
 export interface AssetUploadResult {
   asset: Asset;
   upload: {
-    driveFileId: string;
-    driveFileUrl: string;
+    r2Key: string;
+    fileUrl: string;
     mimeType: string;
     fileSize: number;
     uploadStatus: 'uploaded';
   };
 }
 
+export interface UploadFinalizationMetadata {
+  mimeType: string;
+  fileSize: number;
+  uploadStatus: 'uploaded';
+  thumbnailLink?: string | null;
+  mediaWidth?: number | null;
+  mediaHeight?: number | null;
+  durationSeconds?: number | null;
+}
+
 export interface AssetUploadFinalizationInput {
   fileName: string;
-  uploadResult: DriveUploadResult;
+  uploadResult: {
+    key: string;
+    url: string;
+  } & UploadFinalizationMetadata;
 }
 
 export async function finalizeAssetUpload(
   assetId: string,
   input: AssetUploadFinalizationInput
 ): Promise<AssetUploadResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createServerSupabaseClient();
-  const [userResult, sessionResult] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
-  const {
-    data: { user },
-    error,
-  } = userResult;
 
   console.info(
     '[upload][auth] ' +
@@ -546,14 +451,10 @@ export async function finalizeAssetUpload(
         assetId,
         authSource: 'service-cookie-store',
         userExists: Boolean(user),
-        sessionExists: Boolean(sessionResult.data.session),
+        sessionExists: true,
         cookiesPresent: 'unknown',
       })
   );
-
-  if (error || !user) {
-    throw new Error('Unauthorized');
-  }
 
   await getOrCreateCurrentUserProfile();
 
@@ -577,11 +478,6 @@ export async function finalizeAssetUpload(
     await transitionAssetStatus(assetId, supabase, 'uploading', 'upload-start');
   }
 
-  const folder = await resolveAssetDriveFolder(asset.type, asset.client_id);
-  if (!folder) {
-    throw new Error('Drive folder not found for asset');
-  }
-
   console.info('[upload][asset-check]', {
     assetId,
     clientId: asset.client_id,
@@ -591,30 +487,12 @@ export async function finalizeAssetUpload(
     fileSize: input.uploadResult.fileSize,
   });
 
-  console.info('[upload][folder-resolved]', {
-    assetId,
-    clientId: asset.client_id,
-    assetType: asset.type,
-    folderId: folder.id,
-    folderUrl: folder.url,
-  });
-
-  console.info('[upload][drive-upload]', {
-    assetId,
-    clientId: asset.client_id,
-    folderId: folder.id,
-    fileName: input.fileName,
-    mimeType: input.uploadResult.mimeType || 'application/octet-stream',
-    fileSize: input.uploadResult.fileSize,
-    uploadPayloadSize: input.uploadResult.fileSize,
-  });
-
   const uploadedAt = new Date().toISOString();
   const fileExtension = input.fileName.includes('.') ? input.fileName.split('.').pop()?.toLowerCase() ?? null : null;
 
   const updates: Parameters<typeof updateAssetRow>[1] = {
-    drive_file_id: input.uploadResult.driveFileId,
-    drive_file_url: input.uploadResult.driveFileUrl,
+    drive_file_id: input.uploadResult.key,
+    drive_file_url: input.uploadResult.url,
     thumbnail_url: input.uploadResult.thumbnailLink ?? asset.thumbnail_url ?? null,
     mime_type: input.uploadResult.mimeType,
     file_size: input.uploadResult.fileSize,
@@ -687,8 +565,8 @@ export async function finalizeAssetUpload(
         version_number: versionNumber,
         uploaded_by: user.id,
         uploaded_at: uploadedAt,
-        drive_file_id: input.uploadResult.driveFileId,
-        drive_file_url: input.uploadResult.driveFileUrl,
+        drive_file_id: input.uploadResult.key,
+        drive_file_url: input.uploadResult.url,
         file_size: input.uploadResult.fileSize,
         mime_type: input.uploadResult.mimeType,
         media_width: input.uploadResult.mediaWidth ?? null,
@@ -733,11 +611,11 @@ export async function finalizeAssetUpload(
             await logAssetActivity({
               assetId,
               action: 'revision_created',
-              metadata: {
+                metadata: {
                 assetId,
                 revisionId: revisionData.id,
                 revisionNumber: versionNumber,
-                driveFileId: input.uploadResult.driveFileId,
+                r2Key: input.uploadResult.key,
               },
             });
           }
@@ -751,9 +629,8 @@ export async function finalizeAssetUpload(
   } catch (error) {
     logUploadFailure('metadata-persistence', error, assetId, {
       clientId: asset.client_id,
-      folderId: folder.id,
-      driveFileId: input.uploadResult.driveFileId,
-      driveFileUrl: input.uploadResult.driveFileUrl,
+      r2Key: input.uploadResult.key,
+      fileUrl: input.uploadResult.url,
       mimeType: input.uploadResult.mimeType,
       fileSize: input.uploadResult.fileSize,
       activity: 'file_uploaded',
@@ -770,21 +647,18 @@ export async function finalizeAssetUpload(
       assetId,
       action: 'file_uploaded',
       metadata: {
-        driveFileId: input.uploadResult.driveFileId,
-        driveFileUrl: input.uploadResult.driveFileUrl,
+        r2Key: input.uploadResult.key,
+        fileUrl: input.uploadResult.url,
         mimeType: input.uploadResult.mimeType,
         fileSize: input.uploadResult.fileSize,
         uploadStatus: input.uploadResult.uploadStatus,
-        folderId: folder.id,
-        folderUrl: folder.url,
       },
     });
   } catch (error) {
     logUploadFailure('metadata-persistence', error, assetId, {
       clientId: asset.client_id,
-      folderId: folder.id,
-      driveFileId: input.uploadResult.driveFileId,
-      driveFileUrl: input.uploadResult.driveFileUrl,
+      r2Key: input.uploadResult.key,
+      fileUrl: input.uploadResult.url,
       mimeType: input.uploadResult.mimeType,
       fileSize: input.uploadResult.fileSize,
       activity: 'file_uploaded',
@@ -794,8 +668,8 @@ export async function finalizeAssetUpload(
   console.info('[upload][success]', {
     assetId,
     clientId: asset.client_id,
-    driveFileId: input.uploadResult.driveFileId,
-    driveFileUrl: input.uploadResult.driveFileUrl,
+    r2Key: input.uploadResult.key,
+    fileUrl: input.uploadResult.url,
     mimeType: input.uploadResult.mimeType,
     fileSize: input.uploadResult.fileSize,
     uploadStatus: input.uploadResult.uploadStatus,
@@ -809,7 +683,7 @@ export async function finalizeAssetUpload(
         revisionVersion: revisionNotificationVersion,
         uploadedBy: {
           email: user.email,
-          name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+          name: user.name ?? null,
         },
         uploadedAt,
       });
@@ -823,7 +697,7 @@ export async function finalizeAssetUpload(
       assetStatus: updates.status ?? asset.status,
       uploadedBy: {
         email: user.email,
-        name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+        name: user.name ?? null,
       },
       uploadedAt,
     });
@@ -832,8 +706,8 @@ export async function finalizeAssetUpload(
   return {
     asset: mapped,
     upload: {
-      driveFileId: input.uploadResult.driveFileId,
-      driveFileUrl: input.uploadResult.driveFileUrl,
+      r2Key: input.uploadResult.key,
+      fileUrl: input.uploadResult.url,
       mimeType: input.uploadResult.mimeType,
       fileSize: input.uploadResult.fileSize,
       uploadStatus: input.uploadResult.uploadStatus,
@@ -842,12 +716,12 @@ export async function finalizeAssetUpload(
 }
 
 export async function uploadAssetFile(assetId: string, file: File): Promise<AssetUploadResult> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error('Unauthorized');
+  }
+
   const supabase = await createServerSupabaseClient();
-  const [userResult, sessionResult] = await Promise.all([supabase.auth.getUser(), supabase.auth.getSession()]);
-  const {
-    data: { user },
-    error,
-  } = userResult;
 
   console.info(
     '[upload][auth] ' +
@@ -855,14 +729,10 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
         assetId,
         authSource: 'service-cookie-store',
         userExists: Boolean(user),
-        sessionExists: Boolean(sessionResult.data.session),
+        sessionExists: true,
         cookiesPresent: 'unknown',
       })
   );
-
-  if (error || !user) {
-    throw new Error('Unauthorized');
-  }
 
   await getOrCreateCurrentUserProfile();
 
@@ -896,67 +766,30 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
   });
 
   try {
-    let folder;
-    try {
-      folder = await resolveAssetDriveFolder(asset.type, asset.client_id);
-    } catch (error) {
-      logUploadFailure('folder-resolution', error, assetId, {
+    const r2Key = getAssetR2Key(asset.client_id, assetId, file.name);
+    const arrayBuffer = await file.arrayBuffer();
+
+    const uploadResult = await uploadFile({
+      key: r2Key,
+      body: Buffer.from(arrayBuffer),
+      contentType: file.type || 'application/octet-stream',
+      contentLength: file.size,
+      metadata: {
+        assetId,
         clientId: asset.client_id,
-        assetType: asset.type,
         fileName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        fileSize: file.size,
-      });
-      throw error;
-    }
-
-    if (!folder) {
-      const error = new Error('Drive folder not found for asset');
-      logUploadFailure('folder-resolution', error, assetId, {
-        clientId: asset.client_id,
-        assetType: asset.type,
-        fileName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        fileSize: file.size,
-      });
-      throw error;
-    }
-
-    console.info('[upload][folder-resolved]', {
-      assetId,
-      clientId: asset.client_id,
-      assetType: asset.type,
-      folderId: folder.id,
-      folderUrl: folder.url,
-    });
-
-    console.info('[upload][drive-upload]', {
-      assetId,
-      clientId: asset.client_id,
-      folderId: folder.id,
-      fileName: file.name,
-      mimeType: file.type || 'application/octet-stream',
-      fileSize: file.size,
-      uploadPayloadSize: file.size,
-    });
-
-    const uploadResult: DriveUploadResult = await uploadFileToFolder({
-      folderId: folder.id,
-      fileName: file.name || asset.title,
-      mimeType: file.type || 'application/octet-stream',
-      fileSize: file.size,
-      file,
+      },
     });
 
     const uploadedAt = new Date().toISOString();
     const fileExtension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? null : null;
 
     const updates: Parameters<typeof updateAssetRow>[1] = {
-      drive_file_id: uploadResult.driveFileId,
-      drive_file_url: uploadResult.driveFileUrl,
-      thumbnail_url: uploadResult.thumbnailLink ?? asset.thumbnail_url ?? null,
-      mime_type: uploadResult.mimeType,
-      file_size: uploadResult.fileSize,
+      drive_file_id: uploadResult.key,
+      drive_file_url: uploadResult.url,
+      thumbnail_url: asset.thumbnail_url ?? null,
+      mime_type: file.type || 'application/octet-stream',
+      file_size: file.size,
       file_extension: fileExtension,
       uploaded_at: uploadedAt,
       uploaded_by: user.id,
@@ -984,11 +817,11 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
       const metadata = await extractAssetMetadata({
         assetId,
         file,
-        mimeType: uploadResult.mimeType,
-        fileSize: uploadResult.fileSize,
-        driveFileId: uploadResult.driveFileId,
-        driveFileUrl: uploadResult.driveFileUrl,
-        thumbnailUrl: uploadResult.thumbnailLink ?? asset.thumbnail_url ?? null,
+        mimeType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        driveFileId: uploadResult.key,
+        driveFileUrl: uploadResult.url,
+        thumbnailUrl: asset.thumbnail_url ?? null,
         uploadedBy: user.id,
         uploadedAt,
       });
@@ -999,9 +832,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
       if (refreshedMapped) {
         mapped = refreshedMapped;
       }
-      // Create an immutable revision record for this upload and update the asset's revision pointers
       try {
-        // Reuse refreshed asset fetched above instead of making a duplicate DB call
         const persistedAfterUpdate = refreshed ?? persisted;
         const currentCount = persistedAfterUpdate?.revision_count ?? 0;
         const versionNumber = (currentCount ?? 0) + 1;
@@ -1011,10 +842,10 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           version_number: versionNumber,
           uploaded_by: user.id,
           uploaded_at: uploadedAt,
-          drive_file_id: uploadResult.driveFileId,
-          drive_file_url: uploadResult.driveFileUrl,
-          file_size: uploadResult.fileSize,
-          mime_type: uploadResult.mimeType,
+          drive_file_id: uploadResult.key,
+          drive_file_url: uploadResult.url,
+          file_size: file.size,
+          mime_type: file.type || 'application/octet-stream',
           media_width: metadata.extractedFields.mediaWidth ?? null,
           media_height: metadata.extractedFields.mediaHeight ?? null,
           duration_seconds: metadata.extractedFields.durationSeconds ?? null,
@@ -1028,7 +859,6 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
         } else if (revisionData) {
           revisionNotificationVersion = versionNumber;
 
-          // update asset pointers to reference this new revision
           await updateAssetRow(
             assetId,
             {
@@ -1054,7 +884,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
                   assetId,
                   revisionId: revisionData.id,
                   revisionNumber: versionNumber,
-                  driveFileId: uploadResult.driveFileId,
+                  r2Key: uploadResult.key,
                 },
               });
             }
@@ -1083,23 +913,20 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
         assetId,
         action: 'file_uploaded',
         metadata: {
-          driveFileId: uploadResult.driveFileId,
-          driveFileUrl: uploadResult.driveFileUrl,
-          mimeType: uploadResult.mimeType,
-          fileSize: uploadResult.fileSize,
-          uploadStatus: uploadResult.uploadStatus,
-          folderId: folder.id,
-          folderUrl: folder.url,
+          r2Key: uploadResult.key,
+          fileUrl: uploadResult.url,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          uploadStatus: 'uploaded',
         },
       });
     } catch (error) {
       logUploadFailure('metadata-persistence', error, assetId, {
         clientId: asset.client_id,
-        folderId: folder.id,
-        driveFileId: uploadResult.driveFileId,
-        driveFileUrl: uploadResult.driveFileUrl,
-        mimeType: uploadResult.mimeType,
-        fileSize: uploadResult.fileSize,
+        r2Key: uploadResult.key,
+        fileUrl: uploadResult.url,
+        mimeType: file.type || 'application/octet-stream',
+        fileSize: file.size,
         activity: 'file_uploaded',
       });
     }
@@ -1107,11 +934,11 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
     console.info('[upload][success]', {
       assetId,
       clientId: asset.client_id,
-      driveFileId: uploadResult.driveFileId,
-      driveFileUrl: uploadResult.driveFileUrl,
-      mimeType: uploadResult.mimeType,
-      fileSize: uploadResult.fileSize,
-      uploadStatus: uploadResult.uploadStatus,
+      r2Key: uploadResult.key,
+      fileUrl: uploadResult.url,
+      mimeType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+      uploadStatus: 'uploaded',
     });
 
     if (isRevisionUpload) {
@@ -1122,7 +949,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           revisionVersion: revisionNotificationVersion,
           uploadedBy: {
             email: user.email,
-            name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+            name: user.name ?? null,
           },
           uploadedAt,
         });
@@ -1136,7 +963,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
         assetStatus: updates.status ?? asset.status,
         uploadedBy: {
           email: user.email,
-          name: user.user_metadata?.full_name ?? user.user_metadata?.name ?? null,
+          name: user.name ?? null,
         },
         uploadedAt,
       });
@@ -1145,11 +972,11 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
     return {
       asset: mapped,
       upload: {
-        driveFileId: uploadResult.driveFileId,
-        driveFileUrl: uploadResult.driveFileUrl,
-        mimeType: uploadResult.mimeType,
-        fileSize: uploadResult.fileSize,
-        uploadStatus: uploadResult.uploadStatus,
+        r2Key: uploadResult.key,
+        fileUrl: uploadResult.url,
+        mimeType: file.type || 'application/octet-stream',
+        fileSize: file.size,
+        uploadStatus: 'uploaded' as const,
       },
     };
   } catch (error) {
@@ -1177,10 +1004,8 @@ export async function updateAsset(
   assetId: string,
   input: Partial<AssetInput>
 ): Promise<Asset> {
+  const user = await getCurrentUser();
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   const existing = await getAssetById(assetId);
   if (!existing) {
     throw new Error('Asset not found');
@@ -1203,11 +1028,6 @@ export async function updateAsset(
   if (input.type !== undefined) updates.type = input.type;
   if (input.status !== undefined) updates.status = input.status;
   if (input.driveFileUrl !== undefined) updates.drive_file_url = input.driveFileUrl;
-  const driveFolderTargetChanged = input.clientId !== undefined || input.type !== undefined;
-  if (driveFolderTargetChanged) {
-    updates.drive_folder_id = null;
-    updates.drive_folder_url = null;
-  }
   if (input.thumbnailUrl !== undefined) updates.thumbnail_url = input.thumbnailUrl;
   if (input.assignedTo !== undefined) updates.assigned_to = input.assignedTo;
   if (input.scheduledAt !== undefined) {
@@ -1234,43 +1054,6 @@ export async function updateAsset(
   }
 
   let record = await updateAssetRow(assetId, updates as Parameters<typeof updateAssetRow>[1], supabase);
-
-  const targetClientId = input.clientId ?? existing.client_id;
-  const targetAssetType = input.type ?? existing.type;
-  const shouldResolveDriveFolder = driveFolderTargetChanged || !record.drive_folder_id || !record.drive_folder_url;
-
-  if (shouldResolveDriveFolder) {
-    const driveFolderMetadata = await resolveDriveFolderMetadata(targetClientId, targetAssetType, supabase, assetId);
-    if (
-      driveFolderMetadata &&
-      (record.drive_folder_id !== driveFolderMetadata.drive_folder_id ||
-        record.drive_folder_url !== driveFolderMetadata.drive_folder_url)
-    ) {
-      try {
-        record = await updateAssetRow(assetId, driveFolderMetadata, supabase);
-        const persistedRecord = await getAssetById(assetId, supabase);
-        if (persistedRecord) {
-          record = persistedRecord;
-        }
-
-        console.info('[assets-service] Drive folder metadata persistence succeeded', {
-          assetId,
-          clientId: targetClientId,
-          assetType: targetAssetType,
-          driveFolderId: record.drive_folder_id,
-          driveFolderUrl: record.drive_folder_url,
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to persist Drive folder metadata';
-        console.error('[assets-service] Drive folder metadata persistence failed', {
-          assetId,
-          clientId: targetClientId,
-          assetType: targetAssetType,
-          error: message,
-        });
-      }
-    }
-  }
 
   const mapped = mapAsset(record);
   if (!mapped) {
@@ -1422,10 +1205,10 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
           commentMessage: latestCommentText,
           designerId: assignedDesigner.id,
           designerEmail: assignedDesigner.email,
-          designerName: assignedDesigner.full_name || assignedDesigner.name || null,
+          designerName: assignedDesigner.full_name || null,
           requestedBy: {
             email: requestingUser?.email || 'unknown',
-            name: requestingUser?.full_name || requestingUser?.name || null,
+            name: requestingUser?.full_name || null,
           },
           timestamp: new Date().toISOString(),
         });
@@ -1445,17 +1228,5 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
 
 export async function removeAsset(assetId: string): Promise<void> {
   const supabase = await createServerSupabaseClient();
-  const asset = await getAssetById(assetId, supabase);
-  if (asset?.google_calendar_event_id) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { deleteCalendarEvent } = await import('@/services/calendar-sync.service');
-        await deleteCalendarEvent(user.id, asset.google_calendar_event_id);
-      }
-    } catch (err) {
-      console.warn('Failed to delete Google Calendar event for asset', assetId, err);
-    }
-  }
   await deleteAssetRow(assetId);
 }

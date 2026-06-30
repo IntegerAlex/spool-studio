@@ -129,9 +129,6 @@ export interface Database {
           published_at: string | null;
           approved_at: string | null;
           approved_by: string | null;
-          google_calendar_event_id: string | null;
-          google_calendar_event_url: string | null;
-          calendar_synced_at: string | null;
           created_at: string;
           updated_at: string;
           current_revision_id: string | null;
@@ -167,9 +164,6 @@ export interface Database {
           published_at?: string | null;
           approved_at?: string | null;
           approved_by?: string | null;
-          google_calendar_event_id?: string | null;
-          google_calendar_event_url?: string | null;
-          calendar_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -200,46 +194,11 @@ export interface Database {
           published_at?: string | null;
           approved_at?: string | null;
           approved_by?: string | null;
-          google_calendar_event_id?: string | null;
-          google_calendar_event_url?: string | null;
-          calendar_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
           current_revision_id?: string | null;
           latest_revision_id?: string | null;
           revision_count?: number;
-        };
-      };
-      google_integrations: {
-        Row: {
-          id: string;
-          user_id: string;
-          google_email: string | null;
-          access_token: string;
-          refresh_token: string | null;
-          expiry_date: number;
-          created_at: string;
-          updated_at: string;
-        };
-        Relationships: [];
-        Insert: {
-          id?: string;
-          user_id: string;
-          google_email?: string | null;
-          access_token: string;
-          refresh_token?: string | null;
-          expiry_date: number;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          user_id?: string;
-          google_email?: string | null;
-          access_token?: string;
-          refresh_token?: string | null;
-          expiry_date?: number;
-          created_at?: string;
-          updated_at?: string;
         };
       };
       client_references: {

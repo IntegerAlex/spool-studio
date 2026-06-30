@@ -1,4 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 
@@ -6,13 +5,13 @@ export type DbAssetComment = Database['public']['Tables']['asset_comments']['Row
 
 const commentSelect = 'id,asset_id,user_id,type,message,revision_status,created_at,updated_at';
 
-async function getClient(client?: SupabaseClient<Database>) {
+async function getClient(client?: any) {
   return client ?? (await createServerSupabaseClient());
 }
 
 export async function listCommentsByAssetId(
   assetId: string,
-  client?: SupabaseClient<Database>,
+  client?: any,
   options?: { limit?: number; offset?: number }
 ): Promise<DbAssetComment[]> {
   const supabase = await getClient(client);
@@ -38,7 +37,7 @@ export async function listCommentsByAssetId(
 
 export async function getCommentById(
   commentId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAssetComment | null> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -56,7 +55,7 @@ export async function getCommentById(
 
 export async function insertComment(
   payload: Database['public']['Tables']['asset_comments']['Insert'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAssetComment> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -75,7 +74,7 @@ export async function insertComment(
 export async function updateComment(
   commentId: string,
   updates: Database['public']['Tables']['asset_comments']['Update'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAssetComment> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -94,7 +93,7 @@ export async function updateComment(
 
 export async function deleteComment(
   commentId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<void> {
   const supabase = await getClient(client);
   const { error } = await supabase.from('asset_comments').delete().eq('id', commentId);

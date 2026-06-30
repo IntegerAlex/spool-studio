@@ -1,5 +1,6 @@
 import type { Asset, AssetRevision } from '@/types/index';
 import { getAssetPreviewType } from '@/lib/asset-display';
+import { generatePublicUrl, generatePreviewUrl } from '@/integrations/r2/r2-service';
 
 export interface AssetPreviewDescriptor {
   title: string;
@@ -20,64 +21,21 @@ export interface AssetPreviewUrls {
   directMediaUrl: string | null;
 }
 
-export function extractGoogleDriveFileId(value?: string | null): string | null {
-  if (!value) {
-    return null;
+function resolveR2Key(input: Pick<AssetPreviewDescriptor, 'driveFileId' | 'driveFileUrl'>): string | null {
+  if (input.driveFileId) {
+    return input.driveFileId;
   }
-
-  const urlPatterns = [
-    /\/file\/d\/([a-zA-Z0-9_-]+)\//,
-    /[?&]id=([a-zA-Z0-9_-]+)/,
-    /\/d\/([a-zA-Z0-9_-]+)(?:\/|$)/,
-  ];
-
-  for (const pattern of urlPatterns) {
-    const match = value.match(pattern);
-    if (match?.[1]) {
-      return match[1];
-    }
-  }
-
   return null;
-}
-
-function resolveDriveFileId(input: Pick<AssetPreviewDescriptor, 'driveFileId' | 'driveFileUrl'>): string | null {
-  return input.driveFileId ?? extractGoogleDriveFileId(input.driveFileUrl);
-}
-
-export function getGoogleDrivePreviewUrl(input: Pick<AssetPreviewDescriptor, 'driveFileId' | 'driveFileUrl'>): string | null {
-  const driveFileId = resolveDriveFileId(input);
-  if (!driveFileId) {
-    return input.driveFileUrl ?? null;
-  }
-
-  return `https://drive.google.com/file/d/${driveFileId}/preview`;
-}
-
-export function getGoogleDriveViewUrl(input: Pick<AssetPreviewDescriptor, 'driveFileId' | 'driveFileUrl'>): string | null {
-  const driveFileId = resolveDriveFileId(input);
-  if (!driveFileId) {
-    return input.driveFileUrl ?? null;
-  }
-
-  return `https://drive.google.com/uc?export=view&id=${driveFileId}`;
-}
-
-export function getGoogleDriveDownloadUrl(input: Pick<AssetPreviewDescriptor, 'driveFileId' | 'driveFileUrl'>): string | null {
-  const driveFileId = resolveDriveFileId(input);
-  if (!driveFileId) {
-    return input.driveFileUrl ?? null;
-  }
-
-  return `https://drive.google.com/uc?export=download&id=${driveFileId}`;
 }
 
 export function getAssetPreviewUrls(input: AssetPreviewDescriptor): AssetPreviewUrls {
   const previewType = getAssetPreviewType(input);
-  const openUrl = input.driveFileUrl ?? getGoogleDrivePreviewUrl(input);
-  const viewUrl = getGoogleDriveViewUrl(input);
-  const downloadUrl = getGoogleDriveDownloadUrl(input);
-  const previewUrl = previewType === 'video' ? downloadUrl ?? openUrl : getGoogleDrivePreviewUrl(input);
+  const r2Key = resolveR2Key(input);
+
+  const openUrl = r2Key ? generatePublicUrl(r2Key) : input.driveFileUrl ?? null;
+  const previewUrl = r2Key ? generatePreviewUrl(r2Key) : input.driveFileUrl ?? null;
+  const viewUrl = r2Key ? generatePublicUrl(r2Key) : input.driveFileUrl ?? null;
+  const downloadUrl = r2Key ? generatePublicUrl(r2Key) : input.driveFileUrl ?? null;
 
   return {
     openUrl,

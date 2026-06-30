@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { User } from '@/types/index';
 import { getUserById, insertUser, listUsers, listUsersByIds } from '@/repositories/users-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { getCurrentUser } from '@/lib/auth';
 
 function mapUser(user: Awaited<ReturnType<typeof getUserById>>): User | null {
   if (!user) {
@@ -28,17 +29,14 @@ export async function getCurrentUserProfile(): Promise<User | null> {
 }
 
 export async function getOrCreateCurrentUserProfile(): Promise<User> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const authUser = await getCurrentUser();
+  if (!authUser) {
     throw new Error('Unauthorized');
   }
 
-  const existing = await getUserById(user.id, supabase);
+  const supabase = await createServerSupabaseClient();
+
+  const existing = await getUserById(authUser.id, supabase);
   if (existing) {
     const mapped = mapUser(existing);
     if (!mapped) {
@@ -47,21 +45,18 @@ export async function getOrCreateCurrentUserProfile(): Promise<User> {
     return mapped;
   }
 
-  if (!user.email) {
+  if (!authUser.email) {
     throw new Error('Authenticated user is missing email');
   }
 
-  const fullName =
-    (user.user_metadata?.full_name as string | undefined) ??
-    (user.user_metadata?.name as string | undefined) ??
-    user.email;
+  const fullName = authUser.name ?? authUser.email;
 
   const inserted = await insertUser(
     {
-      id: user.id,
-      email: user.email,
+      id: authUser.id,
+      email: authUser.email,
       full_name: fullName,
-      avatar_url: (user.user_metadata?.avatar_url as string | undefined) ?? null,
+      avatar_url: authUser.avatarUrl ?? null,
     },
     supabase
   );

@@ -1,7 +1,6 @@
 import { getClientById } from '@/repositories/clients-repository';
 import { listClientAssetsForReport } from '@/repositories/reports-repository';
 
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 
 export interface ReportOptions {
@@ -11,7 +10,7 @@ export interface ReportOptions {
   isMonthly?: boolean;
   month?: number;
   year?: number;
-  client?: SupabaseClient<Database>;
+  client?: any;
 }
 
 export interface MonthlyReportPayload {
@@ -181,7 +180,7 @@ export async function generateMonthlyReport(
   clientId: string,
   month: number,
   year: number,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<MonthlyReportPayload | null> {
   const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
   const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));

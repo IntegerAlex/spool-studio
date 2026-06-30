@@ -8,6 +8,7 @@ import { getOrCreateCurrentUserProfile, getUsersByIds } from '@/services/users-s
 import type { Json } from '@/types/database';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { emitEvent } from '@/lib/event-bus';
+import { getCurrentUser } from '@/lib/auth';
 
 export interface ActivityInput {
   assetId: string;
@@ -76,15 +77,12 @@ export async function getAssetActivityWithUsers(
 }
 
 export async function logAssetActivity(input: ActivityInput): Promise<AssetActivityLog> {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   await getOrCreateCurrentUserProfile();
 

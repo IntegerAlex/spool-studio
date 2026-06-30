@@ -8,8 +8,8 @@ import {
   updateClient as updateClientRow,
 } from '@/repositories/clients-repository';
 import { listAssetSummaries, listAssetsByClientId } from '@/repositories/assets-repository';
-import { createClientDriveFolders } from '@/integrations/google-drive/folder-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { getCurrentUser } from '@/lib/auth';
 
 export interface ClientInput {
   name: string;
@@ -249,7 +249,7 @@ export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Clie
       .map((client) => {
         const mapped = mapClient(client, assetSummaries, metricsMap);
         if (!mapped) return null;
-        mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - mapped.weeklyCompleted);
+        mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0));
         return mapped;
       })
       .filter((client): client is Client => Boolean(client));
@@ -282,7 +282,7 @@ export async function getClientDetail(clientId: string): Promise<Client | null> 
     const mapped = mapClient(client, assetSummaries, metricsMap);
     if (!mapped) return null;
 
-    mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - mapped.weeklyCompleted);
+    mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0));
 
     return mapped;
   } catch (error) {
@@ -293,15 +293,12 @@ export async function getClientDetail(clientId: string): Promise<Client | null> 
 
 export async function createClient(input: ClientInput): Promise<Client> {
   console.log("[client-create][payload]", input);
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
+  const user = await getCurrentUser();
+  if (!user) {
     throw new Error('Unauthorized');
   }
+
+  const supabase = await createServerSupabaseClient();
 
   const calculatedWeeklyGoal = (input.weeklyPosterGoal ?? 0) + (input.weeklyReelGoal ?? 0);
   const monthlyGoal = input.monthlyGoal ?? ((input.monthlyReelsTarget ?? 0) + (input.monthlyPostsTarget ?? 0));
@@ -330,49 +327,6 @@ export async function createClient(input: ClientInput): Promise<Client> {
   );
 
   let updatedRecord = record;
-
-  try {
-    console.info('[clients-service] Starting Drive folder provisioning for client', {
-      clientId: record.id,
-      clientName: record.name,
-    });
-
-    const driveFolders = await createClientDriveFolders(record.name);
-
-    console.info('[clients-service] Drive folder provisioning succeeded', {
-      clientId: record.id,
-      clientName: record.name,
-      rootFolderId: driveFolders.root.id,
-      rootFolderUrl: driveFolders.root.url,
-    });
-
-    updatedRecord = await updateClientRow(
-      record.id,
-      {
-        drive_folder_id: driveFolders.root.id,
-        drive_folder_url: driveFolders.root.url,
-      },
-      supabase
-    );
-
-    const persistedRecord = await getClientById(record.id, supabase);
-    if (persistedRecord) {
-      updatedRecord = persistedRecord;
-    }
-
-    console.info('[clients-service] Supabase Drive metadata persistence succeeded', {
-      clientId: record.id,
-      driveFolderId: updatedRecord.drive_folder_id,
-      driveFolderUrl: updatedRecord.drive_folder_url,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to provision Drive folders';
-    console.error('[clients-service] Drive folder provisioning failed', {
-      clientId: record.id,
-      clientName: record.name,
-      error: message,
-    });
-  }
 
   const assetSummaries = await listAssetSummaries(supabase);
   const mapped = mapClient(updatedRecord, assetSummaries);

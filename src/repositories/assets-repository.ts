@@ -1,6 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
+import type { AssetStatus } from '@/types/index';
 
 export type DbAsset = Database['public']['Tables']['content_assets']['Row'];
 export type DbAssetSummary = Pick<
@@ -42,17 +42,17 @@ export type DbKanbanAsset = Pick<
 >;
 
 const assetSelect =
-  'id,client_id,title,type,status,mime_type,file_size,file_extension,uploaded_at,uploaded_by,drive_file_id,drive_file_url,drive_folder_id,drive_folder_url,thumbnail_url,media_width,media_height,duration_seconds,created_by,created_at,updated_at,scheduled_at,publish_date,publish_time,scheduled_by,published_at,approved_at,approved_by,google_calendar_event_id,google_calendar_event_url,calendar_synced_at,assigned_to,current_revision_id,latest_revision_id,revision_count';
+  'id,client_id,title,type,status,mime_type,file_size,file_extension,uploaded_at,uploaded_by,drive_file_id,drive_file_url,drive_folder_id,drive_folder_url,thumbnail_url,media_width,media_height,duration_seconds,created_by,created_at,updated_at,scheduled_at,publish_date,publish_time,scheduled_by,published_at,approved_at,approved_by,calendar_synced_at,assigned_to,current_revision_id,latest_revision_id,revision_count';
 
 const dashboardSummarySelect = 'status,publish_date,publish_time,published_at,type,client_id,created_at';
 const kanbanAssetSelect =
   'id,client_id,title,type,status,mime_type,file_extension,thumbnail_url,assigned_to,publish_date,created_at,updated_at';
 
-async function getClient(client?: SupabaseClient<Database>) {
+async function getClient(client?: any) {
   return client ?? (await createServerSupabaseClient());
 }
 
-export async function listAssets(client?: SupabaseClient<Database>): Promise<DbAsset[]> {
+export async function listAssets(client?: any): Promise<DbAsset[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
@@ -67,14 +67,14 @@ export async function listAssets(client?: SupabaseClient<Database>): Promise<DbA
 }
 
 export async function listAssetsByStatuses(
-  statuses: readonly string[],
-  client?: SupabaseClient<Database>
+  statuses: readonly AssetStatus[],
+  client?: any
 ): Promise<DbAsset[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
     .select(assetSelect)
-    .in('status', statuses as string[])
+    .in('status', statuses as AssetStatus[])
     .order('updated_at', { ascending: false });
 
   if (error) {
@@ -85,7 +85,7 @@ export async function listAssetsByStatuses(
 }
 
 export async function listAssetSummaries(
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAssetSummary[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -100,7 +100,7 @@ export async function listAssetSummaries(
 }
 
 export async function listDashboardAssetSummaries(
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbDashboardAssetSummary[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -115,7 +115,7 @@ export async function listDashboardAssetSummaries(
 }
 
 export async function listKanbanAssets(
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbKanbanAsset[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -132,7 +132,7 @@ export async function listKanbanAssets(
 
 export async function listAssetsByIds(
   ids: string[],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<Pick<DbAsset, 'id' | 'title' | 'type' | 'status' | 'publish_date' | 'publish_time' | 'published_at' | 'thumbnail_url'>[]> {
   if (!ids || ids.length === 0) return [];
   const supabase = await getClient(client);
@@ -151,7 +151,7 @@ export async function listAssetsByIds(
 
 export async function getWeeklyCountsGroupedByClient(
   weekStartIso: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<{ client_id: string; weekly_count: number }[]> {
   const supabase = await getClient(client);
   // Call Postgres function created by migration: clients_weekly_counts(week_start timestamptz)
@@ -165,7 +165,7 @@ export async function getWeeklyCountsGroupedByClient(
 
 export async function listAssetsByClientId(
   clientId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAsset[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -183,7 +183,7 @@ export async function listAssetsByClientId(
 
 export async function getAssetById(
   assetId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAsset | null> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -201,7 +201,7 @@ export async function getAssetById(
 
 export async function insertAsset(
   payload: Database['public']['Tables']['content_assets']['Insert'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAsset> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -220,7 +220,7 @@ export async function insertAsset(
 export async function updateAsset(
   assetId: string,
   updates: Database['public']['Tables']['content_assets']['Update'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbAsset> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -239,7 +239,7 @@ export async function updateAsset(
 
 export async function deleteAsset(
   assetId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<void> {
   const supabase = await getClient(client);
   
@@ -257,7 +257,7 @@ export async function deleteAsset(
 
 export async function listRevisionsByAssetId(
   assetId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<Database['public']['Tables']['asset_revisions']['Row'][]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase

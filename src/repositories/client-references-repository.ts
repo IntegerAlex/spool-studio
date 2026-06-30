@@ -1,16 +1,15 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
 
 export type DbClientReference = Database['public']['Tables']['client_references']['Row'];
 
-async function getClient(client?: SupabaseClient<Database>) {
+async function getClient(client?: any) {
   return client ?? (await createServerSupabaseClient());
 }
 
 export async function listClientReferencesByClientId(
   clientId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClientReference[]> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -28,7 +27,7 @@ export async function listClientReferencesByClientId(
 
 export async function getClientReferenceById(
   referenceId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClientReference | null> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -46,7 +45,7 @@ export async function getClientReferenceById(
 
 export async function insertClientReference(
   payload: Database['public']['Tables']['client_references']['Insert'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClientReference> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -65,7 +64,7 @@ export async function insertClientReference(
 export async function updateClientReference(
   referenceId: string,
   updates: Database['public']['Tables']['client_references']['Update'],
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<DbClientReference> {
   const supabase = await getClient(client);
   const { data, error } = await supabase
@@ -84,7 +83,7 @@ export async function updateClientReference(
 
 export async function deleteClientReference(
   referenceId: string,
-  client?: SupabaseClient<Database>
+  client?: any
 ): Promise<void> {
   const supabase = await getClient(client);
   const { error } = await supabase.from('client_references').delete().eq('id', referenceId);

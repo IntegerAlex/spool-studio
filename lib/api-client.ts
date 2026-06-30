@@ -1,4 +1,3 @@
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import { mockNotifications } from './mock-data/notifications';
 import { mockUploadQueue } from './mock-data/upload-queue';
 import { mockWorkspace } from './mock-data/workspace';
@@ -217,7 +216,7 @@ function emitUploadProgress(
   onProgress?.({ phase, percentage: Math.max(0, Math.min(100, Math.round(percentage))) });
 }
 
-async function uploadFileToDriveSession(
+async function uploadFileToR2Session(
   uploadUrl: string,
   file: File,
   assetId: string,
@@ -244,7 +243,7 @@ async function uploadFileToDriveSession(
       };
 
       xhr.onload = () => {
-        console.info('[google-upload][transport-complete]', {
+        console.info('[r2-upload][transport-complete]', {
           status: xhr.status,
         });
 
@@ -252,7 +251,7 @@ async function uploadFileToDriveSession(
       };
 
       xhr.onerror = () => {
-        console.warn('[google-upload][opaque-transport]', {
+        console.warn('[r2-upload][opaque-transport]', {
           note: 'Browser blocked response visibility but upload may still have succeeded.',
         });
 
@@ -312,26 +311,18 @@ function hydrateClient(client: Client): Client {
 
 export const authApi = {
   login: async (email: string, password: string): Promise<{ user: User; token: string }> => {
-    const supabase = createBrowserSupabaseClient();
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
-
-    if (error || !data.session) {
-      throw new Error(error?.message ?? 'Login failed');
-    }
-
-    const profile = await fetchJson<User>('/api/users/me');
-    return { user: hydrateUser(profile), token: data.session.access_token };
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return { user: data.user, token: 'cookie-based' };
   },
 
   logout: async (): Promise<void> => {
-    const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      throw new Error(error.message);
-    }
+    await fetch('/api/auth/logout', { method: 'POST' });
   },
 
   getCurrentUser: async (): Promise<User | null> => {
@@ -339,20 +330,14 @@ export const authApi = {
     return user ? hydrateUser(user) : null;
   },
 
-  forgotPassword: async (email: string): Promise<void> => {
-    const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) {
-      throw new Error(error.message);
-    }
+  forgotPassword: async (_email: string): Promise<void> => {
+    // TODO: implement with Mailgun / custom reset flow
+    return;
   },
 
-  resetPassword: async (_token: string, newPassword: string): Promise<void> => {
-    const supabase = createBrowserSupabaseClient();
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      throw new Error(error.message);
-    }
+  resetPassword: async (_token: string, _newPassword: string): Promise<void> => {
+    // TODO: implement
+    return;
   },
 };
 
@@ -517,7 +502,7 @@ export const assetsApi = {
   uploadFile: async (assetId: string, file: File, options?: UploadFileOptions): Promise<Asset> => {
     emitUploadProgress(options?.onProgress, 'requesting-session', 0);
 
-    const session = await fetchJson<{ uploadUrl: string; driveFileId: string }>(`/api/uploads/google-session`, {
+    const { uploadUrl, key: r2Key } = await fetchJson<{ uploadUrl: string; key: string }>(`/api/uploads/r2-session`, {
       method: 'POST',
       body: JSON.stringify({
         assetId,
@@ -528,14 +513,14 @@ export const assetsApi = {
     });
 
     emitUploadProgress(options?.onProgress, 'uploading', 15);
-    await uploadFileToDriveSession(session.uploadUrl, file, assetId, options?.onProgress);
+    await uploadFileToR2Session(uploadUrl, file, assetId, options?.onProgress);
 
     emitUploadProgress(options?.onProgress, 'finalizing', 96);
 
     const payload = await fetchJson<{ asset: Asset; upload: unknown }>(`/api/assets/${assetId}/upload`, {
       method: 'POST',
       body: JSON.stringify({
-        driveFileId: session.driveFileId,
+        r2Key,
         fileName: file.name,
       }),
     });
