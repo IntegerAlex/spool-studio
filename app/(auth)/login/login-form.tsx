@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
 export function LoginForm() {
   const router = useRouter();
@@ -23,15 +22,13 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      const supabase = createBrowserSupabaseClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
-
-      if (signInError) {
-        throw signInError;
-      }
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
 
       const redirectTo = searchParams.get('redirectedFrom') ?? '/dashboard';
       router.replace(redirectTo);

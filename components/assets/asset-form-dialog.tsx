@@ -262,10 +262,6 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
           clearApiClientCache();
           router.refresh();
           onSaved?.(uploaded);
-          
-          // Let the user see 100% and success state before hiding
-          await new Promise((resolve) => setTimeout(resolve, 800));
-          
           setOpen(false);
           return;
         } catch (uploadError) {
@@ -438,7 +434,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
             </div>
 
             <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              Drive folders are assigned automatically from the selected client and asset type.
+              Files are uploaded securely to cloud storage.
             </div>
 
             <FormItem>
@@ -461,7 +457,7 @@ export function AssetFormDialog({ mode, asset, trigger, onSaved }: AssetFormDial
               {uploadState === 'uploading' && (
                 <div className="space-y-2 pt-2">
                   <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    <span>Uploading to Drive</span>
+                    <span>Uploading</span>
                     <span>{uploadProgress}%</span>
                   </div>
                   <Progress value={uploadProgress} className="h-2" />

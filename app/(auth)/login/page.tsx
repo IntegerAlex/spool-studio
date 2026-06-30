@@ -1,13 +1,13 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { Card } from '@/components/ui/card';
-import { getUser } from '@/lib/supabase/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { LoginForm } from './login-form';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LoginPage() {
-  const user = await getUser();
+  const user = await getCurrentUser();
   if (user) {
     redirect('/dashboard');
   }

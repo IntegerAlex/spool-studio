@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { authApi } from '@/lib/api-client';
 import { ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
@@ -20,7 +19,7 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      await authApi.forgotPassword(email);
+      // TODO: implement with Mailgun / custom reset flow
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed');
