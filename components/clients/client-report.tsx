@@ -454,7 +454,7 @@ export function ClientReport({ clientId, contractStartDate, contractEndDate }: C
                                 href={asset.driveFileUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1.5 hover:text-[#818cf8] transition-colors"
+                                className="inline-flex items-center gap-1.5 hover:text-emerald-300 transition-colors"
                               >
                                 <span>{asset.title}</span>
                                 <ArrowUpRight className="h-3.5 w-3.5 text-[#71717a] shrink-0" />

@@ -54,21 +54,15 @@ export default function AssetDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingRevision, setIsUploadingRevision] = useState(false);
   const [revisionUploadProgress, setRevisionUploadProgress] = useState(0);
-  const [isSyncingCalendar, setIsSyncingCalendar] = useState(false);
+
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
   const [workflowAction, setWorkflowAction] = useState<'process' | 'move_to_draft' | null>(null);
   const [revisionRefreshKey, setRevisionRefreshKey] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const revisionInputRef = useRef<HTMLInputElement | null>(null);
 
-  const driveFolderLabel = asset?.type === 'reel'
-    ? 'Reels'
-    : asset?.type === 'poster'
-      ? 'Posters'
-      : 'Exports';
+  const storageLabel = 'Cloud Storage';
 
-  const canSyncToCalendar = asset?.status === 'approved' && Boolean(asset?.publishDate);
-  const isAlreadySynced = Boolean(asset?.googleCalendarEventId);
   const canApproveDraft = asset?.status === 'draft';
   const canRequestRevision = asset?.status === 'draft';
   const canApproveRevision = asset?.status === 'revision_requested';
@@ -172,9 +166,6 @@ export default function AssetDetailPage() {
       }
       clearApiClientCache();
       router.refresh();
-
-      // Let the user see 100% and success state before hiding
-      await new Promise((resolve) => setTimeout(resolve, 800));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
       toast({ title: 'Upload failed', description: message, variant: 'destructive' });
@@ -183,56 +174,6 @@ export default function AssetDetailPage() {
       setIsUploadingRevision(false);
       // reset input so same file can be selected again
       if (revisionInputRef.current) revisionInputRef.current.value = '';
-    }
-  };
-
-  const handleCalendarSync = async () => {
-    if (!asset) {
-      return;
-    }
-
-    if (!canSyncToCalendar || isAlreadySynced) {
-      return;
-    }
-
-    try {
-      setIsSyncingCalendar(true);
-      const response = await fetch('/api/calendar/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assetId: asset.id }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error ?? 'Calendar sync failed');
-      }
-
-      if (payload.status === 'already_synced') {
-        setAsset((prev) => (prev ? {
-          ...prev,
-          googleCalendarEventId: payload.eventId ?? prev.googleCalendarEventId,
-          googleCalendarEventUrl: payload.eventUrl ?? prev.googleCalendarEventUrl,
-        } : prev));
-        toast({ title: 'Already synced', description: 'This asset is already linked to Google Calendar.' });
-        return;
-      }
-
-      setAsset((prev) => (prev ? {
-        ...prev,
-        googleCalendarEventId: payload.eventId ?? prev.googleCalendarEventId,
-        googleCalendarEventUrl: payload.eventUrl ?? prev.googleCalendarEventUrl,
-        calendarSyncedAt: payload.syncedAt ? new Date(payload.syncedAt) : new Date(),
-      } : prev));
-
-      toast({ title: 'Calendar synced', description: 'Google Calendar event created.' });
-      clearApiClientCache();
-      router.refresh();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Calendar sync failed';
-      toast({ title: 'Calendar sync failed', description: message, variant: 'destructive' });
-    } finally {
-      setIsSyncingCalendar(false);
     }
   };
 
@@ -481,19 +422,6 @@ export default function AssetDetailPage() {
                   </Button>
                 )}
 
-                {asset.driveFolderUrl && (
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="h-10 w-full border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
-                  >
-                    <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer">
-                      <FolderOpen className="mr-2 h-4 w-4" />
-                      Open Folder
-                    </a>
-                  </Button>
-                )}
-
                 {asset.driveFileUrl && (
                   <Button
                     variant="outline"
@@ -539,7 +467,7 @@ export default function AssetDetailPage() {
                           borderWidth: 2,
                           borderStyle: 'solid',
                           borderColor: 'rgba(255,255,255,0.14)',
-                          borderTopColor: '#6366f1',
+                          borderTopColor: '#3ecf8e',
                           borderRadius: '50%',
                           display: 'inline-block',
                         }}
@@ -585,8 +513,8 @@ export default function AssetDetailPage() {
                 <p className="mt-1 font-medium text-white">{client?.name ?? 'Unknown client'}</p>
               </div>
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
-                <p className="text-[#71717a]">Folder</p>
-                <p className="mt-1 font-medium text-white">{driveFolderLabel}</p>
+                <p className="text-[#71717a]">Storage</p>
+                <p className="mt-1 font-medium text-white">{storageLabel}</p>
               </div>
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
                 <p className="text-[#71717a]">File</p>
@@ -699,31 +627,6 @@ export default function AssetDetailPage() {
                 </Button>
               )}
 
-              {canSyncToCalendar && (
-                <Button
-                  variant={isAlreadySynced ? 'outline' : 'default'}
-                  className="h-9 w-full justify-between px-3 text-[13px]"
-                  disabled={isAlreadySynced || isSyncingCalendar}
-                  onClick={handleCalendarSync}
-                  aria-busy={isSyncingCalendar}
-                >
-                  <span>{isAlreadySynced ? 'Already Synced' : 'Sync to Google Calendar'}</span>
-                  <span className="text-[#71717a]">→</span>
-                </Button>
-              )}
-
-              {asset.googleCalendarEventUrl && (
-                <Button
-                  variant="outline"
-                  className="h-9 w-full justify-between px-3 text-[13px]"
-                  onClick={() => {
-                    window.open(asset.googleCalendarEventUrl ?? '', '_blank', 'noopener,noreferrer');
-                  }}
-                >
-                  <span>View in Google Calendar</span>
-                  <span className="text-[#71717a]">→</span>
-                </Button>
-              )}
             </div>
 
             {!uploadEligible && (
@@ -732,40 +635,35 @@ export default function AssetDetailPage() {
           </Card>
 
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">Drive handoff</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">File storage</p>
             <p className="mt-2 text-[13px] text-[#d4d4d8]">
-              {asset.driveFolderUrl ? 'Linked folder ready for upload handoff.' : 'No Drive folder has been linked yet.'}
+              {asset.driveFileUrl ? 'File is stored in cloud storage and ready for access.' : 'No file has been uploaded yet.'}
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {asset.driveFolderUrl ? (
+              {asset.driveFileUrl ? (
                 <>
                   <Button asChild className="h-9 bg-[var(--primary)] px-3 text-[13px] text-white hover:bg-[#4f46e5]">
-                    <a href={asset.driveFolderUrl} target="_blank" rel="noreferrer">
-                      <FolderOpen className="mr-2 h-4 w-4" />
-                      Open Folder
+                    <a href={asset.driveFileUrl} target="_blank" rel="noreferrer">
+                      Open File
                     </a>
                   </Button>
                   <Button
                     variant="outline"
                     className="h-9 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                     onClick={() => {
-                      void navigator.clipboard.writeText(asset.driveFolderUrl ?? '');
-                      toast({ title: 'Folder link copied' });
+                      void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
+                      toast({ title: 'Link copied' });
                     }}
                   >
                     <Copy className="mr-2 h-4 w-4" />
-                    Copy Folder Link
+                    Copy Link
                   </Button>
                 </>
               ) : (
-                <p className="text-[12px] text-[#71717a]">The folder association will appear here once Drive lookup succeeds.</p>
+                <p className="text-[12px] text-[#71717a]">Upload a file to see storage details.</p>
               )}
             </div>
-
-            {asset.driveFolderId && (
-              <p className="mt-3 text-[12px] text-[#71717a]">Folder ID: {asset.driveFolderId}</p>
-            )}
           </Card>
         </div>
       </div>

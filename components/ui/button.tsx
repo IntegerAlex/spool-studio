@@ -6,11 +6,11 @@ import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-[13px] font-medium transition-[color,box-shadow,transform,border-color,background-color] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-[rgba(99,102,241,0.5)] focus-visible:ring-[rgba(99,102,241,0.1)] focus-visible:ring-[3px] aria-invalid:ring-[rgba(239,68,68,0.1)] aria-invalid:border-[#ef4444]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-[13px] font-medium transition-[color,box-shadow,transform,border-color,background-color] duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-[rgba(16,185,129,0.5)] focus-visible:ring-[rgba(16,185,129,0.1)] focus-visible:ring-[3px] aria-invalid:ring-[rgba(239,68,68,0.1)] aria-invalid:border-[#ef4444]",
   {
     variants: {
       variant: {
-        default: 'bg-[#6366f1] text-white shadow-none hover:bg-[#4f46e5]',
+        default: 'bg-[#3ecf8e] text-black shadow-none hover:opacity-90',
         destructive:
           'border border-[rgba(239,68,68,0.3)] bg-transparent text-[#f87171] shadow-none hover:bg-[rgba(239,68,68,0.08)] hover:text-[#f87171] focus-visible:ring-[rgba(239,68,68,0.12)]',
         outline:

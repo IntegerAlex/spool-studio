@@ -51,7 +51,7 @@ const referenceTypes: Array<{
   { value: 'pinterest', label: 'Pinterest', icon: Pin, toneClassName: 'text-rose-300' },
   { value: 'drive_folder', label: 'Drive Folder', icon: DriveFolderIcon, toneClassName: 'text-amber-300' },
   { value: 'competitor', label: 'Competitor', icon: Shield, toneClassName: 'text-orange-300' },
-  { value: 'branding', label: 'Branding', icon: Brush, toneClassName: 'text-indigo-300' },
+  { value: 'branding', label: 'Branding', icon: Brush, toneClassName: 'text-emerald-300' },
   { value: 'reel_reference', label: 'Reel Reference', icon: Clapperboard, toneClassName: 'text-violet-300' },
   { value: 'ad_reference', label: 'Ad Reference', icon: Megaphone, toneClassName: 'text-emerald-300' },
   { value: 'other', label: 'Other', icon: Link2, toneClassName: 'text-slate-300' },
@@ -423,7 +423,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
     {
       title: 'Total Assets',
       value: assets.length,
-      icon: <LayoutGrid className="h-5 w-5 text-[#6366f1]" />,
+      icon: <LayoutGrid className="h-5 w-5 text-emerald-400" />,
       iconBg: 'bg-[rgba(99,102,241,0.12)]',
     },
     {
@@ -483,7 +483,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
             href={`https://instagram.com/${client.instagramHandle.replace('@', '')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[13px] text-[var(--primary)] hover:text-[#818cf8]"
+            className="inline-flex items-center gap-1 text-[13px] text-[var(--primary)] hover:text-emerald-300"
           >
             <span>Open Instagram profile</span>
             <ExternalLink className="h-3.5 w-3.5" />
@@ -491,21 +491,6 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
-          {client.driveFolderUrl && (
-            <>
-              <Button asChild variant="outline" className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)]">
-                <a href={client.driveFolderUrl} target="_blank" rel="noreferrer">
-                  <FolderOpen className="mr-2 h-4 w-4" />
-                  Open Drive Folder
-                </a>
-              </Button>
-              <Button variant="outline" className="h-9 rounded-md border border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.18)] hover:bg-[rgba(255,255,255,0.06)]" onClick={handleCopyFolderLink}>
-                <Copy className="mr-2 h-4 w-4" />
-                Copy Folder Link
-              </Button>
-            </>
-          )}
-
           <ClientFormDialog
             client={client}
             onSaved={(updatedClient) => setClient(updatedClient)}
@@ -836,7 +821,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                               href={reference.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="block break-all text-[13px] text-[var(--primary)] hover:text-[#818cf8]"
+                              className="block break-all text-[13px] text-[var(--primary)] hover:text-emerald-300"
                             >
                               {formatReferenceUrl(reference.url)}
                             </a>
@@ -924,7 +909,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
           <div className="flex items-center justify-between">
             <h2 className="text-[13px] font-medium text-white">Assets</h2>
-            <Link href="/dashboard/assets" className="text-[13px] font-medium text-[var(--primary)] hover:text-[#818cf8]">
+            <Link href="/dashboard/assets" className="text-[13px] font-medium text-[var(--primary)] hover:text-emerald-300">
               View all
             </Link>
           </div>

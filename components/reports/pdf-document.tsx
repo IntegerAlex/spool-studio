@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 2,
-    color: '#6366f1',
+    color: '#3ecf8e',
     marginBottom: 4,
   },
   clientName: {
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     borderTopStyle: 'solid',
     paddingTop: 10,
     flexDirection: 'row',
-    justifyContent: 'between',
+    justifyContent: 'space-between',
     fontSize: 8,
     color: '#a1a1aa',
   },

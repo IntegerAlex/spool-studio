@@ -21,7 +21,7 @@ export function Toaster() {
         return (
           <Toast key={id} {...props}>
             <div className="flex min-w-0 items-start gap-3">
-              <div className={isDestructive ? 'mt-0.5 text-[#f87171]' : 'mt-0.5 text-[#818cf8]'}>
+              <div className={isDestructive ? 'mt-0.5 text-[#f87171]' : 'mt-0.5 text-[#3ecf8e]'}>
                 {isDestructive ? <AlertCircle className="size-4" /> : <Info className="size-4" />}
               </div>
               <div className="min-w-0 flex-1">

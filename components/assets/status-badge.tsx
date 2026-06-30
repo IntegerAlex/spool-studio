@@ -28,7 +28,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
 
   const styles: Record<AssetStatus, string> = {
     draft: 'status-badge-draft',
-    uploading: 'border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.15)] text-[#818cf8]',
+    uploading: 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-emerald-400',
     uploaded: 'border-[rgba(20,184,166,0.3)] bg-[rgba(20,184,166,0.15)] text-[#2dd4bf]',
     processing: 'border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.15)] text-[#c084fc]',
     approved: 'status-badge-approved',
@@ -38,7 +38,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     in_design: 'status-badge-draft',
     ready_for_review: 'status-badge-draft',
     revision_requested: 'status-badge-revision',
-    scheduled: 'border-[rgba(99,102,241,0.3)] bg-[rgba(99,102,241,0.15)] text-[#818cf8]',
+    scheduled: 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-emerald-400',
   };
 
   return (

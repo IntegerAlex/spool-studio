@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import ErrorBoundary from '@/components/ui/error-boundary';
-const KanbanBoard = dynamic(() => import('@/components/kanban/board').then((mod) => mod.KanbanBoard), { ssr: false });
+import { PageSkeleton } from '@/components/ui/page-skeleton';
+const KanbanBoard = dynamic(() => import('@/components/kanban/board').then((mod) => mod.KanbanBoard), {
+  ssr: false,
+  loading: () => <PageSkeleton rows={3} />,
+});
 import { assetsApi, kanbanApi } from '@/lib/api-client';
 import type { Asset, KanbanClientOption } from '@/types/index';
 import { Button } from '@/components/ui/button';
@@ -22,7 +26,10 @@ import { cn } from '@/lib/utils';
 
 const AssetFormDialog = dynamic(
   () => import('@/components/assets/asset-form-dialog').then((mod) => mod.AssetFormDialog),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => <PageSkeleton rows={2} />,
+  }
 );
 
 export default function KanbanPage() {
@@ -113,90 +120,6 @@ export default function KanbanPage() {
   return (
     <ErrorBoundary>
       <div className="space-y-6 kanban-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '24px 32px' }}>
-      <style>{`
-        .kanban-container {
-          background-color: var(--color-bg-app);
-          max-width: none !important;
-        }
-        .kanban-title {
-          font-size: 20px !important;
-          font-weight: 600 !important;
-          color: var(--color-text-primary) !important;
-          letter-spacing: -0.025em !important;
-          line-height: 1.25 !important;
-        }
-        .kanban-subtitle {
-          font-size: 12.5px !important;
-          color: var(--color-text-muted) !important;
-          margin-top: 3px !important;
-        }
-        .top-toolbar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-        .search-container {
-          position: relative;
-          width: 280px;
-        }
-        .search-icon {
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--color-text-faint) !important;
-          pointer-events: none;
-          width: 13px;
-          height: 13px;
-        }
-        .search-input {
-          background-color: var(--color-bg-surface) !important;
-          border: 1px solid var(--color-border) !important;
-          border-radius: var(--radius-sm) !important;
-          padding: 8px 14px 8px 34px !important;
-          font-size: 13px !important;
-          color: var(--color-text-secondary) !important;
-          height: auto !important;
-          transition: all 150ms ease !important;
-          width: 100% !important;
-        }
-        .search-input::placeholder {
-          color: var(--color-text-faint) !important;
-        }
-        .search-input:focus {
-          border-color: var(--color-border-strong) !important;
-          box-shadow: 0 0 0 2px rgba(255,255,255,0.03) !important;
-          outline: none !important;
-        }
-        .filter-btn {
-          background-color: var(--color-bg-surface) !important;
-          border: 1px solid var(--color-border) !important;
-          border-radius: var(--radius-sm) !important;
-          font-size: 12.5px !important;
-          color: var(--color-text-muted) !important;
-          height: auto !important;
-          padding: 6px 14px !important;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          cursor: pointer;
-          transition: all 150ms ease !important;
-          box-shadow: none !important;
-        }
-        .filter-btn:hover {
-          background-color: var(--color-bg-hover) !important;
-          color: var(--color-text-secondary) !important;
-        }
-        .filter-btn.active {
-          border-color: var(--color-border-strong) !important;
-          color: var(--color-text-primary) !important;
-          background-color: var(--color-bg-overlay) !important;
-        }
-
-      `}</style>
-
       <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Kanban Board' }]} />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -258,7 +181,7 @@ export default function KanbanPage() {
             mode="create"
             onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
             trigger={
-              <Button variant="accent" className="new-asset-btn">
+              <Button variant="accent">
                 <Plus className="w-4 h-4 mr-2" />
                 New Asset
               </Button>

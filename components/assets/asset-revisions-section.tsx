@@ -137,17 +137,17 @@ export function AssetRevisionsSection({ assetId, currentRevisionId, refreshKey }
                     <span
                       className={`absolute left-0 top-3 rounded-full ${isActive ? 'w-2 h-2' : 'w-1.5 h-1.5'}`}
                       style={{
-                        background: isActive ? '#6366f1' : 'rgba(255,255,255,0.06)',
+                        background: isActive ? '#3ecf8e' : 'rgba(255,255,255,0.06)',
                         display: 'inline-block',
                       }}
                     />
 
                     {isActive ? (
                       <div className="ml-4 bg-[#1c1c1c] border rounded-[10px]" style={{ border: '1px solid rgba(99,102,241,0.35)' }}>
-                        <div style={{ borderLeft: '3px solid #6366f1' }} className="px-4 py-3.5">
+                        <div style={{ borderLeft: '3px solid #3ecf8e' }} className="px-4 py-3.5">
                           <div className="flex items-center justify-between">
                             <p className="text-[14px] font-medium text-white">v{versionLabel}</p>
-                            <span className="inline-flex items-center px-3 rounded-full" style={{ height: 18, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', fontSize: 10 }}>
+                            <span className="inline-flex items-center px-3 rounded-full" style={{ height: 18, background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', color: '#3ecf8e', fontSize: 10 }}>
                               Active
                             </span>
                           </div>
@@ -204,7 +204,7 @@ export function AssetRevisionsSection({ assetId, currentRevisionId, refreshKey }
                             ) : null}
                             <button
                               onClick={() => handleSetActive(rev.id)}
-                              className="h-7 text-[12px] inline-flex items-center px-3 border border-[rgba(255,255,255,0.08)] rounded-md text-[#a1a1aa] hover:border-[rgba(99,102,241,0.3)] hover:text-[#818cf8] hover:bg-[rgba(99,102,241,0.08)] transition-colors duration-150"
+                              className="h-7 text-[12px] inline-flex items-center px-3 border border-[rgba(255,255,255,0.08)] rounded-md text-[#a1a1aa] hover:border-[rgba(16,185,129,0.3)] hover:text-[#3ecf8e] hover:bg-[rgba(16,185,129,0.08)] transition-colors duration-150"
                             >
                               Set Active
                             </button>
