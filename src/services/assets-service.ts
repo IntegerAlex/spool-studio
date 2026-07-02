@@ -24,6 +24,7 @@ import {
   updateAsset as updateAssetRow,
   listRevisionsByAssetId,
 } from '@/repositories/assets-repository';
+import { emitEvent } from '@/lib/event-bus';
 import { getClientById } from '@/repositories/clients-repository';
 import { getUserById } from '@/repositories/users-repository';
 import type { Database } from '@/types/database';
@@ -195,6 +196,11 @@ async function transitionAssetStatus(
   }
 
   await updateAssetRow(assetId, { status: nextStatus }, supabase);
+
+  emitEvent({
+    type: 'asset:status-changed',
+    payload: { assetId, previousStatus: currentAsset.status, nextStatus },
+  });
 }
 
 export function getAssetR2Key(clientId: string, assetId: string, fileName: string): string {
@@ -1041,6 +1047,12 @@ export async function updateAsset(
 
   if (statusChanged) {
     logAssetStatusTransition(assetId, existing.status as AssetStatus, input.status as AssetStatus, 'api-update');
+
+    emitEvent({
+      type: 'asset:status-changed',
+      payload: { assetId, previousStatus: existing.status, nextStatus: input.status },
+    });
+
     try {
       await logAssetActivity({
         assetId,
@@ -1125,6 +1137,11 @@ export async function approveAsset(assetId: string, userId: string): Promise<Ass
   if (!mapped) {
     throw new Error('Failed to map asset');
   }
+
+  emitEvent({
+    type: 'asset:status-changed',
+    payload: { assetId, previousStatus: existing.status, nextStatus: 'approved' },
+  });
 
   return mapped;
 }
@@ -1214,6 +1231,11 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
   if (!mapped) {
     throw new Error('Failed to map asset');
   }
+
+  emitEvent({
+    type: 'asset:status-changed',
+    payload: { assetId, previousStatus: existing.status, nextStatus: 'revision_requested' },
+  });
 
   return mapped;
 }

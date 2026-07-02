@@ -3,7 +3,7 @@
 import type { AssetComment, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 
 type CommentRecord = AssetComment & {
@@ -13,6 +13,13 @@ type CommentRecord = AssetComment & {
   replies?: unknown[];
 };
 
+interface MentionUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+}
+
 interface CommentsThreadProps {
   comments: CommentRecord[];
   onAddComment?: (content: string, isInternal: boolean) => void;
@@ -21,22 +28,137 @@ interface CommentsThreadProps {
   users?: Map<string, User> | User[];
 }
 
+function renderCommentWithMentions(text: string): React.ReactNode[] {
+  const mentionRegex = /@(\w+)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = mentionRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={`mention-${match.index}`}
+        className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary"
+      >
+        @{match[1]}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
 export function CommentsThread({ comments, onAddComment, isLoading, readOnly, users }: CommentsThreadProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionResults, setMentionResults] = useState<MentionUser[]>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionStart, setMentionStart] = useState(-1);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListRef = useRef<HTMLDivElement>(null);
 
   const userMap = useMemo(() => {
     if (!users) {
       return new Map<string, User>();
     }
-
     if (users instanceof Map) {
       return users;
     }
-
     return new Map(users.map((user) => [user.id, user]));
   }, [users]);
+
+  const fetchMentionUsers = useCallback(async (query: string) => {
+    try {
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const { data } = await res.json();
+        setMentionResults(data ?? []);
+        setMentionIndex(0);
+      }
+    } catch {
+      setMentionResults([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mentionQuery.length > 0) {
+      void fetchMentionUsers(mentionQuery);
+    } else {
+      setMentionResults([]);
+    }
+  }, [mentionQuery, fetchMentionUsers]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    const cursorPos = e.target.selectionStart;
+    setNewComment(value);
+
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const atIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (atIndex >= 0) {
+      const textAfterAt = textBeforeCursor.slice(atIndex + 1);
+      if (!/\s/.test(textAfterAt) && textAfterAt.length <= 20) {
+        setMentionQuery(textAfterAt);
+        setMentionStart(atIndex);
+        setShowMentions(true);
+        return;
+      }
+    }
+
+    setShowMentions(false);
+    setMentionQuery('');
+    setMentionStart(-1);
+  };
+
+  const insertMention = (user: MentionUser) => {
+    const textarea = textareaRef.current;
+    if (!textarea || mentionStart < 0) return;
+
+    const beforeAt = newComment.slice(0, mentionStart);
+    const afterCursor = newComment.slice(textarea.selectionStart);
+    const username = user.name.replace(/\s+/g, '').toLowerCase();
+    const newValue = `${beforeAt}@${username} ${afterCursor}`;
+
+    setNewComment(newValue);
+    setShowMentions(false);
+    setMentionQuery('');
+    setMentionStart(-1);
+
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = mentionStart + username.length + 2;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
+
+  const handleMentionKeyDown = (e: React.KeyboardEvent) => {
+    if (!showMentions || mentionResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setMentionIndex((prev) => (prev + 1) % mentionResults.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setMentionIndex((prev) => (prev - 1 + mentionResults.length) % mentionResults.length);
+    } else if (e.key === 'Enter' && showMentions) {
+      e.preventDefault();
+      insertMention(mentionResults[mentionIndex]);
+    } else if (e.key === 'Escape') {
+      setShowMentions(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,12 +175,22 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly, us
   };
 
   const getUser = (userId: string) => {
-    return userMap.get(userId) || {
+    const user = userMap.get(userId);
+    if (user) {
+      return {
+        id: user.id,
+        name: (user as any).full_name ?? (user as any).name ?? 'Unknown',
+        email: user.email,
+        avatar: (user as any).avatar_url ?? (user as any).avatar ?? null,
+        role: user.role,
+      };
+    }
+    return {
       id: userId,
       name: 'Unknown',
       email: 'unknown@example.com',
       role: 'designer' as const,
-      createdAt: new Date(),
+      avatar: null,
     };
   };
 
@@ -76,7 +208,7 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly, us
           </div>
         ) : null}
         {comments.map((comment) => {
-          const authorId = comment.userId ?? comment.authorId ?? 'unknown';
+          const authorId = (comment as any).userId ?? (comment as any).user_id ?? (comment as any).authorId ?? 'unknown';
           const author = getUser(authorId);
           const commentBody = comment.message || comment.content || '';
           const isInternalComment = comment.type === 'internal_note' || comment.isInternal === true;
@@ -88,7 +220,7 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly, us
             }`}>
               <div className="flex items-start space-x-3">
                 <Avatar className="w-8 h-8 flex-shrink-0">
-                  <AvatarImage src={author.avatar} alt={author.name} />
+                  <AvatarImage src={author.avatar ?? undefined} alt={author.name} />
                   <AvatarFallback>{author.name.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
@@ -101,9 +233,11 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly, us
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mb-2">
-                    {new Date(comment.createdAt).toLocaleString()}
+                    {new Date((comment as any).createdAt ?? (comment as any).created_at).toLocaleString()}
                   </p>
-                  <p className="text-sm text-foreground">{commentBody}</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
+                    {renderCommentWithMentions(commentBody)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -112,15 +246,47 @@ export function CommentsThread({ comments, onAddComment, isLoading, readOnly, us
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3 pt-4 border-t border-border">
-        <div>
+        <div className="relative">
           <textarea
-            placeholder="Add a comment..."
+            ref={textareaRef}
+            placeholder="Add a comment... Use @ to mention someone"
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
+            onChange={handleTextareaChange}
+            onKeyDown={handleMentionKeyDown}
             disabled={isSubmitting || readOnly || !onAddComment}
             rows={3}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
           />
+
+          {showMentions && mentionResults.length > 0 && (
+            <div
+              ref={mentionListRef}
+              className="absolute z-50 bottom-full mb-1 left-0 w-72 max-h-48 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+            >
+              {mentionResults.map((user, idx) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => insertMention(user)}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
+                    idx === mentionIndex ? 'bg-accent text-accent-foreground' : ''
+                  }`}
+                >
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={user.avatar ?? undefined} alt={user.name} />
+                    <AvatarFallback className="text-[10px]">
+                      {user.name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-foreground text-xs">{user.name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">{user.email}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between">

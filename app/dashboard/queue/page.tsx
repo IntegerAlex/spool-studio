@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { queueApi, assetsApi, clientsApi } from '@/lib/api-client';
@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { getAssetIcon } from '@/lib/asset-display';
 import Link from 'next/link';
+import { Upload } from 'lucide-react';
 
 function getQueueStatusLabel(status: UploadQueue['status']): string {
   switch (status) {
@@ -61,6 +62,10 @@ export default function QueuePage() {
   const [assets, setAssets] = useState<Map<string, Asset>>(new Map());
   const [clients, setClients] = useState<Map<string, Client>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingAssetIds, setUploadingAssetIds] = useState<Set<string>>(new Set());
+  const [uploadErrors, setUploadErrors] = useState<Map<string, string>>(new Map());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -84,6 +89,75 @@ export default function QueuePage() {
 
   const handleCopyCaption = (caption: string) => {
     navigator.clipboard.writeText(caption);
+  };
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    const queueAssetIds = queue.map((q) => q.assetId);
+
+    for (const file of fileArray) {
+      const targetAssetId = queueAssetIds.length > 0 ? queueAssetIds[0] : null;
+      if (!targetAssetId) {
+        setUploadErrors((prev) => new Map(prev).set('general', 'No queue items available for upload'));
+        continue;
+      }
+
+      setUploadingAssetIds((prev) => new Set(prev).add(targetAssetId));
+      setUploadErrors((prev) => {
+        const next = new Map(prev);
+        next.delete(targetAssetId);
+        return next;
+      });
+
+      try {
+        await assetsApi.uploadFile(targetAssetId, file);
+        const [assetsData] = await Promise.all([assetsApi.getAll()]);
+        setAssets(new Map(assetsData.map((a) => [a.id, a])));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Upload failed';
+        setUploadErrors((prev) => new Map(prev).set(targetAssetId, message));
+      } finally {
+        setUploadingAssetIds((prev) => {
+          const next = new Set(prev);
+          next.delete(targetAssetId);
+          return next;
+        });
+      }
+    }
+  }, [queue]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (e.dataTransfer.files.length > 0) {
+      void handleFiles(e.dataTransfer.files);
+    }
+  }, [handleFiles]);
+
+  const handleBrowseClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      void handleFiles(e.target.files);
+      e.target.value = '';
+    }
   };
 
   const scheduledQueue = queue.filter((q) => q.status === 'scheduled').sort((a, b) =>
@@ -114,13 +188,48 @@ export default function QueuePage() {
         <p className="text-[12px] text-[var(--color-text-muted)] font-medium">{scheduledQueue.length} scheduled next</p>
       </div>
 
-      <div className="upload-drop-zone">
-        <svg className="upload-icon mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-        </svg>
-        <h3 className="upload-zone-heading">Drag and drop files here to upload</h3>
-        <p className="upload-zone-subtext">Supports MP4, MOV, PNG, JPG, and PDF (up to 100MB)</p>
-        <button className="browse-btn mt-4">Browse Files</button>
+      <div
+        className={cn(
+          'upload-drop-zone transition-colors',
+          isDragging && 'border-[var(--color-accent)] bg-[rgba(var(--color-accent-rgb),0.05)]'
+        )}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          multiple
+          accept="video/mp4,video/quicktime,image/png,image/jpeg,application/pdf"
+          onChange={handleFileInputChange}
+        />
+        {uploadingAssetIds.size > 0 ? (
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="h-8 w-8 text-[var(--color-accent)] animate-pulse" />
+            <h3 className="upload-zone-heading">Uploading {uploadingAssetIds.size} file(s)...</h3>
+            <p className="upload-zone-subtext">Please wait while files are uploaded</p>
+          </div>
+        ) : (
+          <>
+            <svg className="upload-icon mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+            </svg>
+            <h3 className="upload-zone-heading">
+              {isDragging ? 'Drop files here' : 'Drag and drop files here to upload'}
+            </h3>
+            <p className="upload-zone-subtext">Supports MP4, MOV, PNG, JPG, and PDF (up to 100MB)</p>
+            <button className="browse-btn mt-4" onClick={handleBrowseClick} type="button">Browse Files</button>
+          </>
+        )}
+        {uploadErrors.size > 0 && (
+          <div className="mt-3 space-y-1">
+            {Array.from(uploadErrors.entries()).map(([key, msg]) => (
+              <p key={key} className="text-[12px] text-[#fca5a5]">{msg}</p>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="table-list-container">

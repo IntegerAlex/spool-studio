@@ -16,6 +16,9 @@ import { getAssetById } from '@/repositories/assets-repository';
 import { getClientById } from '@/repositories/clients-repository';
 import { getUserById } from '@/repositories/users-repository';
 import { getCurrentUser } from '@/lib/auth';
+import { getPool } from '@/lib/db';
+import { emitEvent } from '@/lib/event-bus';
+
 export interface CommentInput {
   assetId: string;
   type: Database['public']['Enums']['comment_type'];
@@ -41,6 +44,51 @@ function mapComment(
     createdAt: new Date(comment.created_at),
     updatedAt: new Date(comment.updated_at),
   };
+}
+
+function parseMentionedUsernames(message: string): string[] {
+  const mentionRegex = /@(\w+)/g;
+  const usernames: string[] = [];
+  let match;
+  while ((match = mentionRegex.exec(message)) !== null) {
+    usernames.push(match[1].toLowerCase());
+  }
+  return [...new Set(usernames)];
+}
+
+async function createMentionNotifications(
+  mentionedUsernames: string[],
+  commenterId: string,
+  assetId: string,
+  commentMessage: string
+): Promise<void> {
+  if (mentionedUsernames.length === 0) return;
+
+  const pool = getPool();
+
+  for (const username of mentionedUsernames) {
+    try {
+      const { rows: users } = await pool.query(
+        `SELECT id, full_name FROM users WHERE LOWER(REPLACE(full_name, ' ', '')) = $1 AND id != $2`,
+        [username, commenterId]
+      );
+
+      if (users.length > 0) {
+        const targetUser = users[0];
+        await pool.query(
+          `INSERT INTO notifications (id, user_id, type, title, message, related_asset_id, created_at)
+           VALUES (gen_random_uuid()::text, $1, 'comment', 'You were mentioned', $2, $3, NOW())`,
+          [
+            targetUser.id,
+            `You were mentioned in a comment on an asset: "${commentMessage.slice(0, 100)}${commentMessage.length > 100 ? '...' : ''}"`,
+            assetId,
+          ]
+        );
+      }
+    } catch (err) {
+      console.error('[comments-service] Failed to create mention notification', { username, error: err });
+    }
+  }
 }
 
 export async function getCommentsByAssetId(
@@ -98,6 +146,17 @@ export async function createComment(input: CommentInput): Promise<AssetComment> 
     throw new Error('Failed to map comment');
   }
 
+  emitEvent({
+    type: 'comment:created',
+    payload: {
+      commentId: mapped.id,
+      assetId: mapped.assetId,
+      userId: mapped.userId,
+      type: mapped.type,
+      message: mapped.message,
+    },
+  });
+
   // Handle Notifications
   try {
     const asset = await getAssetById(input.assetId, supabase);
@@ -137,6 +196,21 @@ export async function createComment(input: CommentInput): Promise<AssetComment> 
     }
   } catch (err) {
     console.error('[comments-service] Failed to send designer notification', err);
+  }
+
+  // Handle @mention notifications
+  try {
+    const mentionedUsernames = parseMentionedUsernames(input.message);
+    if (mentionedUsernames.length > 0) {
+      await createMentionNotifications(
+        mentionedUsernames,
+        user.id,
+        input.assetId,
+        input.message
+      );
+    }
+  } catch (err) {
+    console.error('[comments-service] Failed to create mention notifications', err);
   }
 
   return mapped;
