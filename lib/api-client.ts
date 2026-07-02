@@ -1,6 +1,3 @@
-import { mockNotifications } from './mock-data/notifications';
-import { mockUploadQueue } from './mock-data/upload-queue';
-import { mockWorkspace } from './mock-data/workspace';
 import type {
   Asset,
   AssetActivityLog,
@@ -330,14 +327,18 @@ export const authApi = {
     return user ? hydrateUser(user) : null;
   },
 
-  forgotPassword: async (_email: string): Promise<void> => {
-    // TODO: implement with Mailgun / custom reset flow
-    return;
+  forgotPassword: async (email: string): Promise<void> => {
+    await fetchJson('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
   },
 
-  resetPassword: async (_token: string, _newPassword: string): Promise<void> => {
-    // TODO: implement
-    return;
+  resetPassword: async (token: string, newPassword: string): Promise<void> => {
+    await fetchJson('/api/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password: newPassword }),
+    });
   },
 };
 
@@ -684,62 +685,65 @@ export const kanbanApi = {
   },
 };
 
-// Notifications API (mocked until notifications schema is implemented)
+// Notifications API
 export const notificationsApi = {
   getAll: async (userId?: string): Promise<Notification[]> => {
-    if (userId) {
-      return mockNotifications.filter((n) => n.userId === userId);
-    }
-    return mockNotifications;
+    const data = await fetchJson<Notification[]>('/api/notifications');
+    if (userId) return data.filter((n) => n.userId === userId);
+    return data;
   },
 
   markAsRead: async (id: string): Promise<Notification> => {
-    const notification = mockNotifications.find((n) => n.id === id);
-    if (!notification) throw new Error('Notification not found');
-    return { ...notification, read: true };
+    return fetchJson<Notification>(`/api/notifications/${id}`, { method: 'PATCH' });
   },
 
   markAllAsRead: async (): Promise<void> => {
-    return;
+    await fetchJson('/api/notifications/mark-all-read', { method: 'POST' });
   },
 
   delete: async (id: string): Promise<void> => {
-    const notification = mockNotifications.find((n) => n.id === id);
-    if (!notification) throw new Error('Notification not found');
+    await fetchJson(`/api/notifications/${id}`, { method: 'DELETE' });
   },
 };
 
-// Upload Queue API (mocked until upload queue schema is implemented)
+// Upload Queue API
 export const queueApi = {
   getAll: async (): Promise<UploadQueue[]> => {
-    return mockUploadQueue;
+    return fetchJson<UploadQueue[]>('/api/queue');
   },
 
   getById: async (id: string): Promise<UploadQueue | null> => {
-    return mockUploadQueue.find((q) => q.id === id) || null;
+    return fetchJsonNullable<UploadQueue>(`/api/queue/${id}`);
   },
 
   create: async (queue: Omit<UploadQueue, 'id'>): Promise<UploadQueue> => {
-    return { ...queue, id: `queue_${Date.now()}` };
+    return fetchJson<UploadQueue>('/api/queue', {
+      method: 'POST',
+      body: JSON.stringify(queue),
+    });
   },
 
   update: async (id: string, updates: Partial<UploadQueue>): Promise<UploadQueue> => {
-    const queue = mockUploadQueue.find((q) => q.id === id);
-    if (!queue) throw new Error('Queue item not found');
-    return { ...queue, ...updates };
+    return fetchJson<UploadQueue>(`/api/queue/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    });
   },
 
   delete: async (): Promise<void> => {
-    return;
+    await fetchJson('/api/queue', { method: 'DELETE' });
   },
 };
 
 export const workspaceApi = {
   get: async (): Promise<Workspace> => {
-    return mockWorkspace;
+    return fetchJson<Workspace>('/api/workspace');
   },
 
   update: async (updates: Partial<Workspace>): Promise<Workspace> => {
-    return { ...mockWorkspace, ...updates };
+    return fetchJson<Workspace>('/api/workspace', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
   },
 };

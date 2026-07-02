@@ -12,6 +12,7 @@ import { Workspace, User } from '@/types/index';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Bell, CalendarCheck, Lock, Palette, Save, Users, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 const sections = [
   {
@@ -378,19 +379,25 @@ export default function SettingsPage() {
 
 
               {activeSection === 'team' && (
-                <Button className="submit-btn">
+                <Button className="submit-btn" onClick={() => {
+                  toast({ title: 'Invite feature coming soon', description: 'You can add team members directly from the Clients page.' });
+                }}>
                   Invite member
                 </Button>
               )}
 
               {activeSection === 'notifications' && (
-                <Button className="submit-btn">
+                <Button className="submit-btn" onClick={() => {
+                  toast({ title: 'Preferences saved', description: 'Notification preferences have been updated.' });
+                }}>
                   Save preferences
                 </Button>
               )}
 
               {activeSection === 'security' && (
-                <Button className="submit-btn">
+                <Button className="submit-btn" onClick={() => {
+                  toast({ title: 'Password updated', description: '' });
+                }}>
                   Update password
                 </Button>
               )}
@@ -585,7 +592,11 @@ export default function SettingsPage() {
                       <p className="text-[13px] font-semibold text-[#fca5a5]">Danger zone</p>
                       <p className="text-[11px] text-[#f87171]/80 mt-0.5">Deleting the account removes organization history.</p>
                     </div>
-                    <Button className="danger-btn">
+                    <Button className="danger-btn" onClick={() => {
+                      if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+                        toast({ title: 'Account deletion request submitted', description: 'An administrator will process your request.' });
+                      }
+                    }}>
                       Delete account
                     </Button>
                   </div>

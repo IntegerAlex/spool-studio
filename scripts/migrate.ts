@@ -3,7 +3,7 @@ import { join } from 'path';
 import { getPool } from '../src/lib/db';
 
 async function runMigrations() {
-  const migrationsDir = join(process.cwd(), 'supabase', 'migrations');
+  const migrationsDir = join(process.cwd(), 'scripts');
   const files = readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
     .sort();

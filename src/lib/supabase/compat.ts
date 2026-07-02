@@ -2,24 +2,8 @@
  * Thin Supabase-compatible query builder over direct PostgreSQL (pg).
  * Supports the subset of the Supabase API used by the repository layer.
  */
-import { Pool, PoolClient, QueryResult } from 'pg';
-
-let _pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (_pool) return _pool;
-  _pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  });
-  _pool.on('error', (err) => {
-    console.error('[db] pool error', { message: err.message });
-  });
-  return _pool;
-}
+import { PoolClient, QueryResult } from 'pg';
+import { getPool } from '@/lib/db';
 
 // ---------- helpers ----------
 

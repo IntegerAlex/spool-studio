@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
-import { logMailgunEnvCheck } from '@/lib/runtime-diagnostics'
 import './globals.css'
 import PerfClient from '@/components/perf/client-perf'
 import { SWRProvider } from '@/lib/swr-config'
@@ -39,7 +38,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  logMailgunEnvCheck()
 
   return (
     <html lang="en" className="bg-background text-foreground">

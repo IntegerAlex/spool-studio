@@ -19,7 +19,17 @@ export default function ForgotPasswordPage() {
     setIsLoading(true);
 
     try {
-      // TODO: implement with Mailgun / custom reset flow
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Request failed');
+      }
+
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Request failed');

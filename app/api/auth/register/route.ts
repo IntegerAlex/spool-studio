@@ -1,0 +1,59 @@
+import { NextResponse } from 'next/server';
+import { getPool } from '@/lib/db';
+import { hashPassword, createSession } from '@/lib/auth';
+import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+
+export async function POST(request: Request) {
+  try {
+    const { email, password, fullName, role } = await request.json();
+
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 });
+    }
+
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
+    }
+
+    const pool = getPool();
+    const { rows: existing } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+
+    if (existing.length > 0) {
+      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
+    }
+
+    const passwordHash = await hashPassword(password);
+    const userId = crypto.randomUUID();
+    const validRoles = ['admin', 'designer', 'approver'];
+    const userRole = validRoles.includes(role) ? role : 'designer';
+
+    await pool.query(
+      `INSERT INTO users (id, email, full_name, role, password_hash, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      [userId, email, fullName || email.split('@')[0], userRole, passwordHash]
+    );
+
+    const session = await createSession({
+      id: userId,
+      email,
+      name: fullName || email.split('@')[0],
+      role: userRole,
+      avatarUrl: null,
+    });
+
+    const response = NextResponse.json({
+      user: { id: userId, email, name: fullName || email.split('@')[0], role: userRole },
+    }, { status: 201 });
+
+    response.cookies.set(
+      session.cookie.name,
+      session.cookie.value,
+      session.cookie.options as Parameters<typeof response.cookies.set>[2]
+    );
+
+    return response;
+  } catch (error) {
+    logProductionRuntimeError('api-auth-register', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
