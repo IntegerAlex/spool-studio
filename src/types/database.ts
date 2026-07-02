@@ -51,8 +51,6 @@ export interface Database {
           weekly_goal: number | null;
           weekly_poster_goal: number;
           weekly_reel_goal: number;
-          drive_folder_id: string | null;
-          drive_folder_url: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -72,8 +70,6 @@ export interface Database {
           weekly_goal?: number | null;
           weekly_poster_goal?: number;
           weekly_reel_goal?: number;
-          drive_folder_id?: string | null;
-          drive_folder_url?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -91,8 +87,6 @@ export interface Database {
           weekly_goal?: number | null;
           weekly_poster_goal?: number;
           weekly_reel_goal?: number;
-          drive_folder_id?: string | null;
-          drive_folder_url?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -114,8 +108,6 @@ export interface Database {
           uploaded_by: string | null;
           drive_file_id: string | null;
           drive_file_url: string | null;
-          drive_folder_id: string | null;
-          drive_folder_url: string | null;
           thumbnail_url: string | null;
           media_width: number | null;
           media_height: number | null;
@@ -149,8 +141,6 @@ export interface Database {
           uploaded_by?: string | null;
           drive_file_id?: string | null;
           drive_file_url?: string | null;
-          drive_folder_id?: string | null;
-          drive_folder_url?: string | null;
           thumbnail_url?: string | null;
           media_width?: number | null;
           media_height?: number | null;
@@ -179,8 +169,6 @@ export interface Database {
           uploaded_by?: string | null;
           drive_file_id?: string | null;
           drive_file_url?: string | null;
-          drive_folder_id?: string | null;
-          drive_folder_url?: string | null;
           thumbnail_url?: string | null;
           media_width?: number | null;
           media_height?: number | null;

@@ -453,19 +453,6 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
     .map((part) => part[0]?.toUpperCase())
     .join('') || 'CL';
 
-  const handleCopyFolderLink = async () => {
-    if (!client.driveFolderUrl) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(client.driveFolderUrl);
-      toast({ title: 'Folder link copied' });
-    } catch {
-      toast({ title: 'Unable to copy folder link', variant: 'destructive' });
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

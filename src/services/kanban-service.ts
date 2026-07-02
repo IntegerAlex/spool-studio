@@ -29,8 +29,6 @@ function mapKanbanAsset(asset: Awaited<ReturnType<typeof listKanbanAssets>>[numb
     driveFileId: null,
     fileUrl: undefined,
     driveFileUrl: undefined,
-    driveFolderId: undefined,
-    driveFolderUrl: undefined,
     thumbnailUrl: asset.thumbnail_url ?? undefined,
     mediaWidth: undefined,
     mediaHeight: undefined,

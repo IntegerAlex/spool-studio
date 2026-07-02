@@ -216,8 +216,6 @@ function mapClient(
     weeklyRemaining,
     assignedTeamMembers: Array.from(metrics.assignedTeamMembers),
     brandColor: client.brand_color ?? undefined,
-    driveFolderId: client.drive_folder_id ?? undefined,
-    driveFolderUrl: client.drive_folder_url ?? undefined,
     createdAt: new Date(client.created_at),
     updatedAt: new Date(client.updated_at),
     monthlyReelsTarget: client.monthly_reels_target ?? 0,

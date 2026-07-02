@@ -271,7 +271,6 @@ function hydrateAsset(asset: Asset): Asset {
     scheduledAt: asset.scheduledAt ? new Date(asset.scheduledAt) : null,
     publishedAt: asset.publishedAt ? new Date(asset.publishedAt) : null,
     approvedAt: asset.approvedAt ? new Date(asset.approvedAt) : null,
-    calendarSyncedAt: asset.calendarSyncedAt ? new Date(asset.calendarSyncedAt) : null,
   };
 }
 

@@ -23,8 +23,6 @@ export interface Client {
   assignedTeamMembers: string[];
   brandColor?: string;
   logo?: string;
-  driveFolderId?: string;
-  driveFolderUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
   monthlyReelsTarget?: number;
@@ -101,8 +99,6 @@ export interface Asset {
   driveFileId?: string | null;
   fileUrl?: string;
   driveFileUrl?: string;
-  driveFolderId?: string;
-  driveFolderUrl?: string;
   thumbnailUrl?: string;
   mediaWidth?: number | null;
   mediaHeight?: number | null;
@@ -117,7 +113,6 @@ export interface Asset {
   publishedAt?: Date | null;
   approvedAt?: Date | null;
   approvedBy?: string | null;
-  calendarSyncedAt?: Date | null;
   assignedTo: string[];
   revisions: AssetRevision[];
   // Revision/versioning fields
