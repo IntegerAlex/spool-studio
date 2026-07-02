@@ -12,9 +12,9 @@ export function getPool(): Pool {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.DATABASE_URL?.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    max: parseInt(process.env.DB_POOL_MAX ?? (process.env.VERCEL ? '1' : '5'), 10),
+    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT ?? (process.env.VERCEL ? '5000' : '30000'), 10),
+    connectionTimeoutMillis: parseInt(process.env.DB_CONNECT_TIMEOUT ?? '10000', 10),
   });
 
   pool.on('error', (err) => {

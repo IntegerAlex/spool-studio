@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateReport, generateMonthlyReport } from '@/services/reports-service';
 import type { MonthlyReportPayload } from '@/services/reports-service';
-import { MonthlyReportPDFDocument } from '@/components/reports/pdf-document';
-import { renderToBuffer } from '@react-pdf/renderer';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import React from 'react';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -107,6 +104,11 @@ export async function GET(request: Request, context: RouteContext) {
 
     let buffer: Buffer;
     try {
+      const [{ renderToBuffer }, { MonthlyReportPDFDocument }, React] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/reports/pdf-document'),
+        import('react'),
+      ]);
       buffer = await renderToBuffer(
         React.createElement(MonthlyReportPDFDocument, { report }) as any
       );
