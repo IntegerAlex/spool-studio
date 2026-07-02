@@ -304,8 +304,6 @@ function createTableProxy(tableName: string): any {
 }
 
 export function createSupabaseCompat(): any {
-  const tables: Record<string, any> = {};
-
   return new Proxy(
     {},
     {
@@ -336,10 +334,7 @@ export function createSupabaseCompat(): any {
         // .from('table') support
         if (prop === 'from') {
           return (tableName: string) => {
-            if (!tables[tableName]) {
-              tables[tableName] = createTableProxy(tableName);
-            }
-            return tables[tableName];
+            return createTableProxy(tableName);
           };
         }
 

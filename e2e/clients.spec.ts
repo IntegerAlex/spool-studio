@@ -12,11 +12,11 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('Clients', () => {
   test('should display client list', async ({ page }) => {
-    await expect(page.locator('text=Stellar Fitness')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Bloom Studio')).toBeVisible({ timeout: 10000 });
   });
 
   test('should open client detail', async ({ page }) => {
-    await page.click('text=Stellar Fitness');
-    await expect(page.locator('text=Stellar Fitness')).toBeVisible({ timeout: 10000 });
+    await page.click('text=Bloom Studio');
+    await expect(page.locator('text=Bloom Studio')).toBeVisible({ timeout: 10000 });
   });
 });

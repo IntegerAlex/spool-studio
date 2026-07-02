@@ -27,7 +27,7 @@ test.describe('Authentication', () => {
     await page.fill('input#password', 'password123');
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
-    await expect(page.locator('text=Dashboard')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   });
 
   test('should logout and redirect to login', async ({ page }) => {
