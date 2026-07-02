@@ -23,8 +23,8 @@ test.describe('Authentication', () => {
 
   test('should login with valid credentials and redirect to dashboard', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input#email', 'ava.admin@contentops.com');
-    await page.fill('input#password', 'ChangeMeAdmin123!');
+    await page.fill('input#email', 'admin@libreonix.com');
+    await page.fill('input#password', 'password123');
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
     await expect(page.locator('text=Dashboard')).toBeVisible();
@@ -32,8 +32,8 @@ test.describe('Authentication', () => {
 
   test('should logout and redirect to login', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input#email', 'ava.admin@contentops.com');
-    await page.fill('input#password', 'ChangeMeAdmin123!');
+    await page.fill('input#email', 'admin@libreonix.com');
+    await page.fill('input#password', 'password123');
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
 

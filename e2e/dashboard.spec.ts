@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/login');
-  await page.fill('input#email', 'ava.admin@contentops.com');
-  await page.fill('input#password', 'ChangeMeAdmin123!');
+  await page.fill('input#email', 'admin@libreonix.com');
+  await page.fill('input#password', 'password123');
   await page.click('button[type="submit"]');
   await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
 });
@@ -38,8 +38,8 @@ test.describe('Dashboard', () => {
     await expect(page.locator('text=Asset Status Breakdown')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should display recent activity summary', async ({ page }) => {
-    await expect(page.locator('text=Recent Activity Summary')).toBeVisible({ timeout: 10000 });
+  test('should display recent activity', async ({ page }) => {
+    await expect(page.locator('text=Recent Activity')).toBeVisible({ timeout: 10000 });
   });
 
   test('should display top active clients table', async ({ page }) => {
