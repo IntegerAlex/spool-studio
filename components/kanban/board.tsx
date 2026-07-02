@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import React from 'react';
 import { Asset, AssetStatus } from '@/types/index';
 import { Card } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
 import { StatusBadge } from '@/components/assets/status-badge';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import Lenis from 'lenis';
 import {
   GripVertical,
   ChevronDown,
@@ -50,7 +52,6 @@ function isOverdue(asset: Asset): boolean {
 }
 
 function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQuickApprove?: () => void; isDragging?: boolean }) {
-  // shallow compare relevant asset fields to avoid unnecessary rerenders
   const [showActions, setShowActions] = useState(false);
   const revisionCount = asset.revisions.length;
   const commentCount = asset.comments.length;
@@ -59,11 +60,28 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
   const previewType = getAssetPreviewType(asset);
 
   return (
-    <Card
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{
+        opacity: 1,
+        scale: isDragging ? 1.03 : 1,
+        y: 0,
+        boxShadow: isDragging
+          ? '0 20px 40px rgba(0,0,0,0.4), 0 0 0 2px rgba(16,185,129,0.3)'
+          : '0 0 0 0px rgba(0,0,0,0)',
+      }}
+      exit={{ opacity: 0, scale: 0.95, y: -10, transition: { duration: 0.2 } }}
+      transition={{
+        layout: { type: 'spring', stiffness: 350, damping: 30 },
+        opacity: { duration: 0.2 },
+        scale: { type: 'spring', stiffness: 400, damping: 25 },
+      }}
+      whileHover={!isDragging ? { y: -2, transition: { duration: 0.15 } } : undefined}
       className={cn(
         'group relative mb-2 overflow-hidden kanban-card shadow-none',
         overdue && 'border-[rgba(239,68,68,0.4)]',
-        isDragging && 'scale-[1.02] border-[var(--color-border-strong)]'
+        isDragging && 'z-50'
       )}
     >
       <div className="flex items-start gap-2">
@@ -88,7 +106,7 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
               <h4 className="truncate kanban-card-title">{asset.title}</h4>
               <div className="mt-1 flex items-center gap-1 kanban-card-meta">
                 <AssetIcon className="h-3.5 w-3.5 text-[var(--color-text-faint)]" />
-                <span className="truncate">{asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type}</span>
+                <span className="truncate capitalize">{asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type}</span>
               </div>
             </div>
             {overdue && <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#ca8a04]" />}
@@ -121,25 +139,33 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
         )}
       </div>
 
-      {showActions && (
-        <div className="absolute right-2 top-2 z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-surface)] p-1 text-xs shadow-lg">
-          <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[var(--color-bg-hover)]">
-            <Eye className="h-3 w-3" />
-            View
-          </button>
-          {asset.status === 'revision_requested' && (
-            <button onClick={onQuickApprove} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-[#16a34a] hover:bg-[rgba(22,163,74,0.1)]">
-              <CheckCircle2 className="h-3 w-3" />
-              Approve
+      <AnimatePresence>
+        {showActions && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-2 top-2 z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-bg-surface)] p-1 text-xs shadow-lg"
+          >
+            <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[var(--color-bg-hover)]">
+              <Eye className="h-3 w-3" />
+              View
             </button>
-          )}
-          <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[var(--color-bg-hover)]">
-            <Copy className="h-3 w-3" />
-            Copy link
-          </button>
-        </div>
-      )}
-    </Card>
+            {asset.status === 'revision_requested' && (
+              <button onClick={onQuickApprove} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-[#16a34a] hover:bg-[rgba(22,163,74,0.1)]">
+                <CheckCircle2 className="h-3 w-3" />
+                Approve
+              </button>
+            )}
+            <button className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-white hover:bg-[var(--color-bg-hover)]">
+              <Copy className="h-3 w-3" />
+              Copy link
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -157,9 +183,163 @@ function areEqual(prev: any, next: any) {
 
 const MemoizedKanbanCard = React.memo(KanbanCard, areEqual);
 
+function KanbanColumn({
+  status,
+  assets: columnAssets,
+  isCollapsed,
+  onToggleCollapse,
+  draggedItem,
+  onDragStart,
+  onDrop,
+  onStatusChange,
+}: {
+  status: typeof kanbanWorkflowColumns[number];
+  assets: Asset[];
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  draggedItem: { assetId: string; fromStatus: AssetStatus } | null;
+  onDragStart: (assetId: string, status: AssetStatus) => void;
+  onDrop: (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => void;
+  onStatusChange?: (assetId: string, newStatus: AssetStatus) => void;
+}) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  let dotColor = '#52525b';
+  if (status.id === 'draft') dotColor = '#525252';
+  else if (status.id === 'revision') dotColor = '#ca8a04';
+  else if (status.id === 'approved') dotColor = '#16a34a';
+  else if (status.id === 'published') dotColor = '#3b82f6';
+
+  return (
+    <div className="kanban-column-container">
+      <div className="kanban-column-header">
+        <div className="flex items-center gap-2">
+          <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+          <button
+            onClick={onToggleCollapse}
+            className="rounded p-0.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+            aria-label={isCollapsed ? 'Expand column' : 'Collapse column'}
+          >
+            <motion.div
+              animate={{ rotate: isCollapsed ? 180 : 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            >
+              <ChevronDown className="h-4 w-4 text-[var(--color-text-muted)]" />
+            </motion.div>
+          </button>
+          <h3 className="kanban-column-title truncate">{status.label}</h3>
+        </div>
+        <motion.span
+          key={columnAssets.length}
+          initial={{ scale: 1.3 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+          className="kanban-column-counter"
+        >
+          {columnAssets.length}
+        </motion.span>
+      </div>
+
+      <motion.div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => {
+          setIsDragOver(false);
+          onDrop(e, status.id);
+        }}
+        animate={{
+          backgroundColor: isDragOver ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0)',
+          borderColor: isDragOver ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.06)',
+        }}
+        transition={{ duration: 0.15 }}
+        className="kanban-column-body border border-transparent rounded-lg"
+      >
+        <AnimatePresence mode="popLayout">
+          {isCollapsed ? (
+            <motion.div
+              key="collapsed"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="flex items-center justify-center py-8 text-[12px] text-[var(--color-text-muted)]"
+            >
+              {columnAssets.length} items
+            </motion.div>
+          ) : columnAssets.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center justify-center py-[32px] px-[16px] text-center"
+            >
+              <svg className="w-[28px] h-[28px] text-[var(--color-text-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="5" y="5" width="14" height="3" rx="0.5" />
+                <rect x="5" y="10" width="14" height="3" rx="0.5" />
+                <rect x="5" y="15" width="14" height="3" rx="0.5" />
+              </svg>
+              <p className="text-[12px] text-[var(--color-text-faint)] mt-2">No assets</p>
+            </motion.div>
+          ) : (
+            columnAssets.map((asset) => (
+              <div
+                key={asset.id}
+                draggable
+                onDragStart={() => onDragStart(asset.id, asset.status)}
+                className="last:mb-0"
+              >
+                <MemoizedKanbanCard
+                  asset={asset}
+                  isDragging={draggedItem?.assetId === asset.id}
+                  onQuickApprove={
+                    onStatusChange && asset.status === 'revision_requested'
+                      ? () => onStatusChange(asset.id, 'approved')
+                      : undefined
+                  }
+                />
+              </div>
+            ))
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+}
+
 export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
   const [collapsedColumns, setCollapsedColumns] = useState<Set<KanbanWorkflowColumnId>>(new Set());
   const [draggedItem, setDraggedItem] = useState<{ assetId: string; fromStatus: AssetStatus } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const lenisRef = useRef<Lenis | null>(null);
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+
+    const lenis = new Lenis({
+      wrapper: scrollRef.current,
+      content: scrollRef.current.firstElementChild as HTMLElement,
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      touchMultiplier: 2,
+      infinite: false,
+    });
+
+    lenisRef.current = lenis;
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+    requestAnimationFrame(raf);
+
+    return () => {
+      lenis.destroy();
+    };
+  }, []);
 
   const toggleColumnCollapse = useCallback((statusId: KanbanWorkflowColumnId) => {
     setCollapsedColumns((prev) => {
@@ -177,21 +357,12 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
     setDraggedItem({ assetId, fromStatus: status });
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.add('ring-1', 'ring-[var(--color-border-strong)]');
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.currentTarget.classList.remove('ring-1', 'ring-[var(--color-border-strong)]');
-  };
-
   const handleDrop = (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('ring-1', 'ring-[var(--color-border-strong)]');
     const targetStatus = getKanbanWorkflowStatusForColumn(toColumnId);
 
     if (!draggedItem || draggedItem.fromStatus === targetStatus) {
+      setDraggedItem(null);
       return;
     }
 
@@ -204,8 +375,9 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
       return;
     }
 
+    const assetId = draggedItem.assetId;
     setDraggedItem(null);
-    onStatusChange?.(draggedItem.assetId, getKanbanWorkflowStatusForColumn(toColumnId));
+    onStatusChange?.(assetId, getKanbanWorkflowStatusForColumn(toColumnId));
   };
 
   const assetsByStatus = useMemo(() => {
@@ -227,87 +399,21 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
   }, [assets]);
 
   return (
-    <div className="kanban-board-wrapper">
+    <div ref={scrollRef} className="kanban-board-wrapper overflow-x-auto">
       <div className="flex min-w-max gap-4">
-        {kanbanWorkflowColumns.map((status) => {
-          const statusAssets = assetsByStatus.get(status.id) || [];
-          const isCollapsed = collapsedColumns.has(status.id);
-          
-          let dotColor = '#52525b';
-          if (status.id === 'draft') {
-            dotColor = '#525252';
-          } else if (status.id === 'revision') {
-            dotColor = '#ca8a04';
-          } else if (status.id === 'approved') {
-            dotColor = '#16a34a';
-          } else if (status.id === 'published') {
-            dotColor = '#3b82f6';
-          }
-
-          return (
-            <div key={status.id} className="kanban-column-container">
-              <div className="kanban-column-header">
-                <div className="flex items-center gap-2">
-                  <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
-                  <button
-                    onClick={() => toggleColumnCollapse(status.id)}
-                    className="rounded p-0.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
-                    aria-label={isCollapsed ? 'Expand column' : 'Collapse column'}
-                  >
-                    {isCollapsed ? (
-                      <ChevronUp className="h-4 w-4 text-[var(--color-text-muted)]" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-[var(--color-text-muted)]" />
-                    )}
-                  </button>
-                  <h3 className="kanban-column-title truncate">{status.label}</h3>
-                </div>
-                <span className="kanban-column-counter">
-                  {statusAssets.length}
-                </span>
-              </div>
-
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, status.id)}
-                className={cn(
-                  'kanban-column-body transition-all',
-                  draggedItem ? 'bg-[rgba(255,255,255,0.01)]' : ''
-                )}
-              >
-                {isCollapsed ? (
-                  <div className="flex items-center justify-center py-8 text-[12px] text-[var(--color-text-muted)]">
-                    {statusAssets.length} items
-                  </div>
-                ) : statusAssets.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-[32px] px-[16px] text-center">
-                    <svg className="w-[28px] h-[28px] text-[var(--color-text-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <rect x="5" y="5" width="14" height="3" rx="0.5" />
-                      <rect x="5" y="10" width="14" height="3" rx="0.5" />
-                      <rect x="5" y="15" width="14" height="3" rx="0.5" />
-                    </svg>
-                    <p className="text-[12px] text-[var(--color-text-faint)] mt-2">No assets</p>
-                  </div>
-                ) : (
-                  statusAssets.map((asset) => (
-                    <div key={asset.id} draggable onDragStart={() => handleDragStart(asset.id, asset.status)} className="last:mb-0">
-                      <MemoizedKanbanCard
-                        asset={asset}
-                        isDragging={draggedItem?.assetId === asset.id}
-                        onQuickApprove={
-                          onStatusChange && asset.status === 'revision_requested'
-                            ? () => onStatusChange(asset.id, 'approved')
-                            : undefined
-                        }
-                      />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {kanbanWorkflowColumns.map((status) => (
+          <KanbanColumn
+            key={status.id}
+            status={status}
+            assets={assetsByStatus.get(status.id) || []}
+            isCollapsed={collapsedColumns.has(status.id)}
+            onToggleCollapse={() => toggleColumnCollapse(status.id)}
+            draggedItem={draggedItem}
+            onDragStart={handleDragStart}
+            onDrop={handleDrop}
+            onStatusChange={onStatusChange}
+          />
+        ))}
       </div>
 
       <div className="mt-4 px-4 text-center text-xs text-[var(--color-text-muted)] lg:hidden">

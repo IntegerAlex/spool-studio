@@ -3,6 +3,7 @@ import { canTransitionStatus } from '@/lib/asset-workflow';
 import type { Asset, AssetStatus } from '@/types/index';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { logAssetActivity } from '@/services/activity-service';
+import { logAuditEvent } from '@/services/audit-log-service';
 import { uploadFile, generatePublicUrl, getFileMetadata } from '@/integrations/r2/r2-service';
 import type { R2UploadResult } from '@/integrations/r2/types';
 import { extractAssetMetadata } from '@/lib/asset-metadata';
@@ -1073,6 +1074,17 @@ export async function updateAsset(
       });
     } catch (_error) {
       // Activity logging should not block updates.
+    }
+    try {
+      await logAuditEvent({
+        action: 'status_changed',
+        entityType: 'asset',
+        entityId: assetId,
+        entityName: existing.title,
+        metadata: { from: existing.status, to: input.status },
+      });
+    } catch (_error) {
+      // Audit logging should not block updates.
     }
   }
 

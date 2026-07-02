@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Breadcrumb } from '@/components/layout/breadcrumb';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { dashboardApi } from '@/lib/api-client';
+import { logsApi, AuditLogEntry } from '@/lib/api-client';
 import Link from 'next/link';
 import {
   Users,
@@ -14,227 +15,208 @@ import {
   Upload,
   Clock3,
   Search,
-  Calendar,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   Globe,
+  Settings,
+  LogIn,
+  LogOut,
+  Trash2,
+  Edit3,
+  Eye,
+  Shield,
+  Activity,
 } from 'lucide-react';
 
-type DashboardSummary = Awaited<ReturnType<typeof dashboardApi.getSummary>>;
-type ActivityItem = DashboardSummary['recentActivity'][number];
-
-function getActivityIcon(entry: ActivityItem): React.ReactNode {
-  if (entry.iconKind === 'client') {
-    return <Users className="h-4 w-4 text-[#10b981]" />;
-  }
-  if (entry.iconKind === 'revision') {
-    return <FileWarning className="h-4 w-4 text-[#f59e0b]" />;
-  }
-  if (entry.iconKind === 'approval') {
-    return <CheckCircle2 className="h-4 w-4 text-[#10b981]" />;
-  }
-  if (entry.iconKind === 'publish') {
-    return <Globe className="h-4 w-4 text-[#3b82f6]" />;
-  }
-  if (entry.iconKind === 'upload') {
-    return <Upload className="h-4 w-4 text-[#3b82f6]" />;
-  }
-
-  return <Clock3 className="h-4 w-4 text-[#f59e0b]" />;
+function getActionIcon(action: string): React.ReactNode {
+  if (action.includes('login') || action.includes('auth')) return <LogIn className="h-4 w-4 text-emerald-400" />;
+  if (action.includes('logout')) return <LogOut className="h-4 w-4 text-zinc-400" />;
+  if (action.includes('upload') || action.includes('create') || action.includes('asset_created')) return <Upload className="h-4 w-4 text-blue-400" />;
+  if (action.includes('revision')) return <FileWarning className="h-4 w-4 text-amber-400" />;
+  if (action.includes('approve') || action.includes('published')) return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
+  if (action.includes('delete') || action.includes('remove')) return <Trash2 className="h-4 w-4 text-red-400" />;
+  if (action.includes('update') || action.includes('edit') || action.includes('change')) return <Edit3 className="h-4 w-4 text-blue-400" />;
+  if (action.includes('status')) return <Activity className="h-4 w-4 text-purple-400" />;
+  if (action.includes('client')) return <Users className="h-4 w-4 text-emerald-400" />;
+  if (action.includes('setting') || action.includes('config')) return <Settings className="h-4 w-4 text-zinc-400" />;
+  if (action.includes('view') || action.includes('read')) return <Eye className="h-4 w-4 text-zinc-400" />;
+  if (action.includes('permission') || action.includes('role')) return <Shield className="h-4 w-4 text-amber-400" />;
+  return <Globe className="h-4 w-4 text-zinc-400" />;
 }
 
-function getActivityBg(entry: ActivityItem): string {
-  if (entry.iconKind === 'client') {
-    return 'bg-[rgba(16,185,129,0.14)]';
-  }
-  if (entry.iconKind === 'revision') {
-    return 'bg-[rgba(245,158,11,0.14)]';
-  }
-  if (entry.iconKind === 'approval') {
-    return 'bg-[rgba(16,185,129,0.14)]';
-  }
-  if (entry.iconKind === 'publish') {
-    return 'bg-[rgba(59,130,246,0.14)]';
-  }
-  if (entry.iconKind === 'upload') {
-    return 'bg-[rgba(59,130,246,0.14)]';
-  }
-
-  return 'bg-[rgba(245,158,11,0.14)]';
+function getActionBg(action: string): string {
+  if (action.includes('login') || action.includes('auth')) return 'bg-emerald-500/15';
+  if (action.includes('upload') || action.includes('create')) return 'bg-blue-500/15';
+  if (action.includes('revision')) return 'bg-amber-500/15';
+  if (action.includes('approve') || action.includes('published')) return 'bg-emerald-500/15';
+  if (action.includes('delete')) return 'bg-red-500/15';
+  if (action.includes('update') || action.includes('edit')) return 'bg-blue-500/15';
+  if (action.includes('status')) return 'bg-purple-500/15';
+  return 'bg-zinc-500/15';
 }
+
+function formatAction(action: string): string {
+  return action.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatRelativeTime(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+const ACTION_FILTERS = [
+  { value: 'all', label: 'All Actions' },
+  { value: 'auth', label: 'Auth' },
+  { value: 'asset', label: 'Assets' },
+  { value: 'client', label: 'Clients' },
+  { value: 'status', label: 'Status Changes' },
+  { value: 'upload', label: 'Uploads' },
+  { value: 'revision', label: 'Revisions' },
+  { value: 'approval', label: 'Approvals' },
+];
+
+const ITEMS_PER_PAGE = 20;
 
 export default function LogsPage() {
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Search and filter states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState('all');
-  
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
-  const loadData = async () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [actionFilter, setActionFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const getDateRange = useCallback(() => {
+    if (dateFilter === 'all') return {};
+    const now = new Date();
+    if (dateFilter === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { startDate: start.toISOString() };
+    }
+    if (dateFilter === 'yesterday') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    if (dateFilter === 'this_week') {
+      const day = now.getDay();
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+      const start = new Date(now);
+      start.setDate(diff);
+      start.setHours(0, 0, 0, 0);
+      return { startDate: start.toISOString() };
+    }
+    if (dateFilter === 'this_month') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { startDate: start.toISOString() };
+    }
+    return {};
+  }, [dateFilter]);
+
+  const getActionParam = useCallback(() => {
+    if (actionFilter === 'all') return undefined;
+    if (actionFilter === 'auth') return 'login';
+    if (actionFilter === 'asset') return 'asset_created';
+    if (actionFilter === 'client') return 'client_created';
+    if (actionFilter === 'status') return 'status_changed';
+    if (actionFilter === 'upload') return 'file_uploaded';
+    if (actionFilter === 'revision') return 'revision_created';
+    if (actionFilter === 'approval') return 'status_changed';
+    return undefined;
+  }, [actionFilter]);
+
+  const loadLogs = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const summaryData = await dashboardApi.getSummary();
-      setActivities(summaryData.recentActivity ?? []);
+      const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+      const dateRange = getDateRange();
+      const result = await logsApi.getAll({
+        limit: ITEMS_PER_PAGE,
+        offset,
+        action: getActionParam(),
+        search: searchQuery || undefined,
+        ...dateRange,
+      });
+      setLogs(result.data);
+      setTotal(result.total);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load activities';
+      const message = err instanceof Error ? err.message : 'Failed to load audit logs';
       setError(message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, searchQuery, getActionParam, getDateRange]);
 
   useEffect(() => {
-    void loadData();
-  }, []);
+    void loadLogs();
+  }, [loadLogs]);
 
-  // Filtered activities
-  const filteredActivities = useMemo(() => {
-    return activities.filter((activity) => {
-      // 1. Search filter
-      const query = searchQuery.toLowerCase().trim();
-      if (query) {
-        const titleMatch = activity.title?.toLowerCase().includes(query);
-        const detailMatch = activity.detail?.toLowerCase().includes(query);
-        if (!titleMatch && !detailMatch) {
-          return false;
-        }
-      }
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, actionFilter, dateFilter]);
 
-      // 2. Type filter
-      if (typeFilter !== 'all') {
-        if (activity.iconKind !== typeFilter) {
-          return false;
-        }
-      }
-
-      // 3. Date filter
-      if (dateFilter !== 'all') {
-        const timestamp = new Date(activity.timestamp);
-        const today = new Date();
-        
-        if (dateFilter === 'today') {
-          if (timestamp.toDateString() !== today.toDateString()) {
-            return false;
-          }
-        } else if (dateFilter === 'yesterday') {
-          const yesterday = new Date();
-          yesterday.setDate(today.getDate() - 1);
-          if (timestamp.toDateString() !== yesterday.toDateString()) {
-            return false;
-          }
-        } else if (dateFilter === 'this_week') {
-          const weekStart = new Date(today);
-          const day = weekStart.getDay();
-          const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-          weekStart.setDate(diff);
-          weekStart.setHours(0, 0, 0, 0);
-          if (timestamp.getTime() < weekStart.getTime()) {
-            return false;
-          }
-        } else if (dateFilter === 'this_month') {
-          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-          if (timestamp.getTime() < monthStart.getTime()) {
-            return false;
-          }
-        }
-      }
-
-      return true;
-    });
-  }, [activities, searchQuery, typeFilter, dateFilter]);
-
-  // Total pages calculation
-  const totalPages = Math.max(1, Math.ceil(filteredActivities.length / itemsPerPage));
-
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, typeFilter, dateFilter]);
-
-  // Paginated activities
-  const paginatedActivities = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredActivities.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredActivities, currentPage, itemsPerPage]);
-
-  function formatDateTime(dateString: string | Date): string {
-    const date = new Date(dateString);
-    return date.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  }
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 
   return (
-    <div className="space-y-6 logs-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
-      <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Logs' }]} />
+    <div className="space-y-6" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
+      <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Audit Logs' }]} />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="logs-title">System Activity Logs</h1>
-          <p className="logs-subtitle">Audit trail of content operations, asset revisions, approvals, and actions</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Audit Trail</h1>
+          <p className="text-sm text-zinc-400 mt-1">Complete system activity log with user actions, asset changes, and status transitions</p>
         </div>
         <Button
           variant="outline"
-          onClick={() => { void loadData(); }}
-          className="logs-btn flex items-center gap-2 self-start sm:self-center"
-          style={{ height: '38px', fontSize: '13px' }}
+          onClick={() => void loadLogs()}
+          className="flex items-center gap-2 self-start sm:self-center h-9 px-3 text-xs border-white/10 bg-transparent text-zinc-300 hover:bg-white/5"
         >
           <RefreshCw className={isLoading ? 'animate-spin h-4 w-4' : 'h-4 w-4'} />
           <span>Refresh</span>
         </Button>
       </div>
 
-      {/* Filter Options */}
-      <Card className="filter-panel">
+      <Card className="border border-white/[0.06] bg-[var(--color-bg-surface)] p-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-center">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-faint)]" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
             <Input
-              placeholder="Search by client or asset name..."
+              placeholder="Search by entity name, user, or action..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="logs-input pl-9"
-              style={{ height: '38px' }}
+              className="pl-9 h-9 text-xs bg-white/[0.03] border-white/[0.08] text-white placeholder:text-zinc-500"
             />
           </div>
-
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--color-text-muted)] font-medium">Type</span>
+              <span className="text-[11px] text-zinc-500 font-medium">Action</span>
               <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="logs-select"
+                value={actionFilter}
+                onChange={(e) => setActionFilter(e.target.value)}
+                className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-xs text-zinc-300 outline-none focus:border-emerald-500/40"
               >
-                <option value="all">All Activities</option>
-                <option value="upload">Upload</option>
-                <option value="revision">Revision</option>
-                <option value="approval">Approval</option>
-                <option value="publish">Publish</option>
-                <option value="client">Client</option>
+                {ACTION_FILTERS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
               </select>
             </div>
-
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--color-text-muted)] font-medium">Date</span>
+              <span className="text-[11px] text-zinc-500 font-medium">Date</span>
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="logs-select"
+                className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 text-xs text-zinc-300 outline-none focus:border-emerald-500/40"
               >
                 <option value="all">Anytime</option>
                 <option value="today">Today</option>
@@ -247,92 +229,108 @@ export default function LogsPage() {
         </div>
       </Card>
 
-      {/* Logs Table / List */}
-      <div className="table-list-container">
-        <div className="table-header-row">
-          <div className="w-8 header-cell text-center">Event</div>
-          <div className="flex-1 header-cell">Description</div>
-          <div className="w-48 header-cell hidden sm:block">Category</div>
-          <div className="w-56 header-cell text-right">Timestamp</div>
+      <div className="rounded-xl border border-white/[0.06] bg-[var(--color-bg-surface)] overflow-hidden">
+        <div className="grid grid-cols-[44px_1fr_140px_100px_140px] gap-3 bg-white/[0.02] border-b border-white/[0.06] px-4 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 text-center">Event</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">Description</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 hidden sm:block">User</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 hidden md:block">Entity</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 text-right">When</div>
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-[13px] text-[var(--color-text-muted)]">Loading logs...</p>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <RefreshCw className="h-6 w-6 text-zinc-600 animate-spin mb-3" />
+            <p className="text-sm text-zinc-400">Loading audit trail...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-[13px] text-red-400">Error: {error}</p>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-sm text-red-400">{error}</p>
           </div>
-        ) : paginatedActivities.length > 0 ? (
-          <div>
-            {paginatedActivities.map((entry) => (
-              <div key={entry.id} className="table-row-item">
-                <div className="w-8 flex items-center justify-center shrink-0">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${getActivityBg(entry)}`}>
-                    {getActivityIcon(entry)}
+        ) : logs.length > 0 ? (
+          <AnimatePresence>
+            {logs.map((entry, i) => (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.02, duration: 0.2 }}
+                className="grid grid-cols-[44px_1fr_140px_100px_140px] gap-3 items-center px-4 py-3 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex items-center justify-center">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full ${getActionBg(entry.action)}`}>
+                    {getActionIcon(entry.action)}
                   </div>
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <Link href={entry.href} className="hover:underline font-semibold text-[var(--color-text-primary)] block truncate">
-                    {entry.title}
-                  </Link>
-                  <p className="text-[12px] text-[var(--color-text-muted)] mt-0.5 truncate">{entry.detail}</p>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-white truncate">{formatAction(entry.action)}</p>
+                  <p className="text-[11px] text-zinc-500 truncate mt-0.5">
+                    {entry.entityName ? (
+                      entry.entityType === 'asset' ? (
+                        <Link href={`/dashboard/assets/${entry.entityId}`} className="hover:text-emerald-400 transition-colors">{entry.entityName}</Link>
+                      ) : entry.entityType === 'client' ? (
+                        <Link href={`/dashboard/clients/${entry.entityId}`} className="hover:text-emerald-400 transition-colors">{entry.entityName}</Link>
+                      ) : (
+                        entry.entityName
+                      )
+                    ) : (
+                      <span className="text-zinc-600">—</span>
+                    )}
+                  </p>
                 </div>
 
-                <div className="w-48 shrink-0 hidden sm:block">
-                  <span className="text-[12px] capitalize px-2 py-0.5 rounded bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.05)] text-[var(--color-text-secondary)]">
-                    {entry.iconKind === 'client' ? 'client workspace' : entry.iconKind}
+                <div className="hidden sm:block min-w-0">
+                  <p className="text-[12px] text-zinc-400 truncate">{entry.userName || entry.userEmail || 'System'}</p>
+                </div>
+
+                <div className="hidden md:block">
+                  <span className="inline-flex items-center rounded-md border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[10px] font-medium text-zinc-400 capitalize">
+                    {entry.entityType}
                   </span>
                 </div>
 
-                <div className="w-56 shrink-0 text-right text-[12px] text-[var(--color-text-muted)]">
-                  {formatDateTime(entry.timestamp)}
+                <div className="text-right">
+                  <p className="text-[11px] text-zinc-500" title={new Date(entry.createdAt).toLocaleString()}>
+                    {formatRelativeTime(new Date(entry.createdAt))}
+                  </p>
+                  <p className="text-[10px] text-zinc-600 mt-0.5">{new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-
-            {/* Pagination Controls */}
-            <div className="pagination-container">
-              <div className="text-[12.5px] text-[var(--color-text-muted)]">
-                Showing <span className="font-semibold text-[var(--color-text-secondary)]">{Math.min(filteredActivities.length, (currentPage - 1) * itemsPerPage + 1)}</span> to{' '}
-                <span className="font-semibold text-[var(--color-text-secondary)]">{Math.min(filteredActivities.length, currentPage * itemsPerPage)}</span> of{' '}
-                <span className="font-semibold text-[var(--color-text-secondary)]">{filteredActivities.length}</span> activities
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="pagination-btn"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  <span>Previous</span>
-                </button>
-
-                <div className="text-[12.5px] text-[var(--color-text-muted)] px-2">
-                  Page <span className="font-semibold text-[var(--color-text-secondary)]">{currentPage}</span> of {totalPages}
-                </div>
-
-                <button
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="pagination-btn"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          </AnimatePresence>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <svg className="h-10 w-10 text-[var(--color-text-faint)] mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-            </svg>
-            <p className="text-[14px] font-medium text-[var(--color-text-secondary)]">No activities found</p>
-            <p className="text-[12px] text-[var(--color-text-faint)] mt-1">Try adjusting your filters or search query</p>
+            <Clock3 className="h-10 w-10 text-zinc-700 mb-3" />
+            <p className="text-sm font-medium text-zinc-400">No audit logs found</p>
+            <p className="text-xs text-zinc-600 mt-1">Activity will appear here as users interact with the system</p>
+          </div>
+        )}
+
+        {total > ITEMS_PER_PAGE && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-white/[0.06] bg-white/[0.01]">
+            <p className="text-[12px] text-zinc-500">
+              Showing <span className="font-medium text-zinc-400">{Math.min(total, (currentPage - 1) * ITEMS_PER_PAGE + 1)}</span>–<span className="font-medium text-zinc-400">{Math.min(total, currentPage * ITEMS_PER_PAGE)}</span> of <span className="font-medium text-zinc-400">{total}</span>
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="h-8 px-3 rounded-lg border border-white/[0.08] bg-transparent text-xs text-zinc-400 hover:bg-white/[0.05] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Prev
+              </button>
+              <span className="text-[12px] text-zinc-500 px-2">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="h-8 px-3 rounded-lg border border-white/[0.08] bg-transparent text-xs text-zinc-400 hover:bg-white/[0.05] hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+              >
+                Next <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>

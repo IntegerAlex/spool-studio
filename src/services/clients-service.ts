@@ -10,6 +10,7 @@ import {
 import { listAssetSummaries, listAssetsByClientId } from '@/repositories/assets-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { getCurrentUser } from '@/lib/auth';
+import { logAuditEvent } from '@/services/audit-log-service';
 
 export interface ClientInput {
   name: string;
@@ -331,6 +332,18 @@ export async function createClient(input: ClientInput): Promise<Client> {
 
   if (!mapped) {
     throw new Error('Failed to map client');
+  }
+
+  try {
+    await logAuditEvent({
+      action: 'client_created',
+      entityType: 'client',
+      entityId: mapped.id,
+      entityName: mapped.name,
+      metadata: { name: mapped.name, slug: input.slug },
+    });
+  } catch (_error) {
+    // Audit logging should not block creation.
   }
 
   return mapped;

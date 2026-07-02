@@ -3,6 +3,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { verifyPassword } from '@/lib/auth/password';
 import { createSession } from '@/lib/auth/session';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logAuditEvent } from '@/services/audit-log-service';
 import type { UserRole } from '@/types/index';
 
 // The password_hash column must be added to the users table:
@@ -87,6 +88,22 @@ export async function POST(request: Request) {
       session.cookie.value,
       session.cookie.options as Parameters<typeof response.cookies.set>[2]
     );
+
+    try {
+      const ip = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? null;
+      await logAuditEvent({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.full_name,
+        action: 'login',
+        entityType: 'user',
+        entityId: user.id,
+        entityName: user.full_name ?? user.email,
+        ipAddress: ip,
+      });
+    } catch (_error) {
+      // Audit logging should not block login.
+    }
 
     return response;
   } catch (error) {

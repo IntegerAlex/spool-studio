@@ -746,3 +746,33 @@ export const workspaceApi = {
     });
   },
 };
+
+export interface AuditLogEntry {
+  id: string;
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  metadata: Record<string, unknown>;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export const logsApi = {
+  getAll: async (params?: { limit?: number; offset?: number; action?: string; entityType?: string; search?: string; startDate?: string; endDate?: string }): Promise<{ data: AuditLogEntry[]; total: number }> => {
+    const searchParams = new URLSearchParams();
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+    if (params?.action) searchParams.set('action', params.action);
+    if (params?.entityType) searchParams.set('entityType', params.entityType);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.startDate) searchParams.set('startDate', params.startDate);
+    if (params?.endDate) searchParams.set('endDate', params.endDate);
+    const qs = searchParams.toString();
+    return fetchJson<{ data: AuditLogEntry[]; total: number }>(`/api/logs${qs ? `?${qs}` : ''}`);
+  },
+};
