@@ -195,7 +195,7 @@ export function getUploadEligibilityReason(status: AssetStatus): string {
 }
 
 const statusTransitions: Record<AssetStatus, AssetStatus[]> = {
-  draft: ['uploading', 'in_design'],
+  draft: ['uploading', 'in_design', 'ready_for_review', 'revision_requested'],
   uploading: ['uploaded', 'failed'],
   uploaded: ['processing', 'archived', 'draft'],
   processing: ['ready_for_review', 'failed'],
@@ -203,10 +203,10 @@ const statusTransitions: Record<AssetStatus, AssetStatus[]> = {
   published: ['archived'],
   failed: ['uploading', 'in_design'],
   archived: [],
-  in_design: ['ready_for_review'],
+  in_design: ['ready_for_review', 'approved'],
   ready_for_review: ['revision_requested', 'approved'],
-  revision_requested: ['approved'],
-  scheduled: ['uploaded'],
+  revision_requested: ['approved', 'ready_for_review'],
+  scheduled: ['uploaded', 'archived'],
 };
 
 export function getAllowedTransitions(status: AssetStatus): AssetStatus[] {
