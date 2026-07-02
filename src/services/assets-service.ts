@@ -440,6 +440,7 @@ export async function finalizeAssetUpload(
     throw new Error('Unauthorized');
   }
 
+  await getOrCreateCurrentUserProfile();
   const supabase = await createServerSupabaseClient();
 
   console.info(
@@ -718,6 +719,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
     throw new Error('Unauthorized');
   }
 
+  await getOrCreateCurrentUserProfile();
   const supabase = await createServerSupabaseClient();
 
   console.info(
@@ -1003,6 +1005,11 @@ export async function updateAsset(
 ): Promise<Asset> {
   const user = await getCurrentUser();
   const supabase = await createServerSupabaseClient();
+
+  if (user) {
+    await getOrCreateCurrentUserProfile();
+  }
+
   const existing = await getAssetById(assetId);
   if (!existing) {
     throw new Error('Asset not found');
@@ -1109,6 +1116,7 @@ export async function updateAsset(
 const approvalEligibleStatuses = new Set<AssetStatus>(['draft', 'ready_for_review', 'revision_requested']);
 
 export async function approveAsset(assetId: string, userId: string): Promise<Asset> {
+  await getOrCreateCurrentUserProfile();
   const supabase = await createServerSupabaseClient();
   const existing = await getAssetById(assetId, supabase);
   if (!existing) {
@@ -1147,6 +1155,7 @@ export async function approveAsset(assetId: string, userId: string): Promise<Ass
 }
 
 export async function rejectAsset(assetId: string, userId: string): Promise<Asset> {
+  await getOrCreateCurrentUserProfile();
   const supabase = await createServerSupabaseClient();
   const existing = await getAssetById(assetId, supabase);
   if (!existing) {

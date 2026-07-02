@@ -10,6 +10,7 @@ import {
 import { listAssetSummaries, listAssetsByClientId } from '@/repositories/assets-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 import { getCurrentUser } from '@/lib/auth';
+import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { logAuditEvent } from '@/services/audit-log-service';
 
 export interface ClientInput {
@@ -297,6 +298,7 @@ export async function createClient(input: ClientInput): Promise<Client> {
     throw new Error('Unauthorized');
   }
 
+  await getOrCreateCurrentUserProfile();
   const supabase = await createServerSupabaseClient();
 
   const calculatedWeeklyGoal = (input.weeklyPosterGoal ?? 0) + (input.weeklyReelGoal ?? 0);

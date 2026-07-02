@@ -1,5 +1,6 @@
 import { insertAuditLog, listAuditLogs, type AuditLogInput, type AuditLogListOptions } from '@/repositories/audit-log-repository';
 import { getCurrentUser } from '@/lib/auth';
+import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
 
 export interface AuditLogEntry {
@@ -37,6 +38,9 @@ function mapLog(row: Awaited<ReturnType<typeof insertAuditLog>>): AuditLogEntry 
 export async function logAuditEvent(input: AuditLogInput): Promise<AuditLogEntry> {
   try {
     const user = await getCurrentUser();
+    if (user) {
+      try { await getOrCreateCurrentUserProfile(); } catch (_e) { /* best effort */ }
+    }
     const record = await insertAuditLog({
       ...input,
       userId: input.userId ?? user?.id ?? null,
