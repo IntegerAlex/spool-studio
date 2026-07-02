@@ -1,10 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { canTransitionStatus } from '@/lib/asset-workflow';
+import { canTransitionStatus, canUploadRevisionFromStatus } from '@/lib/asset-workflow';
 import type { Asset, AssetStatus } from '@/types/index';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { logAssetActivity } from '@/services/activity-service';
 import { logAuditEvent } from '@/services/audit-log-service';
-import { uploadFile, generatePublicUrl, getFileMetadata } from '@/integrations/r2/r2-service';
+import { uploadFile, deleteFile, generatePublicUrl, getFileMetadata } from '@/integrations/r2/r2-service';
 import type { R2UploadResult } from '@/integrations/r2/types';
 import { extractAssetMetadata } from '@/lib/asset-metadata';
 import {
@@ -544,19 +544,11 @@ export async function finalizeAssetUpload(
     partialFailures: [],
   });
 
+  // Create an immutable revision record for this upload and update the asset's revision pointers
   try {
-    await updateAssetRow(assetId, updates, supabase);
-    const refreshed = await getAssetById(assetId, supabase);
-    const refreshedMapped = mapAsset(refreshed);
-    if (refreshedMapped) {
-      mapped = refreshedMapped;
-    }
-    // Create an immutable revision record for this upload and update the asset's revision pointers
-    try {
-      // Reuse refreshed asset fetched above instead of making a duplicate DB call
-      const persistedAfterUpdate = refreshed ?? persisted;
-      const currentCount = persistedAfterUpdate?.revision_count ?? 0;
-      const versionNumber = (currentCount ?? 0) + 1;
+    const persistedAfterUpdate = persisted;
+    const currentCount = persistedAfterUpdate?.revision_count ?? 0;
+    const versionNumber = (currentCount ?? 0) + 1;
 
       const revisionInsert = {
         asset_id: assetId,
@@ -624,16 +616,6 @@ export async function finalizeAssetUpload(
     } catch (error) {
       console.error('[revision][create][error]', { assetId, error });
     }
-  } catch (error) {
-    logUploadFailure('metadata-persistence', error, assetId, {
-      clientId: asset.client_id,
-      r2Key: input.uploadResult.key,
-      fileUrl: input.uploadResult.url,
-      mimeType: input.uploadResult.mimeType,
-      fileSize: input.uploadResult.fileSize,
-      activity: 'file_uploaded',
-    });
-  }
 
   try {
     console.log('[activity-log][upload]', {
@@ -750,6 +732,10 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
 
   const isRevisionUpload = Boolean(asset.drive_file_id || asset.uploaded_at || (asset.revision_count ?? 0) > 0);
   let revisionNotificationVersion: number | null = null;
+
+  if (isRevisionUpload && !canUploadRevisionFromStatus(asset.status)) {
+    throw new Error(`Cannot upload revision to an asset with status "${asset.status}"`);
+  }
 
   if (!isRevisionUpload) {
     await transitionAssetStatus(assetId, supabase, 'uploading', 'upload-start');
@@ -1135,6 +1121,10 @@ export async function approveAsset(assetId: string, userId: string): Promise<Ass
     throw new Error('Asset is not eligible for approval');
   }
 
+  if (!existing.drive_file_id) {
+    throw new Error('Asset has no uploaded file and cannot be approved');
+  }
+
   const approvedAt = new Date().toISOString();
   const updated = await updateAssetRow(
     assetId,
@@ -1245,5 +1235,13 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
 
 export async function removeAsset(assetId: string): Promise<void> {
   const supabase = await createServerSupabaseClient();
+  const asset = await getAssetById(assetId, supabase);
+  if (asset?.drive_file_id) {
+    try {
+      await deleteFile(asset.drive_file_id);
+    } catch (_e) {
+      console.warn('[asset][delete][r2-cleanup-failed]', { assetId, key: asset.drive_file_id });
+    }
+  }
   await deleteAssetRow(assetId);
 }

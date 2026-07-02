@@ -16,22 +16,24 @@ export async function POST(request: Request) {
     }
 
     const pool = getPool();
-    const { rows: existing } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
-
-    if (existing.length > 0) {
-      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
-    }
 
     const passwordHash = await hashPassword(password);
     const userId = crypto.randomUUID();
     const validRoles = ['admin', 'designer', 'approver'];
     const userRole = validRoles.includes(role) ? role : 'designer';
 
-    await pool.query(
-      `INSERT INTO users (id, email, full_name, role, password_hash, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-      [userId, email, fullName || email.split('@')[0], userRole, passwordHash]
-    );
+    try {
+      await pool.query(
+        `INSERT INTO users (id, email, full_name, role, password_hash, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+        [userId, email, fullName || email.split('@')[0], userRole, passwordHash]
+      );
+    } catch (err: any) {
+      if (err.code === '23505') {
+        return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 });
+      }
+      throw err;
+    }
 
     const session = await createSession({
       id: userId,

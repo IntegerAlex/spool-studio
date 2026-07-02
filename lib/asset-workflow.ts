@@ -102,7 +102,7 @@ export const assetStatusMeta: Record<AssetStatus, AssetStatusMeta> = {
     icon: PenTool,
   },
   ready_for_review: {
-    label: 'Draft',
+    label: 'Ready for Review',
     badgeClassName: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
     icon: Eye,
   },
@@ -203,10 +203,10 @@ const statusTransitions: Record<AssetStatus, AssetStatus[]> = {
   published: ['archived'],
   failed: ['uploading', 'in_design'],
   archived: [],
-  in_design: ['ready_for_review', 'approved'],
+  in_design: ['ready_for_review'],
   ready_for_review: ['revision_requested', 'approved'],
   revision_requested: ['approved', 'ready_for_review'],
-  scheduled: ['uploaded', 'archived'],
+  scheduled: ['archived'],
 };
 
 export function getAllowedTransitions(status: AssetStatus): AssetStatus[] {

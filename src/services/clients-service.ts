@@ -44,12 +44,11 @@ function getMonthStart(date: Date) {
 }
 
 function getWeekStart(date: Date) {
-  // ISO week start: Monday
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const day = d.getUTCDay();
-  const diff = (day + 6) % 7; // days since Monday
-  d.setUTCDate(d.getUTCDate() - diff);
-  d.setUTCHours(0, 0, 0, 0);
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay();
+  const diff = (day + 6) % 7;
+  d.setDate(d.getDate() - diff);
+  d.setHours(0, 0, 0, 0);
   return d;
 }
 
@@ -94,9 +93,11 @@ function buildClientMetricsMap(
 
     const isCompletedStatus = ['uploaded', 'ready_for_review', 'revision_requested', 'approved', 'published', 'scheduled'].includes(asset.status || '');
 
-    if (asset.created_at && isCompletedStatus) {
-      const created = new Date(asset.created_at);
-      if (created >= weekStart && created <= now) {
+    const lastActivityDate = asset.uploaded_at || asset.approved_at || asset.created_at;
+
+    if (lastActivityDate && isCompletedStatus) {
+      const completed = new Date(lastActivityDate);
+      if (completed >= weekStart && completed <= now) {
         metrics.weeklyCompleted++;
         if (asset.type === 'reel') {
           metrics.weeklyCompletedReels++;
@@ -110,7 +111,7 @@ function buildClientMetricsMap(
       metrics.assignedTeamMembers.add(asset.assigned_to);
     }
 
-    const isCurrentMonth = asset.created_at && new Date(asset.created_at) >= monthStart;
+    const isCurrentMonth = lastActivityDate && new Date(lastActivityDate) >= monthStart;
     if (isCompletedStatus && isCurrentMonth) {
       metrics.completedDeliverables++;
       if (asset.type === 'reel') {

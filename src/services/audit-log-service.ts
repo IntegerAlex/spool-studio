@@ -35,7 +35,7 @@ function mapLog(row: Awaited<ReturnType<typeof insertAuditLog>>): AuditLogEntry 
   };
 }
 
-export async function logAuditEvent(input: AuditLogInput): Promise<AuditLogEntry> {
+export async function logAuditEvent(input: AuditLogInput): Promise<AuditLogEntry | null> {
   try {
     const user = await getCurrentUser();
     if (user) {
@@ -50,7 +50,7 @@ export async function logAuditEvent(input: AuditLogInput): Promise<AuditLogEntry
     return mapLog(record);
   } catch (error) {
     logProductionRuntimeError('audit-log', error, { action: input.action, entityType: input.entityType });
-    throw error;
+    return null;
   }
 }
 

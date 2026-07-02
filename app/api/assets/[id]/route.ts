@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ data: asset });
   } catch (error) {
     logProductionRuntimeError('api-assets-id-get', error);
-    return NextResponse.json({ data: null });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

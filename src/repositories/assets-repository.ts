@@ -13,6 +13,7 @@ export type DbAssetSummary = Pick<
   | 'publish_time'
   | 'published_at'
   | 'approved_at'
+  | 'uploaded_at'
   | 'created_at'
   | 'type'
 >;
@@ -90,7 +91,7 @@ export async function listAssetSummaries(
   const supabase = await getClient(client);
   const { data, error } = await supabase
     .from('content_assets')
-    .select('client_id,status,assigned_to,scheduled_at,publish_date,publish_time,published_at,approved_at,created_at,type');
+    .select('client_id,status,assigned_to,scheduled_at,publish_date,publish_time,published_at,approved_at,uploaded_at,created_at,type');
 
   if (error) {
     throw new Error(error.message);
