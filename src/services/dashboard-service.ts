@@ -187,15 +187,6 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     const repositoryClients = serviceClients;
     const rawSupabaseCount = serviceClients.length;
 
-    console.info('[dashboard-debug][summary]', {
-      stage: 'dashboard-service-inputs',
-      rawSupabaseCount,
-      repositoryResultCount: repositoryClients.length,
-      serviceResultCount: serviceClients.length,
-      assetSummaryCount: assetSummaries.length,
-      activityCount: assetLogs.length,
-    });
-
     const now = new Date();
     const weekStart = getWeekStart(now);
     const monthStart = getMonthStart(now);
@@ -309,17 +300,6 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       totalDeliverables += planned;
       totalCompleted += completed;
 
-      console.info('[dashboard-trace][clients-source]', {
-        clientId: client.id,
-        clientName: client.name,
-        plannedPosters: pPosters,
-        plannedReels: pReels,
-        completedPosters: cPosters,
-        completedReels: cReels,
-        totalDeliverables: planned,
-        totalCompleted: completed,
-      });
-
       // Get next publish date (earliest approved/scheduled asset publish date in the future)
       const clientAssets = assetsByClientId.get(client.id) ?? [];
       const futureDates = clientAssets
@@ -356,31 +336,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 
     const completionPercentage = totalDeliverables > 0 ? Math.round((totalCompleted / totalDeliverables) * 100) : 0;
 
-    // Log final dashboard aggregation
-    console.info('[dashboard-trace][dashboard-source]', {
-      totalClients: serviceClients.length,
-      totalPostersPlanned,
-      totalPostersCompleted,
-      totalReelsPlanned,
-      totalReelsCompleted,
-      totalDeliverables,
-      totalPublished: totalCompleted,
-      completionPercentage,
-    });
-
-    // Verification Step: Log totals comparison trace
-    console.info('[dashboard-trace][totals]', {
-      sumClientCardsPlannedPosters: totalPostersPlanned,
-      dashboardPlannedPosters: totalPostersPlanned,
-      sumClientCardsPlannedReels: totalReelsPlanned,
-      dashboardPlannedReels: totalReelsPlanned,
-      sumClientCardsCompletedPosters: totalPostersCompleted,
-      dashboardCompletedPosters: totalPostersCompleted,
-      sumClientCardsCompletedReels: totalReelsCompleted,
-      dashboardCompletedReels: totalReelsCompleted,
-    });
-
-    // Check for mismatches
+    // Verification Step: Check for mismatches
     for (const client of serviceClients) {
       const pPosters = client.weeklyPosterGoal ?? 0;
       const pReels = client.weeklyReelGoal ?? 0;
@@ -435,10 +391,6 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     };
   } catch (error) {
     logProductionRuntimeError('dashboard-summary', error);
-    console.info('[dashboard-debug][summary]', {
-      stage: 'dashboard-service-error',
-      error: error instanceof Error ? error.message : String(error),
-    });
     return {
       totalAssets: 0,
       pendingApprovals: 0,

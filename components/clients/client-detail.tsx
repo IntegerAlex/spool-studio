@@ -149,11 +149,6 @@ function ReferenceEditorDialog({
 
     setIsSaving(true);
     try {
-      console.log('[references][submit:start]', {
-        clientId,
-        payload: values,
-      });
-
       if (reference) {
         console.info('[references][update]', { clientId, referenceId: reference.id });
         const savedReference = await clientReferencesApi.update(clientId, reference.id, values);
@@ -166,9 +161,6 @@ function ReferenceEditorDialog({
         await onSaved(savedReference);
       }
 
-      console.log('[references][submit:success]', {
-        clientId,
-      });
       onOpenChange(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save reference';
@@ -177,7 +169,6 @@ function ReferenceEditorDialog({
         message,
         stack: error instanceof Error ? error.stack : null,
       });
-      console.log('[references][submit:failed]');
       toast({ title: 'Unable to save reference', description: message, variant: 'destructive' });
     } finally {
       setIsSaving(false);
@@ -742,7 +733,6 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
 
               <Button
                 onClick={() => {
-                  console.log('[references][dialog-open]');
                   setEditingReference(null);
                   setIsReferenceDialogOpen(true);
                 }}
@@ -763,7 +753,6 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                   <p>No references yet. Add links to brand pages, moodboards, competitors, or inspiration.</p>
                   <Button
                     onClick={() => {
-                      console.log('[references][dialog-open]');
                       setEditingReference(null);
                       setIsReferenceDialogOpen(true);
                     }}
@@ -843,7 +832,6 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  console.log('[references][dialog-open]');
                                   setEditingReference(reference);
                                   setIsReferenceDialogOpen(true);
                                 }}
@@ -921,7 +909,6 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         reference={editingReference}
         open={isReferenceDialogOpen}
         onOpenChange={(open) => {
-          console.log(open ? '[references][dialog-open]' : '[references][dialog-close]');
           setIsReferenceDialogOpen(open);
           if (!open) {
             setEditingReference(null);

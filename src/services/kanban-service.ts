@@ -1,12 +1,7 @@
-import type { Asset } from '@/types/index';
+import type { Asset, KanbanClientOption } from '@/types/index';
 import { listKanbanAssets } from '@/repositories/assets-repository';
 import { listClientOptions } from '@/repositories/clients-repository';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-
-export interface KanbanClientOption {
-  id: string;
-  name: string;
-}
 
 export interface KanbanBoardData {
   assets: Asset[];

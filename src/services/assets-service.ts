@@ -381,11 +381,6 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
   }
 
   try {
-    console.log('[activity-log][create]', {
-      assetId: mapped.id,
-      currentStatus: mapped.status,
-      eventType: 'asset_created'
-    });
     await logAssetActivity({
       assetId: mapped.id,
       action: 'asset_created',
@@ -591,11 +586,6 @@ export async function finalizeAssetUpload(
         );
 
         try {
-          console.log('[activity-log][revision]', {
-            assetId,
-            currentStatus: asset.status,
-            eventType: 'revision_created'
-          });
           const shouldLogRevision = asset.status === 'revision_requested' || isRevisionUpload;
           if (shouldLogRevision) {
             await logAssetActivity({
@@ -618,11 +608,6 @@ export async function finalizeAssetUpload(
     }
 
   try {
-    console.log('[activity-log][upload]', {
-      assetId,
-      currentStatus: mapped.status,
-      eventType: 'file_uploaded'
-    });
     await logAssetActivity({
       assetId,
       action: 'file_uploaded',

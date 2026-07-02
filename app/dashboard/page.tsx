@@ -373,10 +373,6 @@ export default function DashboardPage() {
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  function formatTime(date: Date): string {
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-4 p-6">

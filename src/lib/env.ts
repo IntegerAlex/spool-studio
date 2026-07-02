@@ -15,6 +15,11 @@ const envSchema = z.object({
   MAIL_NOTIFICATION_TO: z.string().optional(),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(10).optional(),
+  DB_IDLE_TIMEOUT: z.coerce.number().int().min(1000).optional(),
+  DB_CONNECT_TIMEOUT: z.coerce.number().int().min(1000).optional(),
+  APP_URL: z.string().url().optional(),
+  SITE_URL: z.string().url().optional(),
 });
 
 let _parsed: z.infer<typeof envSchema> | null = null;

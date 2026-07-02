@@ -24,12 +24,6 @@ export async function listClients(client?: any): Promise<DbClient[]> {
 
 
 
-  console.info('[dashboard-debug][repository]', {
-    operation: 'listClients',
-    table: 'clients',
-    repositoryResultCount: data?.length ?? 0,
-  });
-
   return data ?? [];
 }
 

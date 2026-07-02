@@ -41,13 +41,6 @@ function getMailgunConfig() {
   const from = process.env.MAILGUN_FROM;
   const to = process.env.MAIL_NOTIFICATION_TO;
 
-  console.log('[mailgun][env-check]', {
-    apiKeyPresent: !!process.env.MAILGUN_API_KEY,
-    domainPresent: !!process.env.MAILGUN_DOMAIN,
-    fromPresent: !!process.env.MAILGUN_FROM,
-    toPresent: !!process.env.MAIL_NOTIFICATION_TO,
-  });
-
   return { apiKey, domain, from, to };
 }
 

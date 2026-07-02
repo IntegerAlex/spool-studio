@@ -293,7 +293,6 @@ export async function getClientDetail(clientId: string): Promise<Client | null> 
 }
 
 export async function createClient(input: ClientInput): Promise<Client> {
-  console.log("[client-create][payload]", input);
   const user = await getCurrentUser();
   if (!user) {
     throw new Error('Unauthorized');
@@ -320,8 +319,6 @@ export async function createClient(input: ClientInput): Promise<Client> {
     contract_start_date: input.contractStartDate ?? null,
     contract_end_date: input.contractEndDate ?? null,
   };
-
-  console.log("[client-create][insert]", insertData);
 
   const record = await insertClient(
     insertData,
