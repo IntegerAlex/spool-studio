@@ -15,9 +15,9 @@ export async function GET(request: Request) {
     const endDate = searchParams.get('endDate') ?? undefined;
 
     const result = await getAuditLogs({ limit, offset, action, entityType, userId, search, startDate, endDate });
-    return NextResponse.json({ data: result.data, total: result.total });
+    return NextResponse.json({ data: { entries: result.data, total: result.total } });
   } catch (error) {
     logProductionRuntimeError('api-logs-get', error);
-    return NextResponse.json({ data: [], total: 0 });
+    return NextResponse.json({ data: { entries: [], total: 0 } });
   }
 }

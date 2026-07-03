@@ -773,6 +773,6 @@ export const logsApi = {
     if (params?.startDate) searchParams.set('startDate', params.startDate);
     if (params?.endDate) searchParams.set('endDate', params.endDate);
     const qs = searchParams.toString();
-    return fetchJson<{ data: AuditLogEntry[]; total: number }>(`/api/logs${qs ? `?${qs}` : ''}`);
+    return fetchJson<{ entries: AuditLogEntry[]; total: number }>(`/api/logs${qs ? `?${qs}` : ''}`);
   },
 };

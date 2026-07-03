@@ -150,7 +150,7 @@ export default function LogsPage() {
         search: searchQuery || undefined,
         ...dateRange,
       });
-      setLogs(result.data);
+      setLogs(result.entries);
       setTotal(result.total);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load audit logs';

@@ -68,6 +68,8 @@ export default function SettingsPage() {
         setWorkspace(workspaceData);
         setWorkspaceName(workspaceData.name);
         setTeamMembers(usersData);
+      } catch (err) {
+        console.error('[settings] failed to load data', err);
       } finally {
         setIsLoading(false);
       }
