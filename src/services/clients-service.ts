@@ -255,21 +255,9 @@ export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Clie
       })
       .filter((client): client is Client => Boolean(client));
 
-    console.info('[dashboard-debug][service]', {
-      operation: 'getClients',
-      serviceResultCount: mappedClients.length,
-      repositoryClientCount: clients.length,
-      assetSummaryCount: assetSummaries.length,
-    });
-
     return mappedClients;
   } catch (error) {
     logProductionRuntimeError('clients-loader', error);
-    console.info('[dashboard-debug][service]', {
-      operation: 'getClients',
-      serviceResultCount: 0,
-      error: error instanceof Error ? error.message : String(error),
-    });
     return [];
   }
 }

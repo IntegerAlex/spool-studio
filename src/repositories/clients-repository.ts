@@ -53,18 +53,6 @@ export async function countClients(client?: any): Promise<number> {
     throw new Error(error.message);
   }
 
-  console.info('[dashboard-debug][supabase]', {
-    operation: 'countClients',
-    table: 'clients',
-    rawSupabaseCount: data?.length ?? 0,
-  });
-
-  console.info('[dashboard-debug][repository]', {
-    operation: 'countClients',
-    table: 'clients',
-    repositoryResultCount: data?.length ?? 0,
-  });
-
   return data?.length ?? 0;
 }
 

@@ -336,25 +336,6 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 
     const completionPercentage = totalDeliverables > 0 ? Math.round((totalCompleted / totalDeliverables) * 100) : 0;
 
-    // Verification Step: Check for mismatches
-    for (const client of serviceClients) {
-      const pPosters = client.weeklyPosterGoal ?? 0;
-      const pReels = client.weeklyReelGoal ?? 0;
-      const cPosters = client.weeklyCompletedPosters ?? 0;
-      const cReels = client.weeklyCompletedReels ?? 0;
-
-      const matchPlanned = (pPosters + pReels) === (client.weeklyGoal ?? 0);
-      const matchCompleted = (cPosters + cReels) === (client.weeklyCompleted ?? 0);
-      if (!matchPlanned || !matchCompleted) {
-        console.warn(`[dashboard-trace][mismatch] Client ${client.name} (ID: ${client.id}) has mismatched weekly totals:`, {
-          calculatedPlanned: pPosters + pReels,
-          clientWeeklyGoal: client.weeklyGoal,
-          calculatedCompleted: cPosters + cReels,
-          clientWeeklyCompleted: client.weeklyCompleted,
-        });
-      }
-    }
-
     // Build enriched recentActivity by fetching only the small set of assets referenced in activity
     const activityAssetIds = Array.from(new Set(assetLogs.map((a) => a.asset_id).filter(Boolean)));
     let activityAssets: any[] = [];
