@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { requireUser, verifyPassword, hashPassword } from '@/lib/auth';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logAuditEvent } from '@/services/audit-log-service';
 
 export async function POST(request: Request) {
   try {
@@ -52,6 +53,17 @@ export async function POST(request: Request) {
 
     const newHash = await hashPassword(newPassword);
     await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, user.id]);
+
+    try {
+      await logAuditEvent({
+        action: 'password_changed',
+        entityType: 'user',
+        entityId: user.id,
+        entityName: user.email ?? user.name ?? '',
+      });
+    } catch (_error) {
+      // Audit logging should not block password change.
+    }
 
     return NextResponse.json({ message: 'Password updated successfully' });
   } catch (error) {

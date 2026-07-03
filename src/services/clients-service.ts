@@ -399,6 +399,19 @@ export async function updateClient(
     throw new Error('Failed to map client');
   }
 
+  try {
+    const original = await getClientById(clientId);
+    await logAuditEvent({
+      action: original ? 'client_updated' : 'client_created',
+      entityType: 'client',
+      entityId: clientId,
+      entityName: input.name ?? mapped.name ?? '',
+      metadata: { changes: Object.keys(updates) },
+    });
+  } catch (_error) {
+    // Audit logging should not block updates.
+  }
+
   return mapped;
 }
 
@@ -406,6 +419,16 @@ export async function removeClient(clientId: string): Promise<void> {
   const assets = await listAssetsByClientId(clientId);
   if (assets && assets.length > 0) {
     throw new Error('Cannot delete client because it has linked assets.');
+  }
+  try {
+    await logAuditEvent({
+      action: 'client_deleted',
+      entityType: 'client',
+      entityId: clientId,
+      entityName: '',
+    });
+  } catch (_error) {
+    // Audit logging should not block deletion.
   }
   await deleteClientRow(clientId);
 }

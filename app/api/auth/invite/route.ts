@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db';
 import { requireUser, hashPassword } from '@/lib/auth';
 import { signToken } from '@/lib/auth/jwt';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logAuditEvent } from '@/services/audit-log-service';
 
 function generateRandomPassword(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
@@ -89,6 +90,18 @@ export async function POST(request: Request) {
       }
     } else {
       console.info(`[auth] Invite URL for ${email}: ${resetUrl}`);
+    }
+
+    try {
+      await logAuditEvent({
+        action: 'user_invited',
+        entityType: 'user',
+        entityId: userId,
+        entityName: email,
+        metadata: { role: userRole, invitedBy: user.email },
+      });
+    } catch (_error) {
+      // Audit logging should not block invite.
     }
 
     return NextResponse.json(

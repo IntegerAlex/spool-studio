@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logAuditEvent } from '@/services/audit-log-service';
 
 export async function GET() {
   try {
@@ -66,6 +67,18 @@ export async function PUT(request: Request) {
         vals.push(wsId);
         await pool.query(`UPDATE workspaces SET ${sets.join(', ')} WHERE id = $${idx}`, vals);
       }
+    }
+
+    try {
+      await logAuditEvent({
+        action: 'workspace_updated',
+        entityType: 'workspace',
+        entityId: wsId,
+        entityName: name || 'My Workspace',
+        metadata: { name, logo: logo || null },
+      });
+    } catch (_error) {
+      // Audit logging should not block workspace updates.
     }
 
     return NextResponse.json({ id: wsId, name: name || 'My Workspace', logo: logo || null });

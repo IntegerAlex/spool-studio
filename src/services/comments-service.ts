@@ -11,6 +11,7 @@ import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { getUsersByIds } from '@/services/users-service';
 import type { Database } from '@/types/database';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logAuditEvent } from '@/services/audit-log-service';
 import { sendDesignerNotification } from '@/lib/notifications/mailgun';
 import { getAssetById } from '@/repositories/assets-repository';
 import { getClientById } from '@/repositories/clients-repository';
@@ -156,6 +157,18 @@ export async function createComment(input: CommentInput): Promise<AssetComment> 
       message: mapped.message,
     },
   });
+
+  try {
+    await logAuditEvent({
+      action: 'comment_created',
+      entityType: 'asset',
+      entityId: mapped.assetId,
+      entityName: '',
+      metadata: { commentId: mapped.id, type: mapped.type, message: mapped.message.substring(0, 200) },
+    });
+  } catch (_error) {
+    // Audit logging should not block comment creation.
+  }
 
   // Handle Notifications
   try {

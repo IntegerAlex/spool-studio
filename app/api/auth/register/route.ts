@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { hashPassword, createSession } from '@/lib/auth';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logAuditEvent } from '@/services/audit-log-service';
 
 export async function POST(request: Request) {
   try {
@@ -46,6 +47,18 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       user: { id: userId, email, name: fullName || email.split('@')[0], role: userRole },
     }, { status: 201 });
+
+    try {
+      await logAuditEvent({
+        action: 'user_registered',
+        entityType: 'user',
+        entityId: userId,
+        entityName: email,
+        metadata: { role: userRole },
+      });
+    } catch (_error) {
+      // Audit logging should not block registration.
+    }
 
     response.cookies.set(
       session.cookie.name,

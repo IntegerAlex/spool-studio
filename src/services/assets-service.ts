@@ -400,6 +400,18 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     // Activity logging should not block asset creation.
   }
 
+  try {
+    await logAuditEvent({
+      action: 'asset_created',
+      entityType: 'asset',
+      entityId: mapped.id,
+      entityName: mapped.title ?? 'Untitled',
+      metadata: { type: mapped.type, status: mapped.status, clientId: mapped.clientId },
+    });
+  } catch (_error) {
+    // Audit logging should not block asset creation.
+  }
+
   return mapped;
 }
 
@@ -945,6 +957,18 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
       });
     }
 
+    try {
+      await logAuditEvent({
+        action: isRevisionUpload ? 'revision_uploaded' : 'file_uploaded',
+        entityType: 'asset',
+        entityId: assetId,
+        entityName: asset.title ?? 'Untitled',
+        metadata: { fileName: file.name, r2Key: uploadResult.key, fileSize: file.size, isRevision: isRevisionUpload },
+      });
+    } catch (_error) {
+      // Audit logging should not block upload.
+    }
+
     return {
       asset: mapped,
       upload: {
@@ -1076,6 +1100,18 @@ export async function updateAsset(
     } catch (_error) {
       // Audit logging should not block updates.
     }
+  } else if (input.title && input.title !== existing.title) {
+    try {
+      await logAuditEvent({
+        action: 'asset_updated',
+        entityType: 'asset',
+        entityId: assetId,
+        entityName: existing.title,
+        metadata: { field: 'title', from: existing.title, to: input.title },
+      });
+    } catch (_error) {
+      // Audit logging should not block updates.
+    }
   }
 
   if (assignmentChanged) {
@@ -1142,6 +1178,18 @@ export async function approveAsset(assetId: string, userId: string): Promise<Ass
     type: 'asset:status-changed',
     payload: { assetId, previousStatus: existing.status, nextStatus: 'approved' },
   });
+
+  try {
+    await logAuditEvent({
+      action: 'asset_approved',
+      entityType: 'asset',
+      entityId: assetId,
+      entityName: existing.title ?? 'Untitled',
+      metadata: { from: existing.status, to: 'approved' },
+    });
+  } catch (_error) {
+    // Audit logging should not block approval.
+  }
 
   return mapped;
 }
@@ -1237,6 +1285,18 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
     payload: { assetId, previousStatus: existing.status, nextStatus: 'revision_requested' },
   });
 
+  try {
+    await logAuditEvent({
+      action: 'asset_rejected',
+      entityType: 'asset',
+      entityId: assetId,
+      entityName: existing.title ?? 'Untitled',
+      metadata: { from: existing.status, to: 'revision_requested' },
+    });
+  } catch (_error) {
+    // Audit logging should not block rejection.
+  }
+
   return mapped;
 }
 
@@ -1249,6 +1309,17 @@ export async function removeAsset(assetId: string): Promise<void> {
     } catch (_e) {
       console.warn('[asset][delete][r2-cleanup-failed]', { assetId, key: asset.drive_file_id });
     }
+  }
+  try {
+    await logAuditEvent({
+      action: 'asset_deleted',
+      entityType: 'asset',
+      entityId: assetId,
+      entityName: asset?.title ?? '',
+      metadata: { driveFileId: asset?.drive_file_id ?? null },
+    });
+  } catch (_error) {
+    // Audit logging should not block deletion.
   }
   await deleteAssetRow(assetId);
 }
