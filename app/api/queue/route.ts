@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { UploadQueueStatus } from '@/types/index';
 
 export async function GET() {
   try {
@@ -23,7 +24,7 @@ export async function GET() {
       assetId: r.asset_id,
       scheduledDate: r.scheduled_date,
       platform: r.platform,
-      status: r.status,
+      status: r.status as UploadQueueStatus,
       caption: r.caption,
       hashtags: r.hashtags,
       createdAt: r.created_at,

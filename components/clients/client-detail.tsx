@@ -457,15 +457,17 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
               <p className="text-[13px] text-[#71717a]">{client.instagramHandle}</p>
             </div>
           </div>
-          <a
-            href={`https://instagram.com/${client.instagramHandle.replace('@', '')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-[13px] text-[var(--primary)] hover:text-emerald-300"
-          >
-            <span>Open Instagram profile</span>
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
+          {client.instagramHandle ? (
+            <a
+              href={`https://instagram.com/${client.instagramHandle.replace('@', '')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[13px] text-[var(--primary)] hover:text-emerald-300"
+            >
+              <span>Open Instagram profile</span>
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">

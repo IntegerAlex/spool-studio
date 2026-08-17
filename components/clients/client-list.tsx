@@ -21,7 +21,7 @@ export function ClientList({ clients, onCreated }: ClientListProps) {
   const filteredClients = clients.filter(
     (client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.instagramHandle.toLowerCase().includes(searchQuery.toLowerCase())
+      (client.instagramHandle ?? '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

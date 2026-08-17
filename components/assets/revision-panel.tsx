@@ -78,11 +78,11 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
           const revisionNote = revision.changeNote ?? 'Revision upload';
           const previewDescriptor = toAssetPreviewDescriptor({
             title: `${assetTitle} v${versionLabel}`,
-            mimeType: revision.mimeType ?? null,
-            driveFileId: revision.driveFileId ?? null,
-            driveFileUrl: revision.driveFileUrl ?? null,
-            fileSize: revision.fileSize ?? null,
-            durationSeconds: revision.durationSeconds ?? null,
+            mimeType: revision.mimeType,
+            driveFileId: revision.driveFileId,
+            driveFileUrl: revision.driveFileUrl,
+            fileSize: revision.fileSize,
+            durationSeconds: revision.durationSeconds,
           });
           return (
             <div

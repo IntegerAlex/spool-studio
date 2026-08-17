@@ -67,8 +67,8 @@ function hydrateAssetDates(asset: Asset): Asset {
 function hydrateClientDates(client: Client): Client {
   return {
     ...client,
-    createdAt: client.createdAt ? new Date(client.createdAt as unknown as string) : undefined,
-    updatedAt: client.updatedAt ? new Date(client.updatedAt as unknown as string) : undefined,
+    createdAt: client.createdAt ? new Date(client.createdAt as unknown as string) : client.createdAt,
+    updatedAt: client.updatedAt ? new Date(client.updatedAt as unknown as string) : client.updatedAt,
   };
 }
 

@@ -300,8 +300,8 @@ function hydrateClientReference(reference: ClientReference): ClientReference {
 function hydrateClient(client: Client): Client {
   return {
     ...client,
-    createdAt: client.createdAt ? new Date(client.createdAt as unknown as string) : undefined,
-    updatedAt: client.updatedAt ? new Date(client.updatedAt as unknown as string) : undefined,
+    createdAt: client.createdAt ? new Date(client.createdAt as unknown as string) : client.createdAt,
+    updatedAt: client.updatedAt ? new Date(client.updatedAt as unknown as string) : client.updatedAt,
   };
 }
 
@@ -763,7 +763,7 @@ export interface AuditLogEntry {
 }
 
 export const logsApi = {
-  getAll: async (params?: { limit?: number; offset?: number; action?: string; entityType?: string; search?: string; startDate?: string; endDate?: string }): Promise<{ data: AuditLogEntry[]; total: number }> => {
+  getAll: async (params?: { limit?: number; offset?: number; action?: string; entityType?: string; search?: string; startDate?: string; endDate?: string }): Promise<{ entries: AuditLogEntry[]; total: number }> => {
     const searchParams = new URLSearchParams();
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.offset) searchParams.set('offset', String(params.offset));

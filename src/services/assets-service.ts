@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { canTransitionStatus, canUploadRevisionFromStatus } from '@/lib/asset-workflow';
-import type { Asset, AssetStatus } from '@/types/index';
+import type { Asset, AssetRevision, AssetStatus } from '@/types/index';
 import { getOrCreateCurrentUserProfile } from '@/services/users-service';
 import { logAssetActivity } from '@/services/activity-service';
 import { logAuditEvent } from '@/services/audit-log-service';
@@ -130,7 +130,7 @@ function mapAsset(asset: Awaited<ReturnType<typeof getAssetById>>): Asset | null
 
 function mapAssetRevisions(
   revisions: Awaited<ReturnType<typeof listRevisionsByAssetId>>
-): Asset['revisions'] {
+): AssetRevision[] {
   return revisions.map((rev) => ({
     id: rev.id,
     assetId: rev.asset_id,
@@ -298,7 +298,7 @@ export async function getAssetSummary(assetId: string): Promise<Asset | null> {
   }
 }
 
-export async function getAssetRevisions(assetId: string): Promise<Asset['revisions']> {
+export async function getAssetRevisions(assetId: string): Promise<AssetRevision[]> {
   try {
     const revisions = await listRevisionsByAssetId(assetId);
     return mapAssetRevisions(revisions);

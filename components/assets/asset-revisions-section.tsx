@@ -125,11 +125,11 @@ export function AssetRevisionsSection({ assetId, currentRevisionId, refreshKey }
                 const uploader = rev.uploadedBy ? (userMap.get(rev.uploadedBy)?.name ?? rev.uploadedBy) : 'Unknown';
                 const revisionPreviewItem = toAssetPreviewDescriptor({
                   title: `Revision v${versionLabel}`,
-                  mimeType: rev.mimeType ?? null,
-                  driveFileId: rev.driveFileId ?? null,
-                  driveFileUrl: rev.driveFileUrl ?? null,
-                  fileSize: rev.fileSize ?? null,
-                  durationSeconds: rev.durationSeconds ?? null,
+                  mimeType: rev.mimeType,
+                  driveFileId: rev.driveFileId,
+                  driveFileUrl: rev.driveFileUrl,
+                  fileSize: rev.fileSize,
+                  durationSeconds: rev.durationSeconds,
                 });
 
                 return (

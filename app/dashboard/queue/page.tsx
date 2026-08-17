@@ -161,9 +161,9 @@ export default function QueuePage() {
   };
 
   const scheduledQueue = queue.filter((q) => q.status === 'scheduled').sort((a, b) =>
-    new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
+    new Date(a.scheduledDate ?? 0).getTime() - new Date(b.scheduledDate ?? 0).getTime()
   );
-  const queuedItems = [...queue].sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime());
+  const queuedItems = [...queue].sort((a, b) => new Date(a.scheduledDate ?? 0).getTime() - new Date(b.scheduledDate ?? 0).getTime());
 
   if (isLoading) {
     return (
@@ -277,7 +277,7 @@ export default function QueuePage() {
                   <p className="truncate">{client?.name || 'Unknown Client'}</p>
                   <p className="mt-0.5 inline-flex items-center gap-1 text-[var(--color-text-faint)]">
                     <Calendar className="h-3 w-3" />
-                    {new Date(item.scheduledDate).toLocaleDateString()}
+                    {item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString() : '—'}
                   </p>
                 </div>
 
