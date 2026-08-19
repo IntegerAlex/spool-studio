@@ -54,6 +54,7 @@ const ALL_PERMISSIONS: Permission[] = [
   "reports:create",
 ]
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening  // role map is intentionally string-keyed by role name
 const rolePermissions: Record<string, Permission[]> = {
   admin: ALL_PERMISSIONS,
   designer: [

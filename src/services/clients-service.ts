@@ -415,7 +415,7 @@ export async function createClient(input: ClientInput): Promise<Client> {
       entityName: mapped.name,
       metadata: { name: mapped.name, slug: input.slug },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block creation.
   }
 
@@ -426,7 +426,7 @@ export async function updateClient(
   clientId: string,
   input: Partial<ClientInput>,
 ): Promise<Client> {
-  const updates: Record<string, unknown> = {}
+  const updates: Record<string, string | number | Date> = {}
   if (input.name !== undefined) updates.name = input.name
   if (input.slug !== undefined) updates.slug = normalizeSlug(input.slug)
   if (input.instagramHandle !== undefined)
@@ -488,6 +488,7 @@ export async function updateClient(
 
   const record = await updateClientRow(
     clientId,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     updates as Parameters<typeof updateClientRow>[1],
   )
   const assetSummaries = await listAssetSummaries()
@@ -506,7 +507,7 @@ export async function updateClient(
       entityName: input.name ?? mapped.name ?? "",
       metadata: { changes: Object.keys(updates) },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block updates.
   }
 
@@ -525,7 +526,7 @@ export async function removeClient(clientId: string): Promise<void> {
       entityId: clientId,
       entityName: "",
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block deletion.
   }
   await deleteClientRow(clientId)

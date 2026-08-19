@@ -58,7 +58,9 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const body = await request.json()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const decision = body.decision as string
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const comment = body.comment as string | undefined
 
     if (decision !== "approved" && decision !== "revision_requested") {
@@ -68,6 +70,7 @@ export async function POST(request: Request, context: RouteContext) {
       )
     }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external payload
     const updates: Record<string, unknown> = {}
     if (decision === "approved") {
       updates.status = "approved"

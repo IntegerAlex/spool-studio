@@ -6,13 +6,8 @@ vi.stubGlobal("fetch", fetchMock)
 import { calendarApi } from "@/lib/api-client"
 import type { CalendarEvent } from "@/types/calendar"
 
-function jsonResponse(body: unknown): Response {
-  return {
-    ok: true,
-    status: 200,
-    json: async () => body,
-    text: async () => "",
-  } as unknown as Response
+function jsonResponse<T>(body: T): Response {
+  return new Response(JSON.stringify(body), { status: 200 })
 }
 
 function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {

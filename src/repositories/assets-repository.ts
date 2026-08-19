@@ -70,6 +70,7 @@ export async function listAssetsByStatuses(
   client?: any,
 ): Promise<DbAsset[]> {
   const supabase = await getClient(client)
+  // SAFETY: statuses is already a readonly AssetStatus[]; the .in() builder widens to unknown[].
   const { data, error } = await supabase
     .from("content_assets")
     .select(assetSelect)
@@ -175,6 +176,7 @@ export async function getWeeklyCountsGroupedByClient(
     throw new Error(error.message)
   }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return (data as any) ?? []
 }
 

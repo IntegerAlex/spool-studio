@@ -10,7 +10,7 @@ export function emitEvent(event: EventPayload) {
   for (const listener of Array.from(listeners)) {
     try {
       listener(event)
-    } catch (_err) {
+    } catch {
       // swallow listener errors
     }
   }

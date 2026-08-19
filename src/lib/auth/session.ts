@@ -5,7 +5,21 @@ export const SESSION_COOKIE_NAME = "cms_session"
 
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 // 7 days in seconds
 
-function getCookieOptions(): Record<string, unknown> {
+type CookieOptions = {
+  httpOnly: boolean
+  secure: boolean
+  sameSite: "lax" | "strict" | "none"
+  path: string
+  maxAge: number
+}
+
+type SessionCookie = {
+  name: string
+  value: string
+  options: CookieOptions
+}
+
+function getCookieOptions(): CookieOptions {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -60,11 +74,7 @@ export async function validateSession(cookieStore?: {
   }
 }
 
-export function destroySession(): {
-  name: string
-  value: string
-  options: Record<string, unknown>
-} {
+export function destroySession(): SessionCookie {
   return {
     name: SESSION_COOKIE_NAME,
     value: "",

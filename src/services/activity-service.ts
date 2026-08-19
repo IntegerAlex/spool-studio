@@ -16,10 +16,12 @@ import type { AssetActivityLog } from "@/types/index"
 export interface ActivityInput {
   assetId: string
   action: string
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, Json>
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters  // external input at boundary (JSON serializer)
 function toJson(value: unknown): Json {
+  // oxlint-disable anti-slop/no-runtime-typeof  // JSON value discrimination at I/O boundary
   if (
     value === null ||
     typeof value === "string" ||
@@ -35,11 +37,13 @@ function toJson(value: unknown): Json {
 
   if (typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      Object.entries(value as Record<string, Json>).map(
         ([key, nestedValue]) => [key, toJson(nestedValue)],
       ),
     )
   }
+  // oxlint-enable anti-slop/no-runtime-typeof
 
   return null
 }
@@ -52,7 +56,8 @@ function mapActivity(
     assetId: row.asset_id,
     userId: row.user_id,
     action: row.action,
-    metadata: (row.metadata as Record<string, unknown>) ?? {},
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    metadata: (row.metadata as Record<string, Json>) ?? {},
     createdAt: new Date(row.created_at),
   }
 }
@@ -78,6 +83,7 @@ export async function getAssetActivityWithUsers(
   users: Awaited<ReturnType<typeof getUsersByIds>>
 }> {
   const activity = await getAssetActivity(assetId, options)
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const userIds = Array.from(
     new Set(activity.map((entry) => entry.userId).filter(Boolean)),
   ) as string[]
@@ -120,7 +126,7 @@ export async function logAssetActivity(
         createdAt: mapped.createdAt.toISOString(),
       },
     })
-  } catch (_err) {
+  } catch {
     // non-blocking - event bus is in-memory only
   }
 

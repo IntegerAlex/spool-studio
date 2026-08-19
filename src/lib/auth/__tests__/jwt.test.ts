@@ -16,6 +16,7 @@ describe("JWT", () => {
   describe("signToken", () => {
     it("should return a string token", async () => {
       const token = await signToken(payload)
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof  // test assertion on produced token
       expect(typeof token).toBe("string")
       expect(token.split(".")).toHaveLength(3)
     })

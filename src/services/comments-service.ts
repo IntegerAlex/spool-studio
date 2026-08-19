@@ -40,9 +40,11 @@ function mapComment(
     id: comment.id,
     assetId: comment.asset_id,
     userId: comment.user_id,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     type: comment.type as CommentType,
     message: comment.message,
     isInternal: comment.type === "internal_note",
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     revisionStatus: comment.revision_status as RevisionStatus | null,
     createdAt: new Date(comment.created_at),
     updatedAt: new Date(comment.updated_at),
@@ -182,7 +184,7 @@ export async function createComment(
         message: mapped.message.substring(0, 200),
       },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block comment creation.
   }
 

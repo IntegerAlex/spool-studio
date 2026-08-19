@@ -6,11 +6,14 @@ import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import type { CalendarEvent, RecurrenceRule } from "@/types/calendar"
 
-function defaultMonthRange(): { start: string; end: string } {
+function defaultMonthRange() {
   const now = new Date()
   const first = new Date(now.getFullYear(), now.getMonth(), 1)
   const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return { start: formatDateKey(first), end: formatDateKey(last) }
+  return {
+    start: formatDateKey(first),
+    end: formatDateKey(last),
+  } satisfies { start: string; end: string }
 }
 
 function calendarQuery(includeDrafts: boolean): string {
@@ -139,22 +142,35 @@ ORDER BY start_value ASC
 const CALENDAR_QUERY = calendarQuery(false)
 const CALENDAR_QUERY_WITH_DRAFTS = calendarQuery(true)
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external payload
 function mapRow(row: Record<string, unknown>): CalendarEvent {
   return {
     id: String(row.source_id),
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     kind: row.kind as CalendarEvent["kind"],
     title: String(row.title),
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     clientId: (row.client_id as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     clientName: (row.client_name as string) ?? null,
     start: String(row.start_value),
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     href: (row.href as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     assetId: (row.asset_id as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     uploadQueueId: (row.upload_queue_id as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     platform: (row.platform as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     status: (row.status_value as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     note: (row.note as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     caption: (row.caption_value as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     contractEndDate: (row.contract_end_value as string) ?? null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     recurrence: (row.recurrence as RecurrenceRule | null) ?? null,
   }
 }

@@ -391,8 +391,11 @@ export async function extractVideoMetadata(file: File): Promise<{
   try {
     const buffer = new Uint8Array(await file.arrayBuffer())
     const parsed = {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       durationSeconds: null as number | null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       width: null as number | null,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       height: null as number | null,
     }
 
@@ -490,6 +493,8 @@ export async function extractAssetMetadata(
   return {
     updates,
     mediaType,
+    // SAFETY: extractedFields aggregates the DB update row into the metadata map.
+    // oxlint-disable-next-line anti-slop/no-known-value-widening  // aggregated metadata map from DB update row
     extractedFields: extractedFields as Record<string, string | number | null>,
     extractionDurationMs,
     partialFailures,

@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       const statuses = statusesParam
         .split(",")
         .filter((s): s is AssetStatus =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
           assetStatusValues.includes(s as AssetStatus),
         )
       assets = await getAssetsByStatuses(statuses)

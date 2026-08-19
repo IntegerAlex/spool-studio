@@ -44,9 +44,8 @@ export const kanbanWorkflowColumns: KanbanWorkflowColumn[] = [
   },
 ]
 
-export const kanbanWorkflowColumnIds = kanbanWorkflowColumns.map(
-  (column) => column.id,
-) as KanbanWorkflowColumnId[]
+export const kanbanWorkflowColumnIds: KanbanWorkflowColumnId[] =
+  kanbanWorkflowColumns.map((column) => column.id)
 
 export const kanbanVisibleWorkflowStatuses: AssetStatus[] = [
   "draft",
@@ -56,7 +55,7 @@ export const kanbanVisibleWorkflowStatuses: AssetStatus[] = [
   "published",
 ]
 
-const columnByStatus: Record<AssetStatus, KanbanWorkflowColumnId> = {
+const columnByStatus = {
   draft: "draft",
   uploading: "draft",
   uploaded: "draft",
@@ -69,14 +68,14 @@ const columnByStatus: Record<AssetStatus, KanbanWorkflowColumnId> = {
   approved: "approved",
   published: "published",
   archived: "published",
-}
+} satisfies Record<AssetStatus, KanbanWorkflowColumnId>
 
-const statusByColumn: Record<KanbanWorkflowColumnId, AssetStatus> = {
+const statusByColumn = {
   draft: "draft",
   revision: "revision_requested",
   approved: "approved",
   published: "published",
-}
+} satisfies Record<KanbanWorkflowColumnId, AssetStatus>
 
 export function getKanbanWorkflowColumnId(
   status: AssetStatus,

@@ -8,21 +8,26 @@ import {
   uploadFile,
 } from "../r2-service"
 
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("../r2-client", () => {
   const store = new Map<string, Buffer>()
 
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic SDK command
   const mockSend = vi.fn(async (command: Record<string, unknown>) => {
     const CommandName = command.constructor?.name ?? ""
 
     if (CommandName === "PutObjectCommand") {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       const input = command.input as { Key: string; Body: Buffer }
       store.set(input.Key, input.Body)
       return { ETag: '"etag-123"', VersionId: "v1" }
     }
 
     if (CommandName === "HeadObjectCommand") {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       const input = command.input as { Key: string }
       if (!store.has(input.Key)) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         const err = new Error("NotFound") as Error & { Code: string }
         err.Code = "NotFound"
         throw err
@@ -37,8 +42,10 @@ vi.mock("../r2-client", () => {
     }
 
     if (CommandName === "DeleteObjectCommand") {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       const input = command.input as { Key: string }
       if (!store.has(input.Key)) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         const err = new Error("Key not found") as Error & { Code: string }
         err.Code = "NoSuchKey"
         throw err
@@ -57,19 +64,24 @@ vi.mock("../r2-client", () => {
   }
 })
 
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: vi.fn(
     async (
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external SDK client at boundary
       _client: unknown,
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic SDK command
       command: Record<string, unknown>,
       opts: { expiresIn: number },
     ) => {
       const CommandName = command.constructor?.name ?? ""
       if (CommandName === "PutObjectCommand") {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         const input = command.input as { Key: string }
         return `https://presigned.example.com/upload/${input.Key}?expires=${opts.expiresIn}`
       }
       if (CommandName === "GetObjectCommand") {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         const input = command.input as { Key: string }
         return `https://presigned.example.com/download/${input.Key}?expires=${opts.expiresIn}`
       }

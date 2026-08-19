@@ -66,7 +66,7 @@ export interface AssetStatusMeta {
   icon: LucideIcon
 }
 
-export const assetStatusMeta: Record<AssetStatus, AssetStatusMeta> = {
+export const assetStatusMeta = {
   draft: {
     label: "Draft",
     badgeClassName:
@@ -100,7 +100,7 @@ export const assetStatusMeta: Record<AssetStatus, AssetStatusMeta> = {
   published: {
     label: "Published",
     badgeClassName:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+      "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
     icon: Globe2,
   },
   failed: {
@@ -139,9 +139,9 @@ export const assetStatusMeta: Record<AssetStatus, AssetStatusMeta> = {
       "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300",
     icon: CalendarClock,
   },
-}
+} satisfies Record<AssetStatus, AssetStatusMeta>
 
-export const assetStatusLabels: Record<AssetStatus, string> = {
+export const assetStatusLabels = {
   draft: assetStatusMeta.draft.label,
   uploading: assetStatusMeta.uploading.label,
   uploaded: assetStatusMeta.uploaded.label,
@@ -154,22 +154,24 @@ export const assetStatusLabels: Record<AssetStatus, string> = {
   ready_for_review: assetStatusMeta.ready_for_review.label,
   revision_requested: assetStatusMeta.revision_requested.label,
   scheduled: assetStatusMeta.scheduled.label,
-}
+} satisfies Record<AssetStatus, string>
 
-export const assetEditorStatusLabels: Partial<Record<AssetStatus, string>> = {
+export const assetEditorStatusLabels = {
   draft: "Draft",
   in_design: "In Design",
   ready_for_review: "Review",
   revision_requested: "Revision",
   approved: "Approved",
   published: "Published",
-}
+} satisfies Partial<Record<AssetStatus, string>>
 
 export function isUserSelectableStatus(status: AssetStatus): boolean {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return (userSelectableStatusValues as readonly AssetStatus[]).includes(status)
 }
 
 export function isSystemControlledStatus(status: AssetStatus): boolean {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return (systemControlledStatusValues as readonly AssetStatus[]).includes(
     status,
   )
@@ -190,6 +192,7 @@ const uploadEligibleStatuses: AssetStatus[] = [
   "revision_requested",
 ]
 
+// oxlint-disable-next-line anti-slop/no-known-value-widening  // partial status->reason map; only some workflow states are blocked
 const uploadBlockedReasons: Partial<Record<AssetStatus, string>> = {
   approved: "Approved assets cannot replace media files.",
   published: "Published assets cannot replace media files.",
@@ -228,7 +231,7 @@ export function getUploadEligibilityReason(status: AssetStatus): string {
   )
 }
 
-const statusTransitions: Record<AssetStatus, AssetStatus[]> = {
+const statusTransitions = {
   draft: ["uploading", "in_design", "ready_for_review", "revision_requested"],
   uploading: ["uploaded", "failed"],
   uploaded: ["processing", "archived", "draft"],
@@ -241,7 +244,7 @@ const statusTransitions: Record<AssetStatus, AssetStatus[]> = {
   ready_for_review: ["revision_requested", "approved"],
   revision_requested: ["approved", "ready_for_review"],
   scheduled: ["archived"],
-}
+} satisfies Record<AssetStatus, AssetStatus[]>
 
 export function getAllowedTransitions(status: AssetStatus): AssetStatus[] {
   return statusTransitions[status] ?? []

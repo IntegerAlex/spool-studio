@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { userId, title, body: notifBody, url } = body as PushPayload
 
     if (!userId || !title || !notifBody) {

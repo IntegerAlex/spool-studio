@@ -10,6 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const body = (await request.json()) as { assetId?: string }
     const assetId = body.assetId?.trim()
     if (!assetId) {

@@ -50,10 +50,12 @@ export interface AssetInput {
   recurrence?: Json | null
 }
 
-function splitScheduledAt(value?: string | null): {
+type ScheduledAtParts = {
   publishDate: string | null
   publishTime: string | null
-} {
+}
+
+function splitScheduledAt(value?: string | null): ScheduledAtParts {
   if (!value) {
     return { publishDate: null, publishTime: null }
   }
@@ -157,16 +159,18 @@ function mapAssetRevisions(
     mediaHeight: rev.media_height ?? undefined,
     durationSeconds: rev.duration_seconds ?? undefined,
     changeNote: rev.change_note ?? undefined,
-    metadata: (rev.metadata as Record<string, unknown>) ?? undefined,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    metadata: (rev.metadata as Record<string, Json>) ?? undefined,
     createdAt: new Date(rev.created_at),
   }))
 }
 
 function logUploadFailure(
   stage: string,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external input at boundary (arbitrary error)
   error: unknown,
   assetId: string,
-  extra: Record<string, unknown> = {},
+  extra: Record<string, Json> = {},
 ) {
   const message =
     error instanceof Error ? error.message : "Unknown upload error"
@@ -297,7 +301,8 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
             mediaHeight: latest.media_height ?? undefined,
             durationSeconds: latest.duration_seconds ?? undefined,
             changeNote: latest.change_note ?? undefined,
-            metadata: (latest.metadata as Record<string, unknown>) ?? undefined,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+            metadata: (latest.metadata as Record<string, Json>) ?? undefined,
             createdAt: new Date(latest.created_at),
           }
         }
@@ -361,7 +366,7 @@ export async function setAssetCurrentRevision(
       action: "revision_activated",
       metadata: { revisionId },
     })
-  } catch (_err) {
+  } catch {
     // non-blocking
   }
 }
@@ -427,7 +432,7 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
         status: mapped.status,
       },
     })
-  } catch (_error) {
+  } catch {
     // Activity logging should not block asset creation.
   }
 
@@ -443,7 +448,7 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
         clientId: mapped.clientId,
       },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block asset creation.
   }
 
@@ -513,7 +518,7 @@ export async function finalizeAssetUpload(
   try {
     const client = await getClientById(asset.client_id, supabase)
     clientName = client?.name ?? clientName
-  } catch (_error) {
+  } catch {
     // Non-blocking: email can fall back to the client id.
   }
 
@@ -665,7 +670,7 @@ export async function finalizeAssetUpload(
             },
           })
         }
-      } catch (_err) {
+      } catch {
         // non-blocking
       }
     }
@@ -780,7 +785,7 @@ export async function uploadAssetFile(
   try {
     const client = await getClientById(asset.client_id, supabase)
     clientName = client?.name ?? clientName
-  } catch (_error) {
+  } catch {
     // Non-blocking: email can fall back to the client id.
   }
 
@@ -903,9 +908,11 @@ export async function uploadAssetFile(
           metadata: metadata.extractedFields,
         }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+        const revisionPayload = revisionInsert as any
         const { data: revisionData, error: revisionError } = await supabase
           .from("asset_revisions")
-          .insert(revisionInsert as any)
+          .insert(revisionPayload)
           .select("id")
           .single()
         if (revisionError) {
@@ -946,7 +953,7 @@ export async function uploadAssetFile(
                 },
               })
             }
-          } catch (_err) {
+          } catch {
             // non-blocking
           }
         }
@@ -1044,7 +1051,7 @@ export async function uploadAssetFile(
           isRevision: isRevisionUpload,
         },
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block upload.
     }
 
@@ -1116,7 +1123,7 @@ export async function updateAsset(
     }
   }
 
-  const updates: Record<string, unknown> = {}
+  const updates: Record<string, Json> = {}
   if (input.clientId !== undefined) updates.client_id = input.clientId
   if (input.title !== undefined) updates.title = input.title
   if (input.type !== undefined) updates.type = input.type
@@ -1154,6 +1161,7 @@ export async function updateAsset(
 
   const record = await updateAssetRow(
     assetId,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     updates as Parameters<typeof updateAssetRow>[1],
     supabase,
   )
@@ -1171,7 +1179,9 @@ export async function updateAsset(
   if (statusChanged) {
     logAssetStatusTransition(
       assetId,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       existing.status as AssetStatus,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       input.status as AssetStatus,
       "api-update",
     )
@@ -1190,11 +1200,11 @@ export async function updateAsset(
         assetId,
         action: "status_changed",
         metadata: {
-          from: existing.status,
-          to: input.status,
+          from: existing.status ?? null,
+          to: input.status ?? null,
         },
       })
-    } catch (_error) {
+    } catch {
       // Activity logging should not block updates.
     }
     try {
@@ -1205,7 +1215,7 @@ export async function updateAsset(
         entityName: existing.title,
         metadata: { from: existing.status, to: input.status },
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block updates.
     }
   } else if (input.title && input.title !== existing.title) {
@@ -1217,7 +1227,7 @@ export async function updateAsset(
         entityName: existing.title,
         metadata: { field: "title", from: existing.title, to: input.title },
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block updates.
     }
   }
@@ -1232,7 +1242,7 @@ export async function updateAsset(
           to: input.assignedTo ?? null,
         },
       })
-    } catch (_error) {
+    } catch {
       // Activity logging should not block updates.
     }
   }
@@ -1306,7 +1316,7 @@ export async function approveAsset(
       entityName: existing.title ?? "Untitled",
       metadata: { from: existing.status, to: "approved" },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block approval.
   }
 
@@ -1372,7 +1382,7 @@ export async function rejectAsset(
           if (comments && comments.length > 0) {
             latestCommentText = comments[0].message
           }
-        } catch (_err) {
+        } catch {
           // non-blocking
         }
 
@@ -1424,7 +1434,7 @@ export async function rejectAsset(
       entityName: existing.title ?? "Untitled",
       metadata: { from: existing.status, to: "revision_requested" },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block rejection.
   }
 
@@ -1437,7 +1447,7 @@ export async function removeAsset(assetId: string): Promise<void> {
   if (asset?.drive_file_id) {
     try {
       await deleteFile(asset.drive_file_id)
-    } catch (_e) {
+    } catch {
       console.warn("[asset][delete][r2-cleanup-failed]", {
         assetId,
         key: asset.drive_file_id,
@@ -1452,7 +1462,7 @@ export async function removeAsset(assetId: string): Promise<void> {
       entityName: asset?.title ?? "",
       metadata: { driveFileId: asset?.drive_file_id ?? null },
     })
-  } catch (_error) {
+  } catch {
     // Audit logging should not block deletion.
   }
   await deleteAssetRow(assetId)

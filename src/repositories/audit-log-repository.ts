@@ -9,6 +9,7 @@ export interface DbAuditLog {
   entity_type: string
   entity_id: string | null
   entity_name: string | null
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic JSONB metadata column
   metadata: Record<string, unknown>
   ip_address: string | null
   user_agent: string | null
@@ -23,6 +24,7 @@ export interface AuditLogInput {
   entityType: string
   entityId?: string | null
   entityName?: string | null
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic JSONB metadata column
   metadata?: Record<string, unknown>
   ipAddress?: string | null
   userAgent?: string | null

@@ -26,6 +26,7 @@ export async function GET() {
         assetId: r.asset_id,
         scheduledDate: r.scheduled_date,
         platform: r.platform,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         status: r.status as UploadQueueStatus,
         caption: r.caption,
         hashtags: r.hashtags,

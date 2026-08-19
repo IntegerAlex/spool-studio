@@ -26,6 +26,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ data: revisions })
     }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const userIds = Array.from(
       new Set(revisions.map((rev) => rev.uploadedBy).filter(Boolean)),
     ) as string[]

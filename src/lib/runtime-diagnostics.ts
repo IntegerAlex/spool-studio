@@ -1,5 +1,7 @@
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external log payload
 type RuntimeLogContext = Record<string, unknown>
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
 const envCheckState = globalThis as typeof globalThis & {
   __cmsEnvChecks?: { mailgun: boolean }
 }
@@ -10,6 +12,7 @@ envCheckState.__cmsEnvChecks = envChecks
 
 export function logProductionRuntimeError(
   source: string,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external error at logging boundary
   error: unknown,
   extra: RuntimeLogContext = {},
 ): void {

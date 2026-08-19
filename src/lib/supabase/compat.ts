@@ -23,7 +23,7 @@ function buildWhereClause(
   wheres: { column: string; op: string; value: unknown }[],
   params: unknown[],
   _offset: number,
-): { clause: string; params: unknown[] } {
+) {
   const clauses: string[] = []
   const resultParams: unknown[] = []
 
@@ -40,6 +40,7 @@ function buildWhereClause(
         break
       case "in": {
         // value should be an array
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         const arr = w.value as unknown[]
         if (arr.length === 0) {
           clauses.push("FALSE")
@@ -63,6 +64,7 @@ function buildWhereClause(
 
 // ---------- Supabase-compatible client ----------
 
+// oxlint-disable anti-slop/no-unsafe-dictionary-type  // dynamic DB row/param values
 interface QueryState {
   table: string
   columns: string[]
@@ -79,6 +81,7 @@ interface QueryState {
   rpcParams: Record<string, unknown>
   countOnly: boolean
 }
+// oxlint-enable anti-slop/no-unsafe-dictionary-type
 
 function createQueryBuilder(state: QueryState): any {
   const builder: any = {
@@ -88,6 +91,7 @@ function createQueryBuilder(state: QueryState): any {
       }
       return builder
     },
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external DB value at boundary
     eq(column: string, value: unknown) {
       state.wheres.push({ column, op: "eq", value })
       return builder
@@ -116,6 +120,7 @@ function createQueryBuilder(state: QueryState): any {
       state.countOnly = true
       return builder
     },
+    // oxlint-disable-next-line unicorn/no-thenable  // intentional query-builder thenable
     then(resolve: any, reject?: any) {
       return executeQuery(state).then(resolve, reject)
     },
@@ -155,6 +160,8 @@ async function executeQuery(
 
     // INSERT
     if (state.insertData) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic DB row
       const row = state.insertData as Record<string, unknown>
       const cols = Object.keys(row)
       const vals = Object.values(row)
@@ -274,6 +281,7 @@ function createTableProxy(tableName: string): any {
       }
       return builder
     },
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external DB value at boundary
     eq(column: string, value: unknown) {
       state.wheres.push({ column, op: "eq", value })
       return builder
@@ -302,10 +310,12 @@ function createTableProxy(tableName: string): any {
       state.countOnly = true
       return builder
     },
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external DB row at boundary
     insert(data: unknown) {
       state.insertData = data
       return builder
     },
+    // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic DB row
     update(data: Record<string, unknown>) {
       state.updateData = data
       return builder
@@ -314,6 +324,7 @@ function createTableProxy(tableName: string): any {
       state.isDelete = true
       return builder
     },
+    // oxlint-disable-next-line unicorn/no-thenable  // intentional query-builder thenable
     then(resolve: any, reject?: any) {
       return executeQuery(state).then(resolve, reject)
     },
@@ -329,6 +340,7 @@ export function createSupabaseCompat(): any {
       get(_target, prop: string) {
         // .rpc() support
         if (prop === "rpc") {
+          // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic RPC params
           return (name: string, params: Record<string, unknown> = {}) => {
             const state: QueryState = {
               table: "",

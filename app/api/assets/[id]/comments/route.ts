@@ -95,7 +95,7 @@ export async function POST(request: Request, context: RouteContext) {
           type: comment.type,
         },
       })
-    } catch (_error) {
+    } catch {
       // Activity logging should not block comment creation.
     }
 

@@ -105,7 +105,7 @@ export async function PUT(request: Request) {
         entityName: name || "My Workspace",
         metadata: { name, logo: logo || null },
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block workspace updates.
     }
 

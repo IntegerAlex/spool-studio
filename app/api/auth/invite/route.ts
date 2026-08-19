@@ -105,7 +105,7 @@ export async function POST(request: Request) {
         entityName: email,
         metadata: { role: userRole, invitedBy: user.email },
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block invite.
     }
 

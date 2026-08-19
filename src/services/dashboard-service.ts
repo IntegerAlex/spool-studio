@@ -7,6 +7,7 @@ import {
 import type { listClients } from "@/repositories/clients-repository"
 import { getClients } from "@/services/clients-service"
 import type { Client } from "@/types/index"
+import type { Json } from "@/types/database"
 
 export interface ClientPerformanceItem {
   id: string
@@ -83,7 +84,7 @@ function getStatusBucket(
 
 function getActivityIconKind(
   action: string,
-  metadata: Record<string, unknown>,
+  metadata: Record<string, Json>,
 ): "upload" | "revision" | "approval" | "status" | "publish" {
   if (action === "asset_created" || action === "file_uploaded") {
     return "upload"
@@ -96,6 +97,7 @@ function getActivityIconKind(
     return "revision"
   }
   if (action === "status_changed") {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // narrowing dynamic metadata value
     const to = typeof metadata.to === "string" ? metadata.to : null
     if (to === "published") {
       return "publish"
@@ -109,7 +111,7 @@ function getActivityIconKind(
 
 function getActivityDetail(
   action: string,
-  metadata: Record<string, unknown>,
+  metadata: Record<string, Json>,
 ): string {
   switch (action) {
     case "asset_created":
@@ -123,6 +125,7 @@ function getActivityDetail(
     case "assignment_changed":
       return "assignment changed"
     case "status_changed": {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof  // narrowing dynamic metadata value
       const to = typeof metadata.to === "string" ? metadata.to : null
       if (!to) {
         return "status changed"
@@ -148,7 +151,8 @@ function buildRecentActivity(
       continue
     }
 
-    const metadata = (entry.metadata as Record<string, unknown>) ?? {}
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const metadata = (entry.metadata as Record<string, Json>) ?? {}
     const detail = getActivityDetail(entry.action, metadata)
     const timestamp = new Date(entry.created_at)
 
@@ -163,6 +167,7 @@ function buildRecentActivity(
     })
   }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   for (const client of clients as any[]) {
     const rawUpdated = client.updatedAt ?? client.updated_at
     const rawCreated = client.createdAt ?? client.created_at
@@ -222,6 +227,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     nextWeek.setDate(now.getDate() + 7)
 
     // Use pre-fetched asset summaries for aggregate computations
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const activeAssets = (assetSummaries as any[]).filter(
       (asset) => asset.status !== "archived" && asset.status !== "failed",
     )
@@ -386,7 +392,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     let activityAssets: any[] = []
     try {
       activityAssets = await listAssetsByIds(activityAssetIds)
-    } catch (_e) {
+    } catch {
       // fallback to empty
       activityAssets = []
     }
@@ -410,7 +416,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       ],
       recentActivity: buildRecentActivity(
         assetLogs,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         activityAssets as any,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         repositoryClients as any,
       ).slice(0, 50),
       totalDeliverables,

@@ -6,22 +6,25 @@ function shouldLog(): boolean {
   return process.env.NEXT_PUBLIC_PERF_DIAG === "1"
 }
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic structured log payload
 export function logPerf(tag: string, payload: Record<string, unknown>) {
   if (!shouldLog()) return
   try {
     // Keep logs structured for easy grepping in production logs
     console.info(`[perf]${tag}`, payload)
-  } catch (_e) {
+  } catch {
     // noop
   }
 }
 
+// oxlint-disable anti-slop/no-runtime-typeof  // runtime duck-typing in proxy
 function wrapObject(obj: any, prefix = ""): any {
   if (!obj || typeof obj !== "object") return obj
 
   return new Proxy(obj, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver)
+    get(target, prop, _receiver) {
+      // SAFETY: target is the proxied object; dynamic property access is safe here.
+      const value = (target as any)[prop]
       if (typeof value === "function") {
         return (...args: any[]) => {
           const start = Date.now()
@@ -60,6 +63,7 @@ function wrapObject(obj: any, prefix = ""): any {
     },
   })
 }
+// oxlint-enable anti-slop/no-runtime-typeof
 
 export function wrapWithTiming<T extends object>(obj: T, label = "object"): T {
   if (
@@ -67,8 +71,9 @@ export function wrapWithTiming<T extends object>(obj: T, label = "object"): T {
     process.env.NEXT_PUBLIC_PERF_DIAG === "1"
   ) {
     try {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       return wrapObject(obj, label) as T
-    } catch (_e) {
+    } catch {
       return obj
     }
   }

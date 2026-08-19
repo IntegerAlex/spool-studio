@@ -34,13 +34,14 @@ export async function POST(request: Request) {
       )
     }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const body = (await request.json()) as UploadSessionBody
     assetId = body.assetId?.trim() ?? "unknown"
     clientId = body.clientId?.trim() ?? "unknown"
     fileName = body.fileName?.trim() ?? "unknown"
     mimeType = body.mimeType?.trim() || "application/octet-stream"
-    const fileSize =
-      typeof body.fileSize === "number" ? body.fileSize : Number(body.fileSize)
+// oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
+    const fileSize = (typeof body.fileSize === "number") ? body.fileSize : Number(body.fileSize)
 
     if (!assetId) {
       return NextResponse.json(

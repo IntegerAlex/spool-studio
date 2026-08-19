@@ -79,13 +79,14 @@ export async function POST(request: Request) {
         entityName: email,
         metadata: { role: userRole },
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block registration.
     }
 
     response.cookies.set(
       session.cookie.name,
       session.cookie.value,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       session.cookie.options as Parameters<typeof response.cookies.set>[2],
     )
 

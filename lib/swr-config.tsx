@@ -2,12 +2,16 @@
 
 import { SWRConfig } from "swr"
 
+type StatusError = Error & { status?: number }
+
 async function fetcher(url: string) {
   const res = await fetch(url)
   if (!res.ok) {
     const error = new Error("API request failed")
-    ;(error as any).status = res.status
-    throw error
+    // SAFETY: annotate the Error with an HTTP status for SWR's retry predicate.
+    const errorWithStatus = error as StatusError
+    errorWithStatus.status = res.status
+    throw errorWithStatus
   }
   return res.json()
 }

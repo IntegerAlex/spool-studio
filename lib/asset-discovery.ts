@@ -41,46 +41,45 @@ export interface AssetDiscoveryContext {
   usersById: Map<string, User>
 }
 
-export const assetSortLabels: Record<AssetSortMode, string> = {
+export const assetSortLabels = {
   newest: "Newest",
   oldest: "Oldest",
   recently_updated: "Recently updated",
   largest_file: "Largest file",
   smallest_file: "Smallest file",
   alphabetical: "Alphabetical",
-}
+} satisfies Record<AssetSortMode, string>
 
-export const assetUploadedDateLabels: Record<AssetUploadedDateFilter, string> =
-  {
+export const assetUploadedDateLabels = {
     all: "Any time",
     today: "Today",
     last_7_days: "Last 7 days",
     last_30_days: "Last 30 days",
-  }
+  } satisfies Record<AssetUploadedDateFilter, string>
 
-export const assetMetadataLabels: Record<AssetMetadataFilter, string> = {
+export const assetMetadataLabels = {
   all: "Any metadata state",
   has_metadata: "Has metadata",
   missing_metadata: "Needs metadata",
-}
+} satisfies Record<AssetMetadataFilter, string>
 
-export const assetQuickFilterLabels: Record<AssetQuickFilter, string> = {
+export const assetQuickFilterLabels = {
   videos: "Videos",
   images: "Images",
   pdfs: "PDFs",
   needs_review: "Needs Review",
   failed_uploads: "Failed Uploads",
   recently_uploaded: "Recently Uploaded",
-}
+} satisfies Record<AssetQuickFilter, string>
 
-const assetQuickFilterEmptyStateLabels: Record<AssetQuickFilter, string> = {
+const assetQuickFilterEmptyStateLabels = {
   videos: "video assets",
   images: "image assets",
   pdfs: "PDF assets",
   needs_review: "assets needing review",
   failed_uploads: "failed upload assets",
   recently_uploaded: "recently uploaded assets",
-}
+} satisfies Record<AssetQuickFilter, string>
 
 function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ")
@@ -409,7 +408,7 @@ function assetStatusLabel(status: AssetStatus): string {
 export function getDiscoveryEmptyState(
   filters: AssetDiscoveryFilters,
   visibleAssetCount: number,
-): { title: string; description: string } {
+) {
   if (visibleAssetCount > 0) {
     return { title: "", description: "" }
   }

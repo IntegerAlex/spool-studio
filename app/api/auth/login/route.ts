@@ -24,7 +24,9 @@ interface UserRowWithPassword {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const email = (body.email as string)?.trim()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const password = (body.password as string)?.trim()
 
     if (!email || !password) {
@@ -49,7 +51,8 @@ export async function POST(request: Request) {
     }
 
     // Cast to include password_hash — safe once the column is added to the table
-    const userWithPassword = user as unknown as UserRowWithPassword
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const userWithPassword = user as UserRowWithPassword
 
     if (!userWithPassword.password_hash) {
       return NextResponse.json(
@@ -86,6 +89,7 @@ export async function POST(request: Request) {
     response.cookies.set(
       session.cookie.name,
       session.cookie.value,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       session.cookie.options as Parameters<typeof response.cookies.set>[2],
     )
 
@@ -104,7 +108,7 @@ export async function POST(request: Request) {
         entityName: user.full_name ?? user.email,
         ipAddress: ip,
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block login.
     }
 

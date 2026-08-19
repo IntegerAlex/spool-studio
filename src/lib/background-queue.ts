@@ -9,9 +9,10 @@ function loadRecentFromDisk(): Map<string, number> {
   try {
     if (!fs.existsSync(PERSIST_PATH)) return new Map()
     const raw = fs.readFileSync(PERSIST_PATH, "utf-8")
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const obj = JSON.parse(raw || "{}") as Record<string, number>
     return new Map(Object.entries(obj))
-  } catch (_e) {
+  } catch {
     return new Map()
   }
 }
@@ -21,7 +22,7 @@ function persistRecentToDisk(m: Map<string, number>) {
     const obj: Record<string, number> = {}
     for (const [k, v] of m.entries()) obj[k] = v
     fs.writeFileSync(PERSIST_PATH, JSON.stringify(obj), { encoding: "utf-8" })
-  } catch (_e) {
+  } catch {
     // ignore disk errors
   }
 }

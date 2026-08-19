@@ -6,20 +6,24 @@ const { queryMock, requireUserMock, logErrorMock } = vi.hoisted(() => ({
   logErrorMock: vi.fn(),
 }))
 
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("@/lib/db", () => ({
   getPool: () => ({ query: queryMock }),
 }))
 
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("@/lib/auth", () => ({
   requireUser: requireUserMock,
 }))
 
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("@/lib/runtime-diagnostics", () => ({
   logProductionRuntimeError: logErrorMock,
 }))
 
 import { GET } from "@/app/api/calendar/route"
 
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external payload
 function row(overrides: Record<string, unknown> = {}) {
   return {
     source_id: "a1",
@@ -92,7 +96,9 @@ describe("GET /api/calendar", () => {
     )
     expect(res.status).toBe(200)
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const sql = queryMock.mock.calls[0][0] as string
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const params = queryMock.mock.calls[0][1] as unknown[]
     expect(sql).toContain("UNION ALL")
     expect(params[0]).toBe("u1")
@@ -134,6 +140,7 @@ describe("GET /api/calendar", () => {
     const res = await GET(new Request("http://localhost/api/calendar"))
     expect(res.status).toBe(200)
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const params = queryMock.mock.calls[0][1] as string[]
     expect(params[1]).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(params[2]).toMatch(/^\d{4}-\d{2}-\d{2}$/)

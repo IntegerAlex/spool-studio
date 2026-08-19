@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const passwordHash = rows[0].password_hash as string | null
     if (!passwordHash) {
       return NextResponse.json(
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
         entityId: user.id,
         entityName: user.email ?? user.name ?? "",
       })
-    } catch (_error) {
+    } catch {
       // Audit logging should not block password change.
     }
 

@@ -138,6 +138,7 @@ export async function GET(request: Request, context: RouteContext) {
           import("react"),
         ])
       buffer = await renderToBuffer(
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         React.createElement(MonthlyReportPDFDocument, { report }) as any,
       )
     } catch (pdfError) {

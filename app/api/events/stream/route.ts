@@ -9,7 +9,7 @@ export async function GET(request: Request) {
         try {
           const data = `event: ${e.type}\ndata: ${JSON.stringify(e.payload ?? {})}\n\n`
           controller.enqueue(encoder.encode(data))
-        } catch (_err) {
+        } catch {
           // ignore
         }
       }
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
           unsubscribe()
           try {
             controller.close()
-          } catch (_e) {}
+          } catch {}
         })
       }
     },

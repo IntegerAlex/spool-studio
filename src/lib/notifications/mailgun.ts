@@ -48,6 +48,7 @@ function getMailgunConfig() {
 }
 
 function formatTimestamp(timestamp: string | Date): string {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // discriminate string|Date at I/O boundary
   const date = typeof timestamp === "string" ? new Date(timestamp) : timestamp
   return Number.isNaN(date.getTime()) ? String(timestamp) : date.toISOString()
 }
@@ -113,6 +114,7 @@ async function sendMailgunNotification(
   subject: string,
   text: string,
   html: string,
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic notification context payload
   context: Record<string, unknown>,
 ): Promise<void> {
   const { domain, from, to } = getMailgunConfig()

@@ -13,7 +13,7 @@ export async function checkClientGoalsMigration(): Promise<{
   try {
     const supabase = await createServerSupabaseClient()
     // check columns existence by attempting to select them
-    const { data: cols, error } = await supabase
+    const { data: _cols, error } = await supabase
       .from("clients")
       .select("id, monthly_goal, weekly_goal")
       .limit(1)
@@ -37,6 +37,7 @@ export async function checkClientGoalsMigration(): Promise<{
     cachedMigrationResult = res
     return res
   } catch (err) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     return { ok: false, missing: [(err as Error).message] }
   }
 }

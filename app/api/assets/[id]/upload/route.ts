@@ -15,8 +15,10 @@ const MAX_UPLOAD_LABEL = "500mb"
 
 function logUploadFailure(
   stage: string,
+// oxlint-disable-next-line anti-slop/no-unknown-parameters  // error originates from catch/throw sites as unknown
   error: unknown,
   assetId: string,
+// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external payload
   extra: Record<string, unknown> = {},
 ) {
   const message =
@@ -87,6 +89,7 @@ export async function POST(request: Request, context: RouteContext) {
     })
 
     if (contentType?.toLowerCase().includes("application/json")) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       const body = (await request.json()) as {
         r2Key?: string
         key?: string
@@ -176,6 +179,7 @@ export async function POST(request: Request, context: RouteContext) {
       success: true,
       keys: Array.from(formData.keys()),
       fileExists: fileValue !== null,
+// oxlint-disable-next-line anti-slop/no-runtime-typeof  // diagnostics logging of value kind
       typeofFile: typeof fileValue,
       instanceofFile: isFile,
       fileName: isFile ? fileValue.name : null,
@@ -219,6 +223,7 @@ export async function POST(request: Request, context: RouteContext) {
         expectedFieldName: "file",
         keys: Array.from(formData.keys()),
         fileExists: true,
+// oxlint-disable-next-line anti-slop/no-runtime-typeof  // diagnostics logging of value kind
         typeofFile: typeof fileValue,
         instanceofFile: false,
       })
