@@ -17,5 +17,10 @@ node_modules
 .env*
 test-results
 tsconfig.tsbuildinfo
+tsconfig.tools.tsbuildinfo
+*.tsbuildinfo
 playwright-report/
 coverage/
+
+# agent scratch dir
+.kilo/

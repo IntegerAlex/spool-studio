@@ -83,6 +83,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
+    "@oxlint/plugins": "1.79.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -94,6 +95,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "jsdom": "^29.1.1",
+    "oxlint": "1.79.0",
     "postcss": "^8.5",
     "s3rver": "^3.7.1",
     "tailwindcss": "^4.2.0",
