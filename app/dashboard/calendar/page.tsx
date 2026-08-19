@@ -570,104 +570,107 @@ export default function CalendarPage() {
           to schedule.
         </p>
 
-        {visibleEvents.length === 0 ? (
-          <div className="rounded-xl border border-white/[0.06] bg-[var(--color-bg-surface)] p-12 text-center">
+        {visibleEvents.length === 0 && (
+          <div className="rounded-xl border border-white/[0.06] bg-[var(--color-bg-surface)] p-6 text-center">
             <p className="text-sm text-zinc-400">
-              No events match your filters.
+              {events.length === 0
+                ? "No events yet. Click the + on any day to schedule one."
+                : "No events match your filters."}
             </p>
-            <p className="text-[12px] text-zinc-600 mt-1">
-              Try enabling more categories or clearing client filters.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 items-start">
-            <div className="xl:col-span-2">
-              <AnimatePresence mode="wait">
-                {viewMode === "month" && (
-                  <motion.div
-                    key="month"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <MonthView
-                      currentDate={currentDate}
-                      getEventsForDate={getEventsForDate}
-                      events={events}
-                      clientsById={clientsById}
-                      onSelectDate={(d) => {
-                        setViewMode("day")
-                        setCurrentDate(d)
-                      }}
-                      onSelectEvent={setSelectedEvent}
-                      onScheduleDate={openComposer}
-                      onDropDate={handleDrop}
-                      onDragStartEvent={(id) => {
-                        draggedEventId.current = id
-                      }}
-                    />
-                  </motion.div>
-                )}
-                {viewMode === "week" && (
-                  <motion.div
-                    key="week"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <WeekView
-                      currentDate={currentDate}
-                      getEventsForHour={getEventsForHour}
-                      clientsById={clientsById}
-                      onSelectEvent={setSelectedEvent}
-                      onScheduleSlot={openComposer}
-                      onDropSlot={handleDrop}
-                      onDragStartEvent={(id) => {
-                        draggedEventId.current = id
-                      }}
-                    />
-                  </motion.div>
-                )}
-                {viewMode === "day" && (
-                  <motion.div
-                    key="day"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <DayView
-                      currentDate={currentDate}
-                      getEventsForHour={getEventsForHour}
-                      clientsById={clientsById}
-                      onSelectEvent={setSelectedEvent}
-                      onScheduleSlot={openComposer}
-                      onDropSlot={handleDrop}
-                      onDragStartEvent={(id) => {
-                        draggedEventId.current = id
-                      }}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <div className="space-y-4">
-              <SidePanel
-                title="Upcoming Approved"
-                items={upcomingApproved}
-                onSelect={setSelectedEvent}
-              />
-              <SidePanel
-                title="Published History"
-                items={publishedHistory}
-                onSelect={setSelectedEvent}
-              />
-            </div>
+            {events.length > 0 && (
+              <p className="text-[12px] text-zinc-600 mt-1">
+                Try enabling more categories or clearing client filters.
+              </p>
+            )}
           </div>
         )}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3 items-start">
+          <div className="xl:col-span-2">
+            <AnimatePresence mode="wait">
+              {viewMode === "month" && (
+                <motion.div
+                  key="month"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <MonthView
+                    currentDate={currentDate}
+                    getEventsForDate={getEventsForDate}
+                    events={events}
+                    clientsById={clientsById}
+                    onSelectDate={(d) => {
+                      setViewMode("day")
+                      setCurrentDate(d)
+                    }}
+                    onSelectEvent={setSelectedEvent}
+                    onScheduleDate={openComposer}
+                    onDropDate={handleDrop}
+                    onDragStartEvent={(id) => {
+                      draggedEventId.current = id
+                    }}
+                  />
+                </motion.div>
+              )}
+              {viewMode === "week" && (
+                <motion.div
+                  key="week"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <WeekView
+                    currentDate={currentDate}
+                    getEventsForHour={getEventsForHour}
+                    clientsById={clientsById}
+                    onSelectEvent={setSelectedEvent}
+                    onScheduleSlot={openComposer}
+                    onDropSlot={handleDrop}
+                    onDragStartEvent={(id) => {
+                      draggedEventId.current = id
+                    }}
+                  />
+                </motion.div>
+              )}
+              {viewMode === "day" && (
+                <motion.div
+                  key="day"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <DayView
+                    currentDate={currentDate}
+                    getEventsForHour={getEventsForHour}
+                    clientsById={clientsById}
+                    onSelectEvent={setSelectedEvent}
+                    onScheduleSlot={openComposer}
+                    onDropSlot={handleDrop}
+                    onDragStartEvent={(id) => {
+                      draggedEventId.current = id
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="space-y-4">
+            <SidePanel
+              title="Upcoming Approved"
+              items={upcomingApproved}
+              onSelect={setSelectedEvent}
+            />
+            <SidePanel
+              title="Published History"
+              items={publishedHistory}
+              onSelect={setSelectedEvent}
+            />
+          </div>
+        </div>
 
         <AnimatePresence>
           {selectedEvent && (
