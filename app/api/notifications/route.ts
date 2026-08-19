@@ -11,8 +11,8 @@ export async function GET() {
 
     const rows = await listNotifications(user.id)
 
-    return NextResponse.json(
-      rows.map((r) => ({
+    return NextResponse.json({
+      data: rows.map((r) => ({
         id: r.id,
         userId: r.user_id,
         type: r.type,
@@ -22,7 +22,7 @@ export async function GET() {
         read: r.read,
         createdAt: r.created_at,
       })),
-    )
+    })
   } catch (error) {
     logProductionRuntimeError("api-notifications-get", error)
     return NextResponse.json(

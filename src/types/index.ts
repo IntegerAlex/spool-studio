@@ -109,7 +109,7 @@ export interface AssetActivityLog {
   assetId: string
   userId: string | null
   action: string
-  metadata: Record<string, unknown>
+  metadata: Record<string, Json>
   createdAt: Date
 }
 
@@ -127,7 +127,7 @@ export interface AssetRevision {
   mediaHeight?: number
   durationSeconds?: number
   changeNote?: string
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, Json>
   createdAt: Date
 }
 
@@ -176,6 +176,20 @@ export interface Notification {
   relatedAssetId: string | null
   read: boolean
   createdAt: string
+}
+
+export interface SearchResults {
+  clients: {
+    id: string
+    name: string
+    slug: string
+    instagramHandle: string | null
+  }[]
+  assets: {
+    id: string
+    title: string
+    type: string
+  }[]
 }
 
 export interface Workspace {

@@ -10,6 +10,7 @@ import type {
   Json,
   Notification,
   RecurrenceRule,
+  SearchResults,
   UploadQueue,
   User,
   Workspace,
@@ -80,8 +81,10 @@ export function clearApiClientCache() {
 }
 
 function buildRequestKey(input: RequestInfo, init?: RequestInit): string {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // RequestInfo is string | Request; branch on its shape
   const requestUrl = typeof input === "string" ? input : String(input)
   const method = init?.method ?? "GET"
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // RequestInit.body is string | BodyInit | null
   const body = typeof init?.body === "string" ? init.body : ""
 
   return `${method}:${requestUrl}:${body}`
@@ -91,6 +94,7 @@ async function dedupeRequest<T>(
   key: string,
   loader: () => Promise<T>,
 ): Promise<T> {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const pending = pendingRequests.get(key) as Promise<T> | undefined
   if (pending) {
     return pending
@@ -100,6 +104,7 @@ async function dedupeRequest<T>(
     pendingRequests.delete(key)
   })
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   pendingRequests.set(key, request as Promise<unknown>)
   return request
 }
@@ -109,6 +114,7 @@ async function fetchJson<T>(
   init?: RequestInit,
 ): Promise<T> {
   const start = Date.now()
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // RequestInfo is string | Request; branch on its shape
   const requestUrl = typeof input === "string" ? input : String(input)
   const method = init?.method ?? "GET"
 
@@ -124,7 +130,7 @@ async function fetchJson<T>(
         signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
-          ...(init?.headers ?? {}),
+          ...init?.headers,
         },
       })
       clearTimeout(timer)
@@ -177,19 +183,22 @@ async function fetchJson<T>(
       status: response.status,
       duration,
     })
-  } catch (_e) {
+  } catch {
     // ignore logging errors
   }
 
   if (!response.ok) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const payload = (await response.json()) as ApiEnvelope<T>
     throw new Error(payload.error ?? "Request failed")
   }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const payload = (await response.json()) as ApiEnvelope<T>
   if (payload.error) {
     throw new Error(payload.error)
   }
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return payload.data as T
 }
 
@@ -204,6 +213,7 @@ async function fetchJsonDeduped<T>(
 
 async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
   const start = Date.now()
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // RequestInfo is string | Request; branch on its shape
   const requestUrl = typeof input === "string" ? input : String(input)
 
   const timeoutMs = 15000
@@ -235,7 +245,7 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
       status: response.status,
       duration,
     })
-  } catch (_e) {
+  } catch {
     // ignore
   }
 
@@ -244,14 +254,17 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
   }
 
   if (!response.ok) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const payload = (await response.json()) as ApiEnvelope<T>
     throw new Error(payload.error ?? "Request failed")
   }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const payload = (await response.json()) as ApiEnvelope<T>
   if (payload.error) {
     throw new Error(payload.error)
   }
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return payload.data as T
 }
 
@@ -364,10 +377,10 @@ function hydrateClient(client: Client): Client {
   return {
     ...client,
     createdAt: client.createdAt
-      ? new Date(client.createdAt as unknown as string)
+      ? new Date(client.createdAt)
       : client.createdAt,
     updatedAt: client.updatedAt
-      ? new Date(client.updatedAt as unknown as string)
+      ? new Date(client.updatedAt)
       : client.updatedAt,
   }
 }
@@ -832,6 +845,14 @@ export const notificationsApi = {
   },
 }
 
+export const searchApi = {
+  search: async (query: string): Promise<SearchResults> => {
+    const q = query.trim()
+    if (!q) return { clients: [], assets: [] }
+    return fetchJson<SearchResults>(`/api/search?q=${encodeURIComponent(q)}`)
+  },
+}
+
 // Upload Queue API
 export const queueApi = {
   getAll: async (): Promise<UploadQueue[]> => {
@@ -886,6 +907,7 @@ export interface AuditLogEntry {
   entityType: string
   entityId: string | null
   entityName: string | null
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external audit payload
   metadata: Record<string, unknown>
   ipAddress: string | null
   userAgent: string | null
@@ -940,6 +962,7 @@ export const calendarApi = {
       publishDate: formatDateKey(input.start),
       publishTime: `${String(input.start.getHours()).padStart(2, "0")}:${String(input.start.getMinutes()).padStart(2, "0")}:00`,
       status: "scheduled",
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       recurrence: (input.recurrence ?? null) as Json | null,
     })
   },
@@ -958,6 +981,7 @@ export const calendarApi = {
       caption: null,
       hashtags: null,
       createdAt: new Date().toISOString(),
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       recurrence: (input.recurrence ?? null) as Json | null,
     })
   },

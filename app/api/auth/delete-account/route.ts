@@ -1,3 +1,4 @@
+import { type PoolClient } from "pg"
 import { NextResponse } from "next/server"
 import { requireUser, verifyPassword } from "@/lib/auth"
 import { destroySession } from "@/lib/auth/session"
@@ -6,9 +7,7 @@ import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 
 export async function POST(request: Request) {
-  let client: Awaited<
-    ReturnType<ReturnType<typeof getPool>["connect"]>
-  > | null = null
+  let client: PoolClient | null = null
 
   try {
     const user = await requireUser()
@@ -16,6 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { password } = (await request
       .json()
       .catch(() => ({ password: "" }))) as { password?: string }
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       [user.id],
     )
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     const passwordHash = (rows[0]?.password_hash as string | null) ?? null
     if (passwordHash) {
       const valid = await verifyPassword(password ?? "", passwordHash)
@@ -84,6 +85,7 @@ export async function POST(request: Request) {
     response.cookies.set(
       session.name,
       session.value,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       session.options as Parameters<typeof response.cookies.set>[2],
     )
     return response

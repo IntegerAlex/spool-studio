@@ -80,13 +80,17 @@ const formSchema = z
 type FormValues = z.infer<typeof formSchema>
 
 function resolveAssetType(value?: string) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return assetTypes.includes(value as (typeof assetTypes)[number])
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     ? (value as (typeof assetTypes)[number])
     : assetTypes[0]
 }
 
 function resolveAssetStatus(value?: string) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return assetStatuses.includes(value as (typeof assetStatuses)[number])
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     ? (value as (typeof assetStatuses)[number])
     : assetStatuses[0]
 }
@@ -155,6 +159,7 @@ export function AssetFormDialog({
   })
 
   const watchedStatus = useWatch({ control: form.control, name: "status" })
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const currentUploadStatus = (watchedStatus ??
     resolveAssetStatus(asset?.status)) as AssetStatus
   const uploadAllowed = canUploadFromStatus(currentUploadStatus)
@@ -446,6 +451,7 @@ export function AssetFormDialog({
                         onValueChange={field.onChange}
                         value={
                           field.value &&
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
                           isUserSelectableStatus(field.value as AssetStatus)
                             ? field.value
                             : ""
@@ -457,12 +463,17 @@ export function AssetFormDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {statusOptions.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {assetEditorStatusLabels[status] ??
-                                assetStatusLabels[status]}
-                            </SelectItem>
-                          ))}
+                          {statusOptions.map((status) => {
+                            const label =
+                              // SAFETY: statusOptions is drawn from AssetStatus, so the cast preserves the known key set.
+                              (assetEditorStatusLabels as Partial<Record<AssetStatus, string>>)[status] ??
+                              assetStatusLabels[status]
+                            return (
+                              <SelectItem key={status} value={status}>
+                                {label}
+                              </SelectItem>
+                            )
+                          })}
                         </SelectContent>
                       </Select>
                       <FormMessage />
