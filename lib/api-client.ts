@@ -409,6 +409,23 @@ export const authApi = {
       body: JSON.stringify({ token, password: newPassword }),
     })
   },
+
+  changePassword: async (
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> => {
+    await fetchJson("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+  },
+
+  deleteAccount: async (password: string): Promise<void> => {
+    await fetchJson("/api/auth/delete-account", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    })
+  },
 }
 
 export const clientsApi = {

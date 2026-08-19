@@ -11,7 +11,8 @@ import {
   Sparkles,
   Users,
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import zxcvbn from "zxcvbn"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,7 @@ import ErrorBoundary from "@/components/ui/error-boundary"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/hooks/use-toast"
-import { usersApi, workspaceApi } from "@/lib/api-client"
+import { authApi, usersApi, workspaceApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import type { User, Workspace } from "@/types/index"
 
@@ -57,6 +58,39 @@ const sections = [
   },
 ] as const
 
+const STRENGTH_COLORS = ["#f87171", "#f87171", "#f59e0b", "#eab308", "#3ecf8e"]
+const STRENGTH_LABELS = ["Very weak", "Weak", "Fair", "Good", "Strong"]
+
+function PasswordStrengthMeter({
+  result,
+}: {
+  result: ReturnType<typeof zxcvbn> | null
+}) {
+  if (!result) return null
+  const color = STRENGTH_COLORS[result.score]
+  const filled = result.score + 1
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex gap-1.5">
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className="h-1.5 flex-1 rounded-full"
+            style={{
+              backgroundColor: i < filled ? color : "var(--color-border)",
+            }}
+          />
+        ))}
+      </div>
+      <p className="text-[11px]" style={{ color }}>
+        {STRENGTH_LABELS[result.score]}
+        {result.feedback.warning ? ` — ${result.feedback.warning}` : ""}
+      </p>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [teamMembers, setTeamMembers] = useState<User[]>([])
@@ -68,6 +102,41 @@ export default function SettingsPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [isSavingPassword, setIsSavingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+
+  const passwordStrength = useMemo(
+    () => (newPassword ? zxcvbn(newPassword) : null),
+    [newPassword],
+  )
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDeletePassword, setShowDeletePassword] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleDeleteAccount = async () => {
+    setDeleteError(null)
+    if (!deletePassword) {
+      setDeleteError("Enter your password to confirm deletion.")
+      return
+    }
+    setIsDeleting(true)
+    try {
+      await authApi.deleteAccount(deletePassword)
+      window.location.assign("/login")
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete account.",
+      )
+      setIsDeleting(false)
+    }
+  }
 
   useEffect(() => {
     const loadData = async () => {
@@ -94,6 +163,45 @@ export default function SettingsPage() {
       const updated = await workspaceApi.update({ name: workspaceName })
       setWorkspace(updated)
       setWorkspaceName(updated.name)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("All fields are required.")
+      return
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters.")
+      return
+    }
+    if (newPassword === currentPassword) {
+      setPasswordError("New password must differ from the current one.")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New password and confirmation do not match.")
+      return
+    }
+
+    setIsSavingPassword(true)
+    try {
+      await authApi.changePassword(currentPassword, newPassword)
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      })
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+    } catch (err) {
+      setPasswordError(
+        err instanceof Error ? err.message : "Failed to update password.",
+      )
+    } finally {
+      setIsSavingPassword(false)
     }
   }
 
@@ -403,7 +511,7 @@ export default function SettingsPage() {
           </aside>
 
           {/* Content Section */}
-          <main className="min-w-0 space-y-6">
+          <main className="min-h-[600px] min-w-0 space-y-6">
             <Card className="content-card">
               <div className="content-card-header">
                 <div>
@@ -460,11 +568,10 @@ export default function SettingsPage() {
                 {activeSection === "security" && (
                   <Button
                     className="submit-btn"
-                    onClick={() => {
-                      toast({ title: "Password updated", description: "" })
-                    }}
+                    onClick={handleChangePassword}
+                    disabled={isSavingPassword}
                   >
-                    Update password
+                    {isSavingPassword ? "Updating..." : "Update password"}
                   </Button>
                 )}
               </div>
@@ -638,6 +745,31 @@ export default function SettingsPage() {
               </Card>
             )}
 
+            {activeSection === "integrations" && (
+              <Card className="content-card">
+                <div className="content-card-header">
+                  <div>
+                    <h4 className="content-card-title">Connected services</h4>
+                    <p className="content-card-description">
+                      Link external tools to sync assets and notifications.
+                    </p>
+                  </div>
+                </div>
+                <div className="content-card-body">
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-[10px] border border-dashed border-[var(--color-border)] px-4 py-12 text-center">
+                    <CalendarCheck className="size-7 text-[var(--color-text-muted)]" />
+                    <p className="text-[13px] font-semibold text-white">
+                      No integrations connected
+                    </p>
+                    <p className="max-w-sm text-[11.5px] text-[var(--color-text-muted)]">
+                      Connect services like Mailgun or R2 to streamline your
+                      workflow. Configured integrations will appear here.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {activeSection === "security" && (
               <Card className="content-card">
                 <div className="content-card-header">
@@ -651,6 +783,11 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="content-card-body space-y-4">
+                  {passwordError && (
+                    <div className="rounded-[10px] border border-[rgba(248,113,113,0.25)] bg-[rgba(248,113,113,0.06)] px-4 py-3 text-[12.5px] text-[#f87171]">
+                      {passwordError}
+                    </div>
+                  )}
                   <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-white">
@@ -663,6 +800,8 @@ export default function SettingsPage() {
                     <div className="relative w-full max-w-full md:max-w-[260px]">
                       <Input
                         type={showCurrentPassword ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
                         placeholder="Enter current password"
                         className="field-input w-full pr-10"
                       />
@@ -699,6 +838,8 @@ export default function SettingsPage() {
                     <div className="relative w-full max-w-full md:max-w-[260px]">
                       <Input
                         type={showNewPassword ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
                         placeholder="Enter new password"
                         className="field-input w-full pr-10"
                       />
@@ -719,6 +860,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
+                  <PasswordStrengthMeter result={passwordStrength} />
+
                   <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-white">
@@ -731,6 +874,8 @@ export default function SettingsPage() {
                     <div className="relative w-full max-w-full md:max-w-[260px]">
                       <Input
                         type={showConfirmPassword ? "text" : "password"}
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Confirm new password"
                         className="field-input w-full pr-10"
                       />
@@ -765,25 +910,81 @@ export default function SettingsPage() {
                           Deleting the account removes organization history.
                         </p>
                       </div>
-                      <Button
-                        className="danger-btn"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Are you sure you want to delete your account? This action cannot be undone.",
-                            )
-                          ) {
-                            toast({
-                              title: "Account deletion request submitted",
-                              description:
-                                "An administrator will process your request.",
-                            })
-                          }
-                        }}
-                      >
-                        Delete account
-                      </Button>
+                      {!showDeleteConfirm && (
+                        <Button
+                          className="danger-btn"
+                          onClick={() => {
+                            setShowDeleteConfirm(true)
+                            setDeleteError(null)
+                          }}
+                        >
+                          Delete account
+                        </Button>
+                      )}
                     </div>
+
+                    {showDeleteConfirm && (
+                      <div className="space-y-3 border-t border-[rgba(248,113,113,0.15)] p-5">
+                        <p className="text-[12.5px] text-[var(--color-text-secondary)]">
+                          This permanently deletes your account and signs you
+                          out. Type your password to confirm.
+                        </p>
+                        <div className="relative w-full max-w-[320px]">
+                          <Input
+                            type={showDeletePassword ? "text" : "password"}
+                            value={deletePassword}
+                            onChange={(e) => setDeletePassword(e.target.value)}
+                            placeholder="Enter your password"
+                            className="field-input w-full pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setShowDeletePassword(!showDeletePassword)
+                            }
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                            aria-label={
+                              showDeletePassword
+                                ? "Hide password"
+                                : "Show password"
+                            }
+                          >
+                            {showDeletePassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        {deleteError && (
+                          <p className="text-[12px] text-[#f87171]">
+                            {deleteError}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3">
+                          <Button
+                            className="danger-btn"
+                            onClick={handleDeleteAccount}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? "Deleting..." : "Confirm deletion"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-[12px] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+                            onClick={() => {
+                              setShowDeleteConfirm(false)
+                              setDeletePassword("")
+                              setDeleteError(null)
+                            }}
+                            disabled={isDeleting}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>

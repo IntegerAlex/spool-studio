@@ -17,11 +17,13 @@ export async function GET() {
 
     if (rows.length === 0) {
       return NextResponse.json({
-        id: null,
-        name: "My Workspace",
-        logo: null,
-        members: [],
-        createdAt: new Date(),
+        data: {
+          id: null,
+          name: "My Workspace",
+          logo: null,
+          members: [],
+          createdAt: new Date(),
+        },
       })
     }
 
@@ -32,17 +34,19 @@ export async function GET() {
     )
 
     return NextResponse.json({
-      id: ws.id,
-      name: ws.name,
-      logo: ws.logo,
-      members: members.map((m) => ({
-        id: m.id,
-        userId: m.user_id,
-        workspaceId: m.workspace_id,
-        role: m.role,
-        joinedAt: m.joined_at,
-      })),
-      createdAt: ws.created_at,
+      data: {
+        id: ws.id,
+        name: ws.name,
+        logo: ws.logo,
+        members: members.map((m) => ({
+          id: m.id,
+          userId: m.user_id,
+          workspaceId: m.workspace_id,
+          role: m.role,
+          joinedAt: m.joined_at,
+        })),
+        createdAt: ws.created_at,
+      },
     })
   } catch (error) {
     logProductionRuntimeError("api-workspace-get", error)
@@ -106,9 +110,11 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json({
-      id: wsId,
-      name: name || "My Workspace",
-      logo: logo || null,
+      data: {
+        id: wsId,
+        name: name || "My Workspace",
+        logo: logo || null,
+      },
     })
   } catch (error) {
     logProductionRuntimeError("api-workspace-update", error)
