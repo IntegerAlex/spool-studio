@@ -1,14 +1,16 @@
-import type { Asset, KanbanClientOption } from '@/types/index';
-import { listKanbanAssets } from '@/repositories/assets-repository';
-import { listClientOptions } from '@/repositories/clients-repository';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { listKanbanAssets } from "@/repositories/assets-repository"
+import { listClientOptions } from "@/repositories/clients-repository"
+import type { Asset, KanbanClientOption } from "@/types/index"
 
 export interface KanbanBoardData {
-  assets: Asset[];
-  clients: KanbanClientOption[];
+  assets: Asset[]
+  clients: KanbanClientOption[]
 }
 
-function mapKanbanAsset(asset: Awaited<ReturnType<typeof listKanbanAssets>>[number]): Asset {
+function mapKanbanAsset(
+  asset: Awaited<ReturnType<typeof listKanbanAssets>>[number],
+): Asset {
   return {
     id: asset.id,
     clientId: asset.client_id,
@@ -41,7 +43,7 @@ function mapKanbanAsset(asset: Awaited<ReturnType<typeof listKanbanAssets>>[numb
     assignedTo: asset.assigned_to ? [asset.assigned_to] : [],
     revisions: [],
     comments: [],
-  };
+  }
 }
 
 export async function getKanbanBoardData(): Promise<KanbanBoardData> {
@@ -49,14 +51,14 @@ export async function getKanbanBoardData(): Promise<KanbanBoardData> {
     const [assets, clients] = await Promise.all([
       listKanbanAssets(),
       listClientOptions(),
-    ]);
+    ])
 
     return {
       assets: assets.map(mapKanbanAsset),
       clients,
-    };
+    }
   } catch (error) {
-    logProductionRuntimeError('kanban-board-loader', error);
-    return { assets: [], clients: [] };
+    logProductionRuntimeError("kanban-board-loader", error)
+    return { assets: [], clients: [] }
   }
 }

@@ -6,7 +6,8 @@
     "dev": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next dev --turbopack",
     "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
     "start": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next start",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "biome check .",
+    "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -79,6 +80,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.9",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
@@ -89,7 +91,6 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
     "postcss": "^8.5",
     "s3rver": "^3.7.1",

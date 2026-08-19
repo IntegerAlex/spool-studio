@@ -1,42 +1,42 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
-import { ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [email, setEmail] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [submitted, setSubmitted] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
 
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
-      });
+      })
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Request failed');
+        const data = await res.json()
+        throw new Error(data.error || "Request failed")
       }
 
-      setSubmitted(true);
+      setSubmitted(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Request failed');
+      setError(err instanceof Error ? err.message : "Request failed")
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -51,14 +51,19 @@ export default function ForgotPasswordPage() {
 
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-foreground">Reset Password</h1>
-          <p className="text-muted-foreground">Enter your email to receive reset instructions</p>
+          <p className="text-muted-foreground">
+            Enter your email to receive reset instructions
+          </p>
         </div>
 
         <Card className="p-8 space-y-6 border border-border">
           {!submitted ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">
+                <label
+                  htmlFor="email"
+                  className="text-sm font-medium text-foreground"
+                >
                   Email Address
                 </label>
                 <Input
@@ -86,7 +91,7 @@ export default function ForgotPasswordPage() {
                     Sending...
                   </>
                 ) : (
-                  'Send Reset Link'
+                  "Send Reset Link"
                 )}
               </Button>
             </form>
@@ -96,7 +101,9 @@ export default function ForgotPasswordPage() {
                 <CheckCircle className="w-12 h-12 text-primary" />
               </div>
               <div className="space-y-2">
-                <h2 className="font-semibold text-foreground">Check your email</h2>
+                <h2 className="font-semibold text-foreground">
+                  Check your email
+                </h2>
                 <p className="text-sm text-muted-foreground">
                   We&apos;ve sent password reset instructions to {email}
                 </p>
@@ -112,5 +119,5 @@ export default function ForgotPasswordPage() {
         </Card>
       </div>
     </div>
-  );
+  )
 }

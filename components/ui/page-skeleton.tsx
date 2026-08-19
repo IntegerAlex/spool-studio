@@ -1,5 +1,5 @@
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card } from '@/components/ui/card';
+import { Card } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function PageSkeleton({ rows = 5 }: { rows?: number }) {
   return (
@@ -18,7 +18,10 @@ export function PageSkeleton({ rows = 5 }: { rows?: number }) {
       </div>
       <Card className="p-4">
         {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="flex items-center gap-4 py-3 border-b border-[rgba(255,255,255,0.04)] last:border-b-0">
+          <div
+            key={i}
+            className="flex items-center gap-4 py-3 border-b border-[rgba(255,255,255,0.04)] last:border-b-0"
+          >
             <Skeleton className="h-8 w-8 rounded-full shrink-0" />
             <div className="flex-1 space-y-2">
               <Skeleton className="h-4 w-3/4" />
@@ -28,5 +31,5 @@ export function PageSkeleton({ rows = 5 }: { rows?: number }) {
         ))}
       </Card>
     </div>
-  );
+  )
 }

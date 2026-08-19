@@ -1,18 +1,18 @@
-'use client';
+"use client"
 
-import { Card } from '@/components/ui/card';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp } from "lucide-react"
+import { Card } from "@/components/ui/card"
 
 interface OverviewCard {
-  title: string;
-  value: string | number;
-  change?: string;
-  icon: React.ReactNode;
-  trend?: 'up' | 'down' | 'neutral';
+  title: string
+  value: string | number
+  change?: string
+  icon: React.ReactNode
+  trend?: "up" | "down" | "neutral"
 }
 
 interface OverviewCardsProps {
-  cards: OverviewCard[];
+  cards: OverviewCard[]
 }
 
 export function OverviewCards({ cards }: OverviewCardsProps) {
@@ -28,14 +28,16 @@ export function OverviewCards({ cards }: OverviewCardsProps) {
               <p className="text-sm text-muted-foreground font-medium mb-1">
                 {card.title}
               </p>
-              <p className="text-2xl font-bold text-foreground">
-                {card.value}
-              </p>
+              <p className="text-2xl font-bold text-foreground">{card.value}</p>
               {card.change && (
-                <p className={`text-xs mt-2 flex items-center space-x-1 ${
-                  card.trend === 'up' ? 'text-green-600' : 'text-muted-foreground'
-                }`}>
-                  {card.trend === 'up' && <ArrowUp className="w-3 h-3" />}
+                <p
+                  className={`text-xs mt-2 flex items-center space-x-1 ${
+                    card.trend === "up"
+                      ? "text-green-600"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {card.trend === "up" && <ArrowUp className="w-3 h-3" />}
                   <span>{card.change}</span>
                 </p>
               )}
@@ -47,5 +49,5 @@ export function OverviewCards({ cards }: OverviewCardsProps) {
         </Card>
       ))}
     </div>
-  );
+  )
 }

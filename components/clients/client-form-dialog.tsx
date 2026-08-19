@@ -1,12 +1,11 @@
-'use client';
+"use client"
 
-import { useEffect, useState } from 'react';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import type { Client } from '@/types/index';
-import { clientsApi, clearApiClientCache } from '@/lib/api-client';
-import { useRouter } from 'next/navigation';
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -15,9 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -25,120 +22,150 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
+} from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/hooks/use-toast"
+import { clearApiClientCache, clientsApi } from "@/lib/api-client"
+import type { Client } from "@/types/index"
 
-const formSchema = z.object({
-  name: z.string().min(2, 'Name is required'),
-  slug: z.string().min(2, 'Slug is required'),
-  instagramHandle: z.string().optional(),
-  brandColor: z.string().optional(),
-  monthlyReelsTarget: z.string().optional(),
-  monthlyPostsTarget: z.string().optional(),
-  weeklyPosterGoal: z.string().optional(),
-  weeklyReelGoal: z.string().optional(),
-  contractStartDate: z.string().optional(),
-  contractEndDate: z.string().optional(),
-}).refine((data) => {
-  if (data.contractStartDate && data.contractEndDate) {
-    return new Date(data.contractEndDate) >= new Date(data.contractStartDate);
-  }
-  return true;
-}, {
-  message: "End Date must be greater than or equal to Start Date",
-  path: ["contractEndDate"]
-});
+const formSchema = z
+  .object({
+    name: z.string().min(2, "Name is required"),
+    slug: z.string().min(2, "Slug is required"),
+    instagramHandle: z.string().optional(),
+    brandColor: z.string().optional(),
+    monthlyReelsTarget: z.string().optional(),
+    monthlyPostsTarget: z.string().optional(),
+    weeklyPosterGoal: z.string().optional(),
+    weeklyReelGoal: z.string().optional(),
+    contractStartDate: z.string().optional(),
+    contractEndDate: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.contractStartDate && data.contractEndDate) {
+        return (
+          new Date(data.contractEndDate) >= new Date(data.contractStartDate)
+        )
+      }
+      return true
+    },
+    {
+      message: "End Date must be greater than or equal to Start Date",
+      path: ["contractEndDate"],
+    },
+  )
 
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof formSchema>
 
 interface ClientFormDialogProps {
-  trigger: React.ReactNode;
-  client?: Client;
-  onSaved?: (client: Client) => void;
+  trigger: React.ReactNode
+  client?: Client
+  onSaved?: (client: Client) => void
 }
 
 function toNumber(value?: string): number | undefined {
-  if (value === undefined || value === '') {
-    return undefined;
+  if (value === undefined || value === "") {
+    return undefined
   }
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? undefined : parsed
 }
 
-export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogProps) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  const { toast } = useToast();
+export function ClientFormDialog({
+  trigger,
+  client,
+  onSaved,
+}: ClientFormDialogProps) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
+  const { toast } = useToast()
 
-  const isEditMode = !!client;
+  const isEditMode = !!client
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: '',
-      slug: '',
-      instagramHandle: '',
-      brandColor: '',
-      monthlyReelsTarget: '',
-      monthlyPostsTarget: '',
-      weeklyPosterGoal: '',
-      weeklyReelGoal: '',
-      contractStartDate: '',
-      contractEndDate: '',
+      name: "",
+      slug: "",
+      instagramHandle: "",
+      brandColor: "",
+      monthlyReelsTarget: "",
+      monthlyPostsTarget: "",
+      weeklyPosterGoal: "",
+      weeklyReelGoal: "",
+      contractStartDate: "",
+      contractEndDate: "",
     },
-  });
+  })
 
-  const monthlyReels = form.watch('monthlyReelsTarget');
-  const monthlyPosts = form.watch('monthlyPostsTarget');
-  const weeklyPosterGoalVal = form.watch('weeklyPosterGoal');
-  const weeklyReelGoalVal = form.watch('weeklyReelGoal');
+  const monthlyReels = form.watch("monthlyReelsTarget")
+  const monthlyPosts = form.watch("monthlyPostsTarget")
+  const weeklyPosterGoalVal = form.watch("weeklyPosterGoal")
+  const weeklyReelGoalVal = form.watch("weeklyReelGoal")
 
-  const reels = toNumber(monthlyReels) ?? 0;
-  const posts = toNumber(monthlyPosts) ?? 0;
-  const suggestedGoal = Math.round((reels + posts) / 4);
+  const reels = toNumber(monthlyReels) ?? 0
+  const posts = toNumber(monthlyPosts) ?? 0
+  const suggestedGoal = Math.round((reels + posts) / 4)
 
-  const wPosterGoal = toNumber(weeklyPosterGoalVal) ?? 0;
-  const wReelGoal = toNumber(weeklyReelGoalVal) ?? 0;
-  const totalWeeklyGoal = wPosterGoal + wReelGoal;
+  const wPosterGoal = toNumber(weeklyPosterGoalVal) ?? 0
+  const wReelGoal = toNumber(weeklyReelGoalVal) ?? 0
+  const totalWeeklyGoal = wPosterGoal + wReelGoal
 
   useEffect(() => {
     if (open) {
       if (client) {
         form.reset({
-          name: client.name || '',
-          slug: client.slug || '',
-          instagramHandle: client.instagramHandle || '',
-          brandColor: client.brandColor || '',
-          monthlyReelsTarget: client.monthlyReelsTarget !== undefined ? client.monthlyReelsTarget.toString() : '',
-          monthlyPostsTarget: client.monthlyPostsTarget !== undefined ? client.monthlyPostsTarget.toString() : '',
-          weeklyPosterGoal: client.weeklyPosterGoal !== undefined ? client.weeklyPosterGoal.toString() : '',
-          weeklyReelGoal: client.weeklyReelGoal !== undefined ? client.weeklyReelGoal.toString() : '',
-          contractStartDate: client.contractStartDate ? new Date(client.contractStartDate).toISOString().split('T')[0] : '',
-          contractEndDate: client.contractEndDate ? new Date(client.contractEndDate).toISOString().split('T')[0] : '',
-        });
+          name: client.name || "",
+          slug: client.slug || "",
+          instagramHandle: client.instagramHandle || "",
+          brandColor: client.brandColor || "",
+          monthlyReelsTarget:
+            client.monthlyReelsTarget !== undefined
+              ? client.monthlyReelsTarget.toString()
+              : "",
+          monthlyPostsTarget:
+            client.monthlyPostsTarget !== undefined
+              ? client.monthlyPostsTarget.toString()
+              : "",
+          weeklyPosterGoal:
+            client.weeklyPosterGoal !== undefined
+              ? client.weeklyPosterGoal.toString()
+              : "",
+          weeklyReelGoal:
+            client.weeklyReelGoal !== undefined
+              ? client.weeklyReelGoal.toString()
+              : "",
+          contractStartDate: client.contractStartDate
+            ? new Date(client.contractStartDate).toISOString().split("T")[0]
+            : "",
+          contractEndDate: client.contractEndDate
+            ? new Date(client.contractEndDate).toISOString().split("T")[0]
+            : "",
+        })
       } else {
         form.reset({
-          name: '',
-          slug: '',
-          instagramHandle: '',
-          brandColor: '',
-          monthlyReelsTarget: '',
-          monthlyPostsTarget: '',
-          weeklyPosterGoal: '',
-          weeklyReelGoal: '',
-          contractStartDate: '',
-          contractEndDate: '',
-        });
+          name: "",
+          slug: "",
+          instagramHandle: "",
+          brandColor: "",
+          monthlyReelsTarget: "",
+          monthlyPostsTarget: "",
+          weeklyPosterGoal: "",
+          weeklyReelGoal: "",
+          contractStartDate: "",
+          contractEndDate: "",
+        })
       }
-      setApiError(null);
+      setApiError(null)
     }
-  }, [client, open, form]);
+  }, [client, open, form])
 
   const handleSubmit = form.handleSubmit(
     async (values) => {
-      console.info('[client-form] submit values', values);
-      setApiError(null);
+      console.info("[client-form] submit values", values)
+      setApiError(null)
       const payload = {
         name: values.name.trim(),
         slug: values.slug.trim(),
@@ -150,54 +177,59 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
         weeklyReelGoal: toNumber(values.weeklyReelGoal),
         contractStartDate: values.contractStartDate || undefined,
         contractEndDate: values.contractEndDate || undefined,
-      };
-      console.info('[client-form] api request', payload);
+      }
+      console.info("[client-form] api request", payload)
 
       try {
-        let saved: Client;
+        let saved: Client
         if (isEditMode && client) {
-          saved = await clientsApi.update(client.id, payload);
+          saved = await clientsApi.update(client.id, payload)
           toast({
-            title: 'Client updated',
+            title: "Client updated",
             description: `${saved.name} changes have been saved.`,
-          });
+          })
         } else {
-          saved = await clientsApi.create(payload);
+          saved = await clientsApi.create(payload)
           toast({
-            title: 'Client created',
+            title: "Client created",
             description: `${saved.name} is ready to go.`,
-          });
+          })
         }
-        clearApiClientCache();
-        router.refresh();
-        onSaved?.(saved);
-        setOpen(false);
+        clearApiClientCache()
+        router.refresh()
+        onSaved?.(saved)
+        setOpen(false)
       } catch (error) {
-        const actionLabel = isEditMode ? 'update' : 'create';
-        const message = error instanceof Error ? error.message : `Failed to ${actionLabel} client`;
-        console.error('[client-form] api error', { error });
-        setApiError(message);
+        const actionLabel = isEditMode ? "update" : "create"
+        const message =
+          error instanceof Error
+            ? error.message
+            : `Failed to ${actionLabel} client`
+        console.error("[client-form] api error", { error })
+        setApiError(message)
         toast({
           title: `Unable to ${actionLabel} client`,
           description: message,
-          variant: 'destructive',
-        });
+          variant: "destructive",
+        })
       }
     },
     (errors) => {
-      console.warn('[client-form] validation errors', errors);
-      setApiError('Please fix the highlighted fields.');
-    }
-  );
+      console.warn("[client-form] validation errors", errors)
+      setApiError("Please fix the highlighted fields.")
+    },
+  )
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="w-[95vw] max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Client' : 'Add Client'}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Client" : "Add Client"}</DialogTitle>
           <DialogDescription>
-            {isEditMode ? 'Modify client details and configuration.' : 'Enter the core client details to get started.'}
+            {isEditMode
+              ? "Modify client details and configuration."
+              : "Enter the core client details to get started."}
           </DialogDescription>
         </DialogHeader>
 
@@ -230,7 +262,11 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
                 <FormItem>
                   <FormLabel>Slug</FormLabel>
                   <FormControl>
-                    <Input placeholder="client-name" {...field} disabled={isEditMode} />
+                    <Input
+                      placeholder="client-name"
+                      {...field}
+                      disabled={isEditMode}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -351,10 +387,13 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
                         <button
                           type="button"
                           onClick={() => {
-                            const sugReels = Math.round(reels / 4);
-                            const sugPosters = Math.round(posts / 4);
-                            form.setValue('weeklyReelGoal', sugReels.toString());
-                            form.setValue('weeklyPosterGoal', sugPosters.toString());
+                            const sugReels = Math.round(reels / 4)
+                            const sugPosters = Math.round(posts / 4)
+                            form.setValue("weeklyReelGoal", sugReels.toString())
+                            form.setValue(
+                              "weeklyPosterGoal",
+                              sugPosters.toString(),
+                            )
                           }}
                           className="text-[11px] text-[var(--color-accent)] hover:underline"
                         >
@@ -382,16 +421,24 @@ export function ClientFormDialog({ trigger, client, onSaved }: ClientFormDialogP
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Client'}
+                {form.formState.isSubmitting
+                  ? "Saving..."
+                  : isEditMode
+                    ? "Save Changes"
+                    : "Create Client"}
               </Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

@@ -1,5 +1,5 @@
-import { webcrypto } from 'node:crypto';
+import { webcrypto } from "node:crypto"
 
-if (typeof globalThis.crypto === 'undefined') {
-  (globalThis as any).crypto = webcrypto;
+if (typeof globalThis.crypto === "undefined") {
+  ;(globalThis as any).crypto = webcrypto
 }

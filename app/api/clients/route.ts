@@ -1,24 +1,30 @@
-import { NextResponse } from 'next/server';
-import { createClient, getClients } from '@/services/clients-service';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+import { NextResponse } from "next/server"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { createClient, getClients } from "@/services/clients-service"
 
 export async function GET() {
   try {
-    const clients = await getClients();
-    const response = NextResponse.json({ data: clients });
-    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
-    return response;
+    const clients = await getClients()
+    const response = NextResponse.json({ data: clients })
+    response.headers.set(
+      "Cache-Control",
+      "public, max-age=30, stale-while-revalidate=60",
+    )
+    return response
   } catch (error) {
-    logProductionRuntimeError('api-clients-get', error);
-    return NextResponse.json({ data: [] });
+    logProductionRuntimeError("api-clients-get", error)
+    return NextResponse.json({ data: [] })
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json()
     if (!body?.name || !body?.slug) {
-      return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Name and slug are required" },
+        { status: 400 },
+      )
     }
     const client = await createClient({
       name: body.name,
@@ -33,11 +39,12 @@ export async function POST(request: Request) {
       weeklyReelGoal: body.weeklyReelGoal,
       contractStartDate: body.contractStartDate,
       contractEndDate: body.contractEndDate,
-    });
-    return NextResponse.json({ data: client }, { status: 201 });
+    })
+    return NextResponse.json({ data: client }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create client';
-    logProductionRuntimeError('api-clients-post', error);
-    return NextResponse.json({ error: message }, { status: 400 });
+    const message =
+      error instanceof Error ? error.message : "Failed to create client"
+    logProductionRuntimeError("api-clients-post", error)
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

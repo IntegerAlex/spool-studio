@@ -1,49 +1,54 @@
- 'use client';
+"use client"
 
-import type { AssetRevision, User } from '@/types/index';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { usersApi } from '@/lib/api-client';
-import { useEffect, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { AssetPreviewModal } from '@/components/assets/asset-preview-modal';
-import { toAssetPreviewDescriptor, type AssetPreviewDescriptor } from '@/lib/asset-preview';
+import { AlertCircle } from "lucide-react"
+import { useEffect, useState } from "react"
+import { AssetPreviewModal } from "@/components/assets/asset-preview-modal"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { usersApi } from "@/lib/api-client"
+import {
+  type AssetPreviewDescriptor,
+  toAssetPreviewDescriptor,
+} from "@/lib/asset-preview"
+import type { AssetRevision, User } from "@/types/index"
 
-type RevisionRecord = AssetRevision;
+type RevisionRecord = AssetRevision
 
 interface RevisionPanelProps {
-  revisions: RevisionRecord[];
-  assetTitle: string;
+  revisions: RevisionRecord[]
+  assetTitle: string
 }
 
 export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
-  const [users, setUsers] = useState<Map<string, User>>(new Map());
-  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [users, setUsers] = useState<Map<string, User>>(new Map())
+  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(
+    null,
+  )
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   useEffect(() => {
-    let isActive = true;
+    let isActive = true
 
     const loadUsers = async () => {
       try {
-        const allUsers = await usersApi.getAll();
-        const userMap = new Map(allUsers.map((u) => [u.id, u]));
+        const allUsers = await usersApi.getAll()
+        const userMap = new Map(allUsers.map((u) => [u.id, u]))
         if (isActive) {
-          setUsers(userMap);
+          setUsers(userMap)
         }
       } catch {
         if (isActive) {
-          setUsers(new Map());
+          setUsers(new Map())
         }
       }
-    };
+    }
 
-    void loadUsers();
+    void loadUsers()
 
     return () => {
-      isActive = false;
-    };
-  }, []);
+      isActive = false
+    }
+  }, [])
 
   if (revisions.length === 0) {
     return (
@@ -53,29 +58,33 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
           <p className="text-muted-foreground">No revisions yet</p>
         </div>
       </Card>
-    );
+    )
   }
 
   const getUser = (userId: string) => {
-    return users.get(userId) || {
-      id: userId,
-      name: 'Unknown',
-      email: 'unknown@example.com',
-      role: 'designer' as const,
-      createdAt: new Date(),
-    };
-  };
+    return (
+      users.get(userId) || {
+        id: userId,
+        name: "Unknown",
+        email: "unknown@example.com",
+        role: "designer" as const,
+        createdAt: new Date(),
+      }
+    )
+  }
 
   return (
     <Card className="p-6 border border-border space-y-4">
-      <h3 className="text-lg font-semibold text-foreground">Revision History</h3>
+      <h3 className="text-lg font-semibold text-foreground">
+        Revision History
+      </h3>
 
       <div className="space-y-4">
         {revisions.map((revision, index) => {
-          const authorId = revision.uploadedBy ?? 'unknown';
-          const author = getUser(authorId);
-          const versionLabel = revision.versionNumber ?? index + 1;
-          const revisionNote = revision.changeNote ?? 'Revision upload';
+          const authorId = revision.uploadedBy ?? "unknown"
+          const author = getUser(authorId)
+          const versionLabel = revision.versionNumber ?? index + 1
+          const revisionNote = revision.changeNote ?? "Revision upload"
           const previewDescriptor = toAssetPreviewDescriptor({
             title: `${assetTitle} v${versionLabel}`,
             mimeType: revision.mimeType,
@@ -83,7 +92,7 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
             driveFileUrl: revision.driveFileUrl,
             fileSize: revision.fileSize,
             durationSeconds: revision.durationSeconds,
-          });
+          })
           return (
             <div
               key={revision.id}
@@ -110,22 +119,26 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    setPreviewItem(previewDescriptor);
-                    setIsPreviewOpen(true);
+                    setPreviewItem(previewDescriptor)
+                    setIsPreviewOpen(true)
                   }}
                 >
                   Preview
                 </Button>
                 {revision.driveFileUrl ? (
                   <Button asChild size="sm">
-                    <a href={revision.driveFileUrl} target="_blank" rel="noreferrer">
+                    <a
+                      href={revision.driveFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       Open Revision
                     </a>
                   </Button>
                 ) : null}
               </div>
             </div>
-          );
+          )
         })}
       </div>
 
@@ -133,13 +146,13 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
         item={previewItem}
         open={isPreviewOpen && Boolean(previewItem)}
         onOpenChange={(open) => {
-          setIsPreviewOpen(open);
+          setIsPreviewOpen(open)
           if (!open) {
-            setPreviewItem(null);
+            setPreviewItem(null)
           }
         }}
         description={`Preview revision history for ${assetTitle}`}
       />
     </Card>
-  );
+  )
 }

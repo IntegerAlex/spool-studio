@@ -1,94 +1,98 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import type { Database } from '@/types/database';
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import type { Database } from "@/types/database"
 
-export type DbClientReference = Database['public']['Tables']['client_references']['Row'];
+export type DbClientReference =
+  Database["public"]["Tables"]["client_references"]["Row"]
 
 async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient());
+  return client ?? (await createServerSupabaseClient())
 }
 
 export async function listClientReferencesByClientId(
   clientId: string,
-  client?: any
+  client?: any,
 ): Promise<DbClientReference[]> {
-  const supabase = await getClient(client);
+  const supabase = await getClient(client)
   const { data, error } = await supabase
-    .from('client_references')
-    .select('id,client_id,title,url,description,type,created_at,updated_at')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false });
+    .from("client_references")
+    .select("id,client_id,title,url,description,type,created_at,updated_at")
+    .eq("client_id", clientId)
+    .order("created_at", { ascending: false })
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message)
   }
 
-  return data ?? [];
+  return data ?? []
 }
 
 export async function getClientReferenceById(
   referenceId: string,
-  client?: any
+  client?: any,
 ): Promise<DbClientReference | null> {
-  const supabase = await getClient(client);
+  const supabase = await getClient(client)
   const { data, error } = await supabase
-    .from('client_references')
-    .select('id,client_id,title,url,description,type,created_at,updated_at')
-    .eq('id', referenceId)
-    .maybeSingle();
+    .from("client_references")
+    .select("id,client_id,title,url,description,type,created_at,updated_at")
+    .eq("id", referenceId)
+    .maybeSingle()
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message)
   }
 
-  return data ?? null;
+  return data ?? null
 }
 
 export async function insertClientReference(
-  payload: Database['public']['Tables']['client_references']['Insert'],
-  client?: any
+  payload: Database["public"]["Tables"]["client_references"]["Insert"],
+  client?: any,
 ): Promise<DbClientReference> {
-  const supabase = await getClient(client);
+  const supabase = await getClient(client)
   const { data, error } = await supabase
-    .from('client_references')
+    .from("client_references")
     .insert(payload)
-    .select('id,client_id,title,url,description,type,created_at,updated_at')
-    .single();
+    .select("id,client_id,title,url,description,type,created_at,updated_at")
+    .single()
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message)
   }
 
-  return data;
+  return data
 }
 
 export async function updateClientReference(
   referenceId: string,
-  updates: Database['public']['Tables']['client_references']['Update'],
-  client?: any
+  updates: Database["public"]["Tables"]["client_references"]["Update"],
+  client?: any,
 ): Promise<DbClientReference> {
-  const supabase = await getClient(client);
+  const supabase = await getClient(client)
   const { data, error } = await supabase
-    .from('client_references')
+    .from("client_references")
     .update(updates)
-    .eq('id', referenceId)
-    .select('id,client_id,title,url,description,type,created_at,updated_at')
-    .single();
+    .eq("id", referenceId)
+    .select("id,client_id,title,url,description,type,created_at,updated_at")
+    .single()
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message)
   }
 
-  return data;
+  return data
 }
 
 export async function deleteClientReference(
   referenceId: string,
-  client?: any
+  client?: any,
 ): Promise<void> {
-  const supabase = await getClient(client);
-  const { error } = await supabase.from('client_references').delete().eq('id', referenceId);
+  const supabase = await getClient(client)
+  const { error } = await supabase
+    .from("client_references")
+    .delete()
+    .eq("id", referenceId)
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message)
   }
 }

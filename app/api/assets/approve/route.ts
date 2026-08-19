@@ -1,28 +1,30 @@
-import { NextResponse } from 'next/server';
-
-import { approveAsset } from '@/services/assets-service';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import { getCurrentUser } from '@/lib/auth';
+import { NextResponse } from "next/server"
+import { getCurrentUser } from "@/lib/auth"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { approveAsset } from "@/services/assets-service"
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const body = (await request.json()) as { assetId?: string };
-    const assetId = body.assetId?.trim();
+    const body = (await request.json()) as { assetId?: string }
+    const assetId = body.assetId?.trim()
     if (!assetId) {
-      return NextResponse.json({ error: 'assetId is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "assetId is required" },
+        { status: 400 },
+      )
     }
 
-    const updated = await approveAsset(assetId, user.id);
+    const updated = await approveAsset(assetId, user.id)
 
-    return NextResponse.json({ data: updated });
+    return NextResponse.json({ data: updated })
   } catch (error) {
-    logProductionRuntimeError('api-assets-approve', error);
-    const message = error instanceof Error ? error.message : 'Approval failed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    logProductionRuntimeError("api-assets-approve", error)
+    const message = error instanceof Error ? error.message : "Approval failed"
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 }

@@ -1,75 +1,85 @@
-'use client';
+"use client"
 
-import { useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { Menu, Bell } from 'lucide-react';
-import type { AuthUser } from '@/lib/auth';
-import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cn } from '@/lib/utils';
+import { Bell, Menu } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import type { ReactNode } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { Header } from "@/components/layout/header"
+import { Sidebar } from "@/components/layout/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import type { AuthUser } from "@/lib/auth"
+import { cn } from "@/lib/utils"
 
 interface DashboardShellProps {
-  title: string;
-  children: ReactNode;
+  title: string
+  children: ReactNode
 }
 
 function getRouteTitle(pathname: string, fallback: string): string {
-  if (pathname === '/dashboard' || pathname === '/dashboard/') return 'Dashboard';
-  if (pathname.startsWith('/dashboard/assets/')) return 'Asset Details';
-  if (pathname.startsWith('/dashboard/assets')) return 'Assets';
-  if (pathname.startsWith('/dashboard/clients')) return 'Clients';
-  if (pathname.startsWith('/dashboard/approvals')) return 'Approvals';
-  if (pathname.startsWith('/dashboard/kanban')) return 'Kanban';
-  if (pathname.startsWith('/dashboard/queue')) return 'Upload Queue';
-  if (pathname.startsWith('/dashboard/calendar')) return 'Calendar';
-  if (pathname.startsWith('/dashboard/settings')) return 'Settings';
-  return fallback;
+  if (pathname === "/dashboard" || pathname === "/dashboard/")
+    return "Dashboard"
+  if (pathname.startsWith("/dashboard/assets/")) return "Asset Details"
+  if (pathname.startsWith("/dashboard/assets")) return "Assets"
+  if (pathname.startsWith("/dashboard/clients")) return "Clients"
+  if (pathname.startsWith("/dashboard/approvals")) return "Approvals"
+  if (pathname.startsWith("/dashboard/kanban")) return "Kanban"
+  if (pathname.startsWith("/dashboard/queue")) return "Upload Queue"
+  if (pathname.startsWith("/dashboard/calendar")) return "Calendar"
+  if (pathname.startsWith("/dashboard/settings")) return "Settings"
+  return fallback
 }
 
 export function DashboardShell({ title, children }: DashboardShellProps) {
-  const pathname = usePathname();
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const pathname = usePathname()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [user, setUser] = useState<AuthUser | null>(null)
 
   useEffect(() => {
-    let isActive = true;
+    const isActive = true
 
     const loadUser = async () => {
       try {
-        const res = await fetch('/api/auth/me');
+        const res = await fetch("/api/auth/me")
         if (res.ok && isActive) {
-          const data = await res.json();
-          setUser(data.user ?? data ?? null);
+          const data = await res.json()
+          setUser(data.user ?? data ?? null)
         } else if (isActive) {
-          setUser(null);
+          setUser(null)
         }
       } catch {
-        if (isActive) setUser(null);
+        if (isActive) setUser(null)
       }
-    };
+    }
 
-    void loadUser();
-  }, []);
+    void loadUser()
+  }, [])
 
-  const displayName = user?.name || user?.email || 'User';
-  const avatarUrl = user?.avatarUrl;
+  const displayName = user?.name || user?.email || "User"
+  const avatarUrl = user?.avatarUrl
   const initials = useMemo(() => {
-    return displayName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part: string) => part[0]?.toUpperCase())
-      .join('')
-      .slice(0, 2) || 'CO';
-  }, [displayName]);
+    return (
+      displayName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part: string) => part[0]?.toUpperCase())
+        .join("")
+        .slice(0, 2) || "CO"
+    )
+  }, [displayName])
 
-  const routeTitle = getRouteTitle(pathname, title);
+  const routeTitle = getRouteTitle(pathname, title)
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[var(--background)] text-foreground">
@@ -92,7 +102,11 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
           </Link>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
+            >
               <Bell className="h-[18px] w-[18px]" />
             </Button>
 
@@ -105,17 +119,32 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
 
             <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
+                >
                   <Menu className="h-[18px] w-[18px]" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[88vw] max-w-sm border-r border-[rgba(255,255,255,0.08)] bg-[var(--sidebar)] p-0 text-white">
+              <SheetContent
+                side="left"
+                className="w-[88vw] max-w-sm border-r border-[rgba(255,255,255,0.08)] bg-[var(--sidebar)] p-0 text-white"
+              >
                 <SheetHeader className="border-b border-[rgba(255,255,255,0.06)] px-4 py-4">
-                  <SheetTitle className="text-left text-[15px] text-white">Dashboard navigation</SheetTitle>
-                  <SheetDescription className="text-left text-[#a1a1aa]">Jump between sections and manage your workspace.</SheetDescription>
+                  <SheetTitle className="text-left text-[15px] text-white">
+                    Dashboard navigation
+                  </SheetTitle>
+                  <SheetDescription className="text-left text-[#a1a1aa]">
+                    Jump between sections and manage your workspace.
+                  </SheetDescription>
                 </SheetHeader>
                 <div className="h-[calc(100%-5rem)] overflow-y-auto">
-                  <Sidebar variant="drawer" onNavigate={() => setMobileNavOpen(false)} user={user} />
+                  <Sidebar
+                    variant="drawer"
+                    onNavigate={() => setMobileNavOpen(false)}
+                    user={user}
+                  />
                 </div>
               </SheetContent>
             </Sheet>
@@ -124,12 +153,16 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
 
         <Header title={routeTitle} className="hidden lg:flex" user={user} />
 
-        <main className={cn('flex-1 w-full max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:pt-20')}> 
+        <main
+          className={cn(
+            "flex-1 w-full max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:pt-20",
+          )}
+        >
           <div className="mx-auto w-full max-w-[1900px] lg:w-[90%] min-w-0">
             {children}
           </div>
         </main>
       </div>
     </div>
-  );
+  )
 }

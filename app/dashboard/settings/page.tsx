@@ -1,62 +1,73 @@
-'use client';
+"use client"
 
-import { useEffect, useState } from 'react';
-import { Breadcrumb } from '@/components/layout/breadcrumb';
-import ErrorBoundary from '@/components/ui/error-boundary';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import { workspaceApi, usersApi } from '@/lib/api-client';
-import { Workspace, User } from '@/types/index';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Bell, CalendarCheck, Lock, Palette, Save, Users, Sparkles, Eye, EyeOff } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { toast } from '@/hooks/use-toast';
+import {
+  Bell,
+  CalendarCheck,
+  Eye,
+  EyeOff,
+  Lock,
+  Palette,
+  Save,
+  Sparkles,
+  Users,
+} from "lucide-react"
+import { useEffect, useState } from "react"
+import { Breadcrumb } from "@/components/layout/breadcrumb"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import ErrorBoundary from "@/components/ui/error-boundary"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "@/hooks/use-toast"
+import { usersApi, workspaceApi } from "@/lib/api-client"
+import { cn } from "@/lib/utils"
+import type { User, Workspace } from "@/types/index"
 
 const sections = [
   {
-    id: 'workspace',
-    label: 'Workspace',
-    description: 'Branding and identity',
+    id: "workspace",
+    label: "Workspace",
+    description: "Branding and identity",
     icon: Palette,
   },
   {
-    id: 'integrations',
-    label: 'Integrations',
-    description: 'Connected services',
+    id: "integrations",
+    label: "Integrations",
+    description: "Connected services",
     icon: CalendarCheck,
   },
   {
-    id: 'team',
-    label: 'Team',
-    description: 'People and access',
+    id: "team",
+    label: "Team",
+    description: "People and access",
     icon: Users,
   },
   {
-    id: 'notifications',
-    label: 'Notifications',
-    description: 'Delivery preferences',
+    id: "notifications",
+    label: "Notifications",
+    description: "Delivery preferences",
     icon: Bell,
   },
   {
-    id: 'security',
-    label: 'Security',
-    description: 'Passwords and account risk',
+    id: "security",
+    label: "Security",
+    description: "Passwords and account risk",
     icon: Lock,
   },
-] as const;
+] as const
 
 export default function SettingsPage() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [teamMembers, setTeamMembers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [activeSection, setActiveSection] = useState<(typeof sections)[number]['id']>('workspace');
+  const [workspace, setWorkspace] = useState<Workspace | null>(null)
+  const [teamMembers, setTeamMembers] = useState<User[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [workspaceName, setWorkspaceName] = useState("")
+  const [activeSection, setActiveSection] =
+    useState<(typeof sections)[number]["id"]>("workspace")
 
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   useEffect(() => {
     const loadData = async () => {
@@ -64,38 +75,44 @@ export default function SettingsPage() {
         const [workspaceData, usersData] = await Promise.all([
           workspaceApi.get(),
           usersApi.getAll(),
-        ]);
-        setWorkspace(workspaceData);
-        setWorkspaceName(workspaceData.name);
-        setTeamMembers(usersData);
+        ])
+        setWorkspace(workspaceData)
+        setWorkspaceName(workspaceData.name)
+        setTeamMembers(usersData)
       } catch (err) {
-        console.error('[settings] failed to load data', err);
+        console.error("[settings] failed to load data", err)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadData();
-  }, []);
-
-
+    loadData()
+  }, [])
 
   const handleSaveWorkspace = async () => {
     if (workspace) {
-      const updated = await workspaceApi.update({ name: workspaceName });
-      setWorkspace(updated);
-      setWorkspaceName(updated.name);
+      const updated = await workspaceApi.update({ name: workspaceName })
+      setWorkspace(updated)
+      setWorkspaceName(updated.name)
     }
-  };
+  }
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Settings" },
+          ]}
+        />
         <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
           <Card className="space-y-2 p-2">
             {sections.map((section) => (
-              <div key={section.id} className="flex h-11 items-center gap-3 rounded-[8px] px-3">
+              <div
+                key={section.id}
+                className="flex h-11 items-center gap-3 rounded-[8px] px-3"
+              >
                 <Skeleton className="size-7 rounded-full" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-3 w-20" />
@@ -111,15 +128,24 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-    );
+    )
   }
 
-  const activeMeta = sections.find((section) => section.id === activeSection) ?? sections[0];
+  const activeMeta =
+    sections.find((section) => section.id === activeSection) ?? sections[0]
 
   return (
     <ErrorBoundary>
-      <div className="space-y-6 settings-page-container" style={{ backgroundColor: 'var(--color-bg-app)', minHeight: '100vh', margin: '-24px', padding: '32px' }}>
-      <style>{`
+      <div
+        className="space-y-6 settings-page-container"
+        style={{
+          backgroundColor: "var(--color-bg-app)",
+          minHeight: "100vh",
+          margin: "-24px",
+          padding: "32px",
+        }}
+      >
+        <style>{`
         .settings-page-container {
           background-color: var(--color-bg-app);
           max-width: none !important;
@@ -320,295 +346,451 @@ export default function SettingsPage() {
         }
       `}</style>
 
-      <Breadcrumb items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]} />
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Settings" },
+          ]}
+        />
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        {/* Navigation Sidebar */}
-        <aside className="settings-nav-card">
-          <div className="mb-2 flex items-center gap-2 rounded-[8px] px-3 py-2">
-            <Sparkles className="size-4 text-[#3ecf8e]" />
-            <div>
-              <p className="text-[12.5px] font-semibold text-white">Settings</p>
-              <p className="text-[10px] text-[var(--color-text-muted)]">Workspace controls</p>
-            </div>
-          </div>
-
-          <nav className="space-y-1">
-            {sections.map((section) => {
-              const Icon = section.icon;
-              const isActive = activeSection === section.id;
-
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => setActiveSection(section.id)}
-                  className={cn("settings-nav-item", isActive && "active")}
-                >
-                  <Icon className={cn("size-4 shrink-0", isActive ? 'text-[#3ecf8e]' : 'text-[var(--color-text-muted)]')} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13px] font-semibold leading-none">{section.label}</span>
-                    <span className="block text-[10px] text-inherit/70 mt-1">{section.description}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-        </aside>
-
-        {/* Content Section */}
-        <main className="min-w-0 space-y-6">
-          <Card className="content-card">
-            <div className="content-card-header">
+        <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+          {/* Navigation Sidebar */}
+          <aside className="settings-nav-card">
+            <div className="mb-2 flex items-center gap-2 rounded-[8px] px-3 py-2">
+              <Sparkles className="size-4 text-[#3ecf8e]" />
               <div>
-                <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-faint)]">{activeMeta.label}</p>
-                <h3 className="content-card-title mt-1">
-                  {activeSection === 'workspace' && 'Workspace identity'}
-                  {activeSection === 'integrations' && 'Connected services'}
-                  {activeSection === 'team' && 'Team access'}
-                  {activeSection === 'notifications' && 'Notification routing'}
-                  {activeSection === 'security' && 'Security controls'}
-                </h3>
+                <p className="text-[12.5px] font-semibold text-white">
+                  Settings
+                </p>
+                <p className="text-[10px] text-[var(--color-text-muted)]">
+                  Workspace controls
+                </p>
               </div>
-
-              {activeSection === 'workspace' && (
-                <Button className="submit-btn" onClick={handleSaveWorkspace}>
-                  <Save className="mr-2 size-4" />
-                  Save changes
-                </Button>
-              )}
-
-
-
-              {activeSection === 'team' && (
-                <Button className="submit-btn" onClick={() => {
-                  toast({ title: 'Invite feature coming soon', description: 'You can add team members directly from the Clients page.' });
-                }}>
-                  Invite member
-                </Button>
-              )}
-
-              {activeSection === 'notifications' && (
-                <Button className="submit-btn" onClick={() => {
-                  toast({ title: 'Preferences saved', description: 'Notification preferences have been updated.' });
-                }}>
-                  Save preferences
-                </Button>
-              )}
-
-              {activeSection === 'security' && (
-                <Button className="submit-btn" onClick={() => {
-                  toast({ title: 'Password updated', description: '' });
-                }}>
-                  Update password
-                </Button>
-              )}
             </div>
-          </Card>
 
-          {/* Section Body Contents */}
-          {activeSection === 'workspace' && (
+            <nav className="space-y-1">
+              {sections.map((section) => {
+                const Icon = section.icon
+                const isActive = activeSection === section.id
+
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
+                    className={cn("settings-nav-item", isActive && "active")}
+                  >
+                    <Icon
+                      className={cn(
+                        "size-4 shrink-0",
+                        isActive
+                          ? "text-[#3ecf8e]"
+                          : "text-[var(--color-text-muted)]",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[13px] font-semibold leading-none">
+                        {section.label}
+                      </span>
+                      <span className="block text-[10px] text-inherit/70 mt-1">
+                        {section.description}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
+          </aside>
+
+          {/* Content Section */}
+          <main className="min-w-0 space-y-6">
             <Card className="content-card">
               <div className="content-card-header">
                 <div>
-                  <h4 className="content-card-title">Workspace details</h4>
-                  <p className="content-card-description">These values shape the workspace identity everywhere in the app.</p>
-                </div>
-              </div>
-
-              <div className="content-card-body space-y-4">
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white">Workspace name</p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">The primary organization name</p>
-                  </div>
-                  <Input
-                    value={workspaceName}
-                    onChange={(e) => setWorkspaceName(e.target.value)}
-                    className="field-input w-full max-w-full md:max-w-[260px]"
-                    placeholder="Your workspace name"
-                  />
+                  <p className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-faint)]">
+                    {activeMeta.label}
+                  </p>
+                  <h3 className="content-card-title mt-1">
+                    {activeSection === "workspace" && "Workspace identity"}
+                    {activeSection === "integrations" && "Connected services"}
+                    {activeSection === "team" && "Team access"}
+                    {activeSection === "notifications" &&
+                      "Notification routing"}
+                    {activeSection === "security" && "Security controls"}
+                  </h3>
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white">Workspace ID</p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">Read-only organization token identifier</p>
-                  </div>
-                  <Input
-                    value={workspace?.id || ''}
-                    disabled
-                    className="field-input w-full max-w-full md:max-w-[260px]"
-                  />
-                </div>
+                {activeSection === "workspace" && (
+                  <Button className="submit-btn" onClick={handleSaveWorkspace}>
+                    <Save className="mr-2 size-4" />
+                    Save changes
+                  </Button>
+                )}
+
+                {activeSection === "team" && (
+                  <Button
+                    className="submit-btn"
+                    onClick={() => {
+                      toast({
+                        title: "Invite feature coming soon",
+                        description:
+                          "You can add team members directly from the Clients page.",
+                      })
+                    }}
+                  >
+                    Invite member
+                  </Button>
+                )}
+
+                {activeSection === "notifications" && (
+                  <Button
+                    className="submit-btn"
+                    onClick={() => {
+                      toast({
+                        title: "Preferences saved",
+                        description:
+                          "Notification preferences have been updated.",
+                      })
+                    }}
+                  >
+                    Save preferences
+                  </Button>
+                )}
+
+                {activeSection === "security" && (
+                  <Button
+                    className="submit-btn"
+                    onClick={() => {
+                      toast({ title: "Password updated", description: "" })
+                    }}
+                  >
+                    Update password
+                  </Button>
+                )}
               </div>
             </Card>
-          )}
 
-
-
-          {activeSection === 'team' && (
-            <Card className="content-card">
-              <div className="content-card-header">
-                <div>
-                  <h4 className="content-card-title">Team members</h4>
-                  <p className="content-card-description">Review access and keep workspace collaborators aligned.</p>
+            {/* Section Body Contents */}
+            {activeSection === "workspace" && (
+              <Card className="content-card">
+                <div className="content-card-header">
+                  <div>
+                    <h4 className="content-card-title">Workspace details</h4>
+                    <p className="content-card-description">
+                      These values shape the workspace identity everywhere in
+                      the app.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="content-card-body space-y-3">
-                {teamMembers.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-3 md:min-h-11 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <Avatar className="size-9 border border-[var(--color-border)]">
-                        <AvatarImage src={member.avatar} alt={member.name} />
-                        <AvatarFallback className="bg-[var(--color-bg-overlay)] text-white text-[12px]">{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate text-[13.5px] font-semibold text-white">{member.name}</p>
-                        <p className="truncate text-[11.5px] text-[var(--color-text-muted)] mt-0.5">{member.email}</p>
+                <div className="content-card-body space-y-4">
+                  <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-white">
+                        Workspace name
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        The primary organization name
+                      </p>
+                    </div>
+                    <Input
+                      value={workspaceName}
+                      onChange={(e) => setWorkspaceName(e.target.value)}
+                      className="field-input w-full max-w-full md:max-w-[260px]"
+                      placeholder="Your workspace name"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-white">
+                        Workspace ID
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Read-only organization token identifier
+                      </p>
+                    </div>
+                    <Input
+                      value={workspace?.id || ""}
+                      disabled
+                      className="field-input w-full max-w-full md:max-w-[260px]"
+                    />
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {activeSection === "team" && (
+              <Card className="content-card">
+                <div className="content-card-header">
+                  <div>
+                    <h4 className="content-card-title">Team members</h4>
+                    <p className="content-card-description">
+                      Review access and keep workspace collaborators aligned.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="content-card-body space-y-3">
+                  {teamMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-3 md:min-h-11 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar className="size-9 border border-[var(--color-border)]">
+                          <AvatarImage src={member.avatar} alt={member.name} />
+                          <AvatarFallback className="bg-[var(--color-bg-overlay)] text-white text-[12px]">
+                            {member.name.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-[13.5px] font-semibold text-white">
+                            {member.name}
+                          </p>
+                          <p className="truncate text-[11.5px] text-[var(--color-text-muted)] mt-0.5">
+                            {member.email}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-overlay)] px-2.5 py-0.5 text-[11px] capitalize text-[var(--color-text-secondary)]">
+                          {member.role}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[12px] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]"
+                        >
+                          Manage
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-bg-overlay)] px-2.5 py-0.5 text-[11px] capitalize text-[var(--color-text-secondary)]">
-                        {member.role}
-                      </span>
-                      <Button variant="outline" size="sm" className="h-7 text-[12px] border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-hover)]">
-                        Manage
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {activeSection === "notifications" && (
+              <Card className="content-card">
+                <div className="content-card-header">
+                  <div>
+                    <h4 className="content-card-title">
+                      Notification preferences
+                    </h4>
+                    <p className="content-card-description">
+                      Choose which lifecycle events surface in your inbox and
+                      workspace alerts.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="content-card-body space-y-3">
+                  {[
+                    {
+                      id: "approvals",
+                      label: "Asset approvals",
+                      description:
+                        "Get notified when assets are ready for review",
+                    },
+                    {
+                      id: "revisions",
+                      label: "Revision requests",
+                      description: "Get notified when revisions are requested",
+                    },
+                    {
+                      id: "uploads",
+                      label: "Upload confirmations",
+                      description: "Get notified when assets are uploaded",
+                    },
+                    {
+                      id: "comments",
+                      label: "New comments",
+                      description: "Get notified about comments on your assets",
+                    },
+                  ].map((pref) => (
+                    <div
+                      key={pref.id}
+                      className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[var(--color-border)] px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-[13px] font-semibold text-white">
+                          {pref.label}
+                        </p>
+                        <p className="text-[11.5px] text-[var(--color-text-muted)] mt-0.5">
+                          {pref.description}
+                        </p>
+                      </div>
+
+                      <label className="toggle-switch">
+                        <input
+                          type="checkbox"
+                          defaultChecked
+                          className="toggle-input"
+                        />
+                        <span className="toggle-track">
+                          <span className="toggle-thumb" />
+                        </span>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {activeSection === "security" && (
+              <Card className="content-card">
+                <div className="content-card-header">
+                  <div>
+                    <h4 className="content-card-title">Password management</h4>
+                    <p className="content-card-description">
+                      Update your credentials and keep the workspace locked
+                      down.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="content-card-body space-y-4">
+                  <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-white">
+                        Current password
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Required before changing password
+                      </p>
+                    </div>
+                    <div className="relative w-full max-w-full md:max-w-[260px]">
+                      <Input
+                        type={showCurrentPassword ? "text" : "password"}
+                        placeholder="Enter current password"
+                        className="field-input w-full pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowCurrentPassword(!showCurrentPassword)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                        aria-label={
+                          showCurrentPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        {showCurrentPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-white">
+                        New password
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Use a long, unique password
+                      </p>
+                    </div>
+                    <div className="relative w-full max-w-full md:max-w-[260px]">
+                      <Input
+                        type={showNewPassword ? "text" : "password"}
+                        placeholder="Enter new password"
+                        className="field-input w-full pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                        aria-label={
+                          showNewPassword ? "Hide password" : "Show password"
+                        }
+                      >
+                        {showNewPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-white">
+                        Confirm password
+                      </p>
+                      <p className="text-[11px] text-[var(--color-text-muted)]">
+                        Re-enter new password exactly
+                      </p>
+                    </div>
+                    <div className="relative w-full max-w-full md:max-w-[260px]">
+                      <Input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirm new password"
+                        className="field-input w-full pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
+                        aria-label={
+                          showConfirmPassword
+                            ? "Hide password"
+                            : "Show password"
+                        }
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="danger-zone">
+                    <div className="danger-zone-header flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-[13px] font-semibold text-[#fca5a5]">
+                          Danger zone
+                        </p>
+                        <p className="text-[11px] text-[#f87171]/80 mt-0.5">
+                          Deleting the account removes organization history.
+                        </p>
+                      </div>
+                      <Button
+                        className="danger-btn"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Are you sure you want to delete your account? This action cannot be undone.",
+                            )
+                          ) {
+                            toast({
+                              title: "Account deletion request submitted",
+                              description:
+                                "An administrator will process your request.",
+                            })
+                          }
+                        }}
+                      >
+                        Delete account
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {activeSection === 'notifications' && (
-            <Card className="content-card">
-              <div className="content-card-header">
-                <div>
-                  <h4 className="content-card-title">Notification preferences</h4>
-                  <p className="content-card-description">Choose which lifecycle events surface in your inbox and workspace alerts.</p>
                 </div>
-              </div>
-
-              <div className="content-card-body space-y-3">
-                {[
-                  { id: 'approvals', label: 'Asset approvals', description: 'Get notified when assets are ready for review' },
-                  { id: 'revisions', label: 'Revision requests', description: 'Get notified when revisions are requested' },
-                  { id: 'uploads', label: 'Upload confirmations', description: 'Get notified when assets are uploaded' },
-                  { id: 'comments', label: 'New comments', description: 'Get notified about comments on your assets' },
-                ].map((pref) => (
-                  <div key={pref.id} className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[var(--color-border)] px-4 py-3">
-                    <div>
-                      <p className="text-[13px] font-semibold text-white">{pref.label}</p>
-                      <p className="text-[11.5px] text-[var(--color-text-muted)] mt-0.5">{pref.description}</p>
-                    </div>
-                    
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        defaultChecked
-                        className="toggle-input"
-                      />
-                      <span className="toggle-track">
-                        <span className="toggle-thumb" />
-                      </span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {activeSection === 'security' && (
-            <Card className="content-card">
-              <div className="content-card-header">
-                <div>
-                  <h4 className="content-card-title">Password management</h4>
-                  <p className="content-card-description">Update your credentials and keep the workspace locked down.</p>
-                </div>
-              </div>
-
-              <div className="content-card-body space-y-4">
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white">Current password</p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">Required before changing password</p>
-                  </div>
-                  <div className="relative w-full max-w-full md:max-w-[260px]">
-                    <Input type={showCurrentPassword ? "text" : "password"} placeholder="Enter current password" className="field-input w-full pr-10" />
-                    <button
-                      type="button"
-                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
-                      aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white">New password</p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">Use a long, unique password</p>
-                  </div>
-                  <div className="relative w-full max-w-full md:max-w-[260px]">
-                    <Input type={showNewPassword ? "text" : "password"} placeholder="Enter new password" className="field-input w-full pr-10" />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
-                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 rounded-[10px] border border-[var(--color-border)] px-4 py-4 md:min-h-11 md:flex-row md:items-center md:justify-between md:py-0">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-white">Confirm password</p>
-                    <p className="text-[11px] text-[var(--color-text-muted)]">Re-enter new password exactly</p>
-                  </div>
-                  <div className="relative w-full max-w-full md:max-w-[260px]">
-                    <Input type={showConfirmPassword ? "text" : "password"} placeholder="Confirm new password" className="field-input w-full pr-10" />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] hover:text-white"
-                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="danger-zone">
-                  <div className="danger-zone-header flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-[13px] font-semibold text-[#fca5a5]">Danger zone</p>
-                      <p className="text-[11px] text-[#f87171]/80 mt-0.5">Deleting the account removes organization history.</p>
-                    </div>
-                    <Button className="danger-btn" onClick={() => {
-                      if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
-                        toast({ title: 'Account deletion request submitted', description: 'An administrator will process your request.' });
-                      }
-                    }}>
-                      Delete account
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          )}
-        </main>
-      </div>
+              </Card>
+            )}
+          </main>
+        </div>
       </div>
     </ErrorBoundary>
-  );
+  )
 }

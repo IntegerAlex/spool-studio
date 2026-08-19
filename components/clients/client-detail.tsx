@@ -1,13 +1,35 @@
-'use client';
+"use client"
 
-import { useEffect, useMemo, useState } from 'react';
-import { Client, Asset, ClientReference, ClientReferenceType, User } from '@/types/index';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Brush,
+  CheckCircle2,
+  Clapperboard,
+  Clock3,
+  Copy,
+  FolderOpen as DriveFolderIcon,
+  Edit2,
+  ExternalLink,
+  Globe,
+  Instagram,
+  LayoutGrid,
+  Link2,
+  Megaphone,
+  Pin,
+  Plus,
+  Shield,
+  Trash2,
+  Users,
+  Youtube,
+} from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { AssetCard } from "@/components/assets/asset-card"
+import { ClientFormDialog } from "@/components/clients/client-form-dialog"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -15,77 +37,146 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { usersApi, clientReferencesApi, authApi, clientsApi, clearApiClientCache } from '@/lib/api-client';
-import { Copy, Edit2, ExternalLink, FolderOpen, LayoutGrid, CheckCircle2, Clock3, Users, Plus, Trash2, Link2, Instagram, Globe, Youtube, Pin, FolderOpen as DriveFolderIcon, Brush, Clapperboard, Megaphone, Shield } from 'lucide-react';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { AssetCard } from '@/components/assets/asset-card';
-import { cn } from '@/lib/utils';
-import { ClientFormDialog } from '@/components/clients/client-form-dialog';
-import { ClientReport } from './client-report';
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
+import {
+  authApi,
+  clearApiClientCache,
+  clientReferencesApi,
+  clientsApi,
+  usersApi,
+} from "@/lib/api-client"
+import { cn } from "@/lib/utils"
+import type {
+  Asset,
+  Client,
+  ClientReference,
+  ClientReferenceType,
+  User,
+} from "@/types/index"
+import { ClientReport } from "./client-report"
 
 interface ClientDetailProps {
-  client: Client;
-  assets: Asset[];
+  client: Client
+  assets: Asset[]
 }
 
 type ReferenceFormState = {
-  title: string;
-  url: string;
-  description: string;
-  type: ClientReferenceType;
-};
+  title: string
+  url: string
+  description: string
+  type: ClientReferenceType
+}
 
 const referenceTypes: Array<{
-  value: ClientReferenceType;
-  label: string;
-  icon: typeof Link2;
-  toneClassName: string;
+  value: ClientReferenceType
+  label: string
+  icon: typeof Link2
+  toneClassName: string
 }> = [
-  { value: 'instagram', label: 'Instagram', icon: Instagram, toneClassName: 'text-pink-300' },
-  { value: 'website', label: 'Website', icon: Globe, toneClassName: 'text-sky-300' },
-  { value: 'youtube', label: 'YouTube', icon: Youtube, toneClassName: 'text-red-300' },
-  { value: 'pinterest', label: 'Pinterest', icon: Pin, toneClassName: 'text-rose-300' },
-  { value: 'drive_folder', label: 'Drive Folder', icon: DriveFolderIcon, toneClassName: 'text-amber-300' },
-  { value: 'competitor', label: 'Competitor', icon: Shield, toneClassName: 'text-orange-300' },
-  { value: 'branding', label: 'Branding', icon: Brush, toneClassName: 'text-emerald-300' },
-  { value: 'reel_reference', label: 'Reel Reference', icon: Clapperboard, toneClassName: 'text-violet-300' },
-  { value: 'ad_reference', label: 'Ad Reference', icon: Megaphone, toneClassName: 'text-emerald-300' },
-  { value: 'other', label: 'Other', icon: Link2, toneClassName: 'text-slate-300' },
-];
+  {
+    value: "instagram",
+    label: "Instagram",
+    icon: Instagram,
+    toneClassName: "text-pink-300",
+  },
+  {
+    value: "website",
+    label: "Website",
+    icon: Globe,
+    toneClassName: "text-sky-300",
+  },
+  {
+    value: "youtube",
+    label: "YouTube",
+    icon: Youtube,
+    toneClassName: "text-red-300",
+  },
+  {
+    value: "pinterest",
+    label: "Pinterest",
+    icon: Pin,
+    toneClassName: "text-rose-300",
+  },
+  {
+    value: "drive_folder",
+    label: "Drive Folder",
+    icon: DriveFolderIcon,
+    toneClassName: "text-amber-300",
+  },
+  {
+    value: "competitor",
+    label: "Competitor",
+    icon: Shield,
+    toneClassName: "text-orange-300",
+  },
+  {
+    value: "branding",
+    label: "Branding",
+    icon: Brush,
+    toneClassName: "text-emerald-300",
+  },
+  {
+    value: "reel_reference",
+    label: "Reel Reference",
+    icon: Clapperboard,
+    toneClassName: "text-violet-300",
+  },
+  {
+    value: "ad_reference",
+    label: "Ad Reference",
+    icon: Megaphone,
+    toneClassName: "text-emerald-300",
+  },
+  {
+    value: "other",
+    label: "Other",
+    icon: Link2,
+    toneClassName: "text-slate-300",
+  },
+]
 
 function getReferenceTypeMeta(type: ClientReferenceType) {
-  return referenceTypes.find((item) => item.value === type) ?? referenceTypes[referenceTypes.length - 1];
+  return (
+    referenceTypes.find((item) => item.value === type) ??
+    referenceTypes[referenceTypes.length - 1]
+  )
 }
 
 function isValidReferenceUrl(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) return false;
+  const trimmed = value.trim()
+  if (!trimmed) return false
 
   try {
-    const parsed = new URL(trimmed);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    const parsed = new URL(trimmed)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
   } catch {
-    return false;
+    return false
   }
 }
 
 function formatReferenceUrl(value: string): string {
   try {
-    return new URL(value).toString();
+    return new URL(value).toString()
   } catch {
-    return value;
+    return value
   }
 }
 
 function getReferenceHost(reference: ClientReference): string {
   try {
-    return new URL(reference.url).hostname.replace(/^www\./, '');
+    return new URL(reference.url).hostname.replace(/^www\./, "")
   } catch {
-    return reference.url;
+    return reference.url
   }
 }
 
@@ -96,48 +187,51 @@ function ReferenceEditorDialog({
   onOpenChange,
   onSaved,
 }: {
-  clientId: string;
-  reference: ClientReference | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSaved: (reference: ClientReference) => Promise<void> | void;
+  clientId: string
+  reference: ClientReference | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSaved: (reference: ClientReference) => Promise<void> | void
 }) {
-  const { toast } = useToast();
+  const { toast } = useToast()
   const [form, setForm] = useState<ReferenceFormState>({
-    title: '',
-    url: '',
-    description: '',
-    type: 'other',
-  });
-  const [isSaving, setIsSaving] = useState(false);
+    title: "",
+    url: "",
+    description: "",
+    type: "other",
+  })
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (reference) {
       setForm({
         title: reference.title,
         url: reference.url,
-        description: reference.description ?? '',
+        description: reference.description ?? "",
         type: reference.type,
-      });
-      return;
+      })
+      return
     }
 
-    setForm({ title: '', url: '', description: '', type: 'other' });
-  }, [reference, open]);
+    setForm({ title: "", url: "", description: "", type: "other" })
+  }, [reference])
 
-  const title = reference ? 'Edit Reference' : 'Add Reference';
+  const title = reference ? "Edit Reference" : "Add Reference"
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+    event.preventDefault()
 
     if (!form.title.trim()) {
-      toast({ title: 'Title is required', variant: 'destructive' });
-      return;
+      toast({ title: "Title is required", variant: "destructive" })
+      return
     }
 
     if (!isValidReferenceUrl(form.url)) {
-      toast({ title: 'Enter a valid http or https URL', variant: 'destructive' });
-      return;
+      toast({
+        title: "Enter a valid http or https URL",
+        variant: "destructive",
+      })
+      return
     }
 
     const values = {
@@ -145,35 +239,53 @@ function ReferenceEditorDialog({
       url: form.url,
       description: form.description,
       type: form.type,
-    };
+    }
 
-    setIsSaving(true);
+    setIsSaving(true)
     try {
       if (reference) {
-        console.info('[references][update]', { clientId, referenceId: reference.id });
-        const savedReference = await clientReferencesApi.update(clientId, reference.id, values);
-        toast({ title: 'Reference updated' });
-        await onSaved(savedReference);
+        console.info("[references][update]", {
+          clientId,
+          referenceId: reference.id,
+        })
+        const savedReference = await clientReferencesApi.update(
+          clientId,
+          reference.id,
+          values,
+        )
+        toast({ title: "Reference updated" })
+        await onSaved(savedReference)
       } else {
-        console.info('[references][create]', { clientId });
-        const savedReference = await clientReferencesApi.create(clientId, values);
-        toast({ title: 'Reference added' });
-        await onSaved(savedReference);
+        console.info("[references][create]", { clientId })
+        const savedReference = await clientReferencesApi.create(
+          clientId,
+          values,
+        )
+        toast({ title: "Reference added" })
+        await onSaved(savedReference)
       }
 
-      onOpenChange(false);
+      onOpenChange(false)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to save reference';
-      console.error(reference ? '[references][update]' : '[references][create]', {
-        clientId,
-        message,
-        stack: error instanceof Error ? error.stack : null,
-      });
-      toast({ title: 'Unable to save reference', description: message, variant: 'destructive' });
+      const message =
+        error instanceof Error ? error.message : "Failed to save reference"
+      console.error(
+        reference ? "[references][update]" : "[references][create]",
+        {
+          clientId,
+          message,
+          stack: error instanceof Error ? error.stack : null,
+        },
+      )
+      toast({
+        title: "Unable to save reference",
+        description: message,
+        variant: "destructive",
+      })
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -182,16 +294,21 @@ function ReferenceEditorDialog({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Save inspiration, brand, social, and reference links for this client.
+              Save inspiration, brand, social, and reference links for this
+              client.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-[13px] font-medium text-white">Title</label>
+              <label className="text-[13px] font-medium text-white">
+                Title
+              </label>
               <Input
                 value={form.title}
-                onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, title: event.target.value }))
+                }
                 placeholder="Homepage redesign inspiration"
               />
             </div>
@@ -200,27 +317,43 @@ function ReferenceEditorDialog({
               <label className="text-[13px] font-medium text-white">URL</label>
               <Input
                 value={form.url}
-                onChange={(event) => setForm((prev) => ({ ...prev, url: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, url: event.target.value }))
+                }
                 placeholder="https://..."
               />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
               <div className="space-y-2">
-                <label className="text-[13px] font-medium text-white">Notes</label>
+                <label className="text-[13px] font-medium text-white">
+                  Notes
+                </label>
                 <Textarea
                   value={form.description}
-                  onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      description: event.target.value,
+                    }))
+                  }
                   placeholder="What should the team look for here?"
                   className="min-h-24"
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[13px] font-medium text-white">Type</label>
+                <label className="text-[13px] font-medium text-white">
+                  Type
+                </label>
                 <Select
                   value={form.type}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, type: value as ClientReferenceType }))}
+                  onValueChange={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      type: value as ClientReferenceType,
+                    }))
+                  }
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select type" />
@@ -238,211 +371,252 @@ function ReferenceEditorDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving} className="bg-[var(--primary)] hover:bg-[#4f46e5]">
-              {isSaving ? 'Saving...' : 'Save Reference'}
+            <Button
+              type="submit"
+              disabled={isSaving}
+              className="bg-[var(--primary)] hover:bg-[#4f46e5]"
+            >
+              {isSaving ? "Saving..." : "Save Reference"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 interface ClientDetailProps {
-  client: Client;
-  assets: Asset[];
+  client: Client
+  assets: Asset[]
 }
 
-export function ClientDetail({ client: initialClient, assets }: ClientDetailProps) {
-  const [client, setClient] = useState<Client>(initialClient);
-  const [activeTab, setActiveTab] = useState<'overview' | 'assets' | 'reports'>('overview');
+export function ClientDetail({
+  client: initialClient,
+  assets,
+}: ClientDetailProps) {
+  const [client, setClient] = useState<Client>(initialClient)
+  const [activeTab, setActiveTab] = useState<"overview" | "assets" | "reports">(
+    "overview",
+  )
 
   useEffect(() => {
-    setClient(initialClient);
-  }, [initialClient]);
-  const [team, setTeam] = useState<User[]>([]);
-  const [references, setReferences] = useState<ClientReference[]>([]);
-  const [referencesLoading, setReferencesLoading] = useState(true);
-  const [isReferenceDialogOpen, setIsReferenceDialogOpen] = useState(false);
-  const [editingReference, setEditingReference] = useState<ClientReference | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const router = useRouter();
-  const { toast } = useToast();
+    setClient(initialClient)
+  }, [initialClient])
+  const [team, setTeam] = useState<User[]>([])
+  const [references, setReferences] = useState<ClientReference[]>([])
+  const [referencesLoading, setReferencesLoading] = useState(true)
+  const [isReferenceDialogOpen, setIsReferenceDialogOpen] = useState(false)
+  const [editingReference, setEditingReference] =
+    useState<ClientReference | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const router = useRouter()
+  const { toast } = useToast()
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const user = await authApi.getCurrentUser();
-        setCurrentUser(user);
+        const user = await authApi.getCurrentUser()
+        setCurrentUser(user)
       } catch (err) {
-        console.error('Failed to get current user', err);
+        console.error("Failed to get current user", err)
       }
-    };
-    fetchUser();
-  }, []);
+    }
+    fetchUser()
+  }, [])
 
   useEffect(() => {
-    let isActive = true;
+    let isActive = true
 
     const loadTeam = async () => {
       try {
-        const allUsers = await usersApi.getAll();
-        const teamUsers = allUsers.filter((u) => client.assignedTeamMembers.includes(u.id));
+        const allUsers = await usersApi.getAll()
+        const teamUsers = allUsers.filter((u) =>
+          client.assignedTeamMembers.includes(u.id),
+        )
         if (isActive) {
-          setTeam(teamUsers);
+          setTeam(teamUsers)
         }
       } catch {
         if (isActive) {
-          setTeam([]);
+          setTeam([])
         }
       }
-    };
+    }
 
-    void loadTeam();
+    void loadTeam()
 
     return () => {
-      isActive = false;
-    };
-  }, [client.assignedTeamMembers]);
+      isActive = false
+    }
+  }, [client.assignedTeamMembers])
 
   useEffect(() => {
-    let isActive = true;
+    let isActive = true
 
     const loadReferences = async () => {
-      setReferencesLoading(true);
-      console.info('[references][fetch]', { clientId: client.id });
+      setReferencesLoading(true)
+      console.info("[references][fetch]", { clientId: client.id })
       try {
-        const clientReferences = await clientReferencesApi.getByClientId(client.id);
-        console.info('[references][fetch]', { clientId: client.id, count: clientReferences.length });
+        const clientReferences = await clientReferencesApi.getByClientId(
+          client.id,
+        )
+        console.info("[references][fetch]", {
+          clientId: client.id,
+          count: clientReferences.length,
+        })
         if (isActive) {
-          setReferences(clientReferences);
+          setReferences(clientReferences)
         }
       } catch (error) {
-        console.error('[references][fetch]', { clientId: client.id, error });
+        console.error("[references][fetch]", { clientId: client.id, error })
         if (isActive) {
-          setReferences([]);
+          setReferences([])
         }
       } finally {
         if (isActive) {
-          setReferencesLoading(false);
+          setReferencesLoading(false)
         }
       }
-    };
+    }
 
-    void loadReferences();
+    void loadReferences()
 
     return () => {
-      isActive = false;
-    };
-  }, [client.id]);
+      isActive = false
+    }
+  }, [client.id])
 
   // Monthly targets & completions
-  const monthlyPostsTarget = client.monthlyPostsTarget ?? 0;
-  const completedPosters = client.completedPosters ?? 0;
-  const monthlyReelsTarget = client.monthlyReelsTarget ?? 0;
-  const completedReels = client.completedReels ?? 0;
+  const monthlyPostsTarget = client.monthlyPostsTarget ?? 0
+  const completedPosters = client.completedPosters ?? 0
+  const monthlyReelsTarget = client.monthlyReelsTarget ?? 0
+  const completedReels = client.completedReels ?? 0
 
-  const monthlyTarget = monthlyPostsTarget + monthlyReelsTarget;
-  const monthlyCompleted = completedPosters + completedReels;
-  const monthlyRemaining = Math.max(0, monthlyTarget - monthlyCompleted);
-  const monthlyProgressPct = monthlyTarget > 0 ? Math.round((monthlyCompleted / monthlyTarget) * 100) : 0;
+  const monthlyTarget = monthlyPostsTarget + monthlyReelsTarget
+  const monthlyCompleted = completedPosters + completedReels
+  const monthlyRemaining = Math.max(0, monthlyTarget - monthlyCompleted)
+  const monthlyProgressPct =
+    monthlyTarget > 0 ? Math.round((monthlyCompleted / monthlyTarget) * 100) : 0
 
-  const monthlyPosterProgress = monthlyPostsTarget > 0 ? (completedPosters / monthlyPostsTarget) * 100 : 0;
-  const monthlyReelProgress = monthlyReelsTarget > 0 ? (completedReels / monthlyReelsTarget) * 100 : 0;
+  const monthlyPosterProgress =
+    monthlyPostsTarget > 0 ? (completedPosters / monthlyPostsTarget) * 100 : 0
+  const monthlyReelProgress =
+    monthlyReelsTarget > 0 ? (completedReels / monthlyReelsTarget) * 100 : 0
 
   // Weekly targets & completions
-  const weeklyPosterGoal = client.weeklyPosterGoal ?? 0;
-  const weeklyCompletedPosters = client.weeklyCompletedPosters ?? 0;
-  const weeklyReelGoal = client.weeklyReelGoal ?? 0;
-  const weeklyCompletedReels = client.weeklyCompletedReels ?? 0;
+  const weeklyPosterGoal = client.weeklyPosterGoal ?? 0
+  const weeklyCompletedPosters = client.weeklyCompletedPosters ?? 0
+  const weeklyReelGoal = client.weeklyReelGoal ?? 0
+  const weeklyCompletedReels = client.weeklyCompletedReels ?? 0
 
-  const weeklyGoal = client.weeklyGoal ?? (weeklyPosterGoal + weeklyReelGoal);
-  const weeklyCompleted = client.weeklyCompleted ?? (weeklyCompletedPosters + weeklyCompletedReels);
-  const weeklyRemaining = Math.max(0, weeklyGoal - weeklyCompleted);
+  const weeklyGoal = client.weeklyGoal ?? weeklyPosterGoal + weeklyReelGoal
+  const weeklyCompleted =
+    client.weeklyCompleted ?? weeklyCompletedPosters + weeklyCompletedReels
+  const weeklyRemaining = Math.max(0, weeklyGoal - weeklyCompleted)
 
-  const weeklyPosterProgress = weeklyPosterGoal > 0 ? (weeklyCompletedPosters / weeklyPosterGoal) * 100 : 0;
-  const weeklyReelProgress = weeklyReelGoal > 0 ? (weeklyCompletedReels / weeklyReelGoal) * 100 : 0;
+  const weeklyPosterProgress =
+    weeklyPosterGoal > 0 ? (weeklyCompletedPosters / weeklyPosterGoal) * 100 : 0
+  const weeklyReelProgress =
+    weeklyReelGoal > 0 ? (weeklyCompletedReels / weeklyReelGoal) * 100 : 0
 
-  const progress = monthlyProgressPct;
-  const pendingDeliverables = monthlyRemaining;
+  const _progress = monthlyProgressPct
+  const pendingDeliverables = monthlyRemaining
 
   // Status Indicator
-  let statusLabel = 'On Track';
-  let statusColorClass = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+  let statusLabel = "On Track"
+  let statusColorClass =
+    "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
   if (monthlyProgressPct < 70) {
-    statusLabel = 'Behind';
-    statusColorClass = 'bg-red-500/10 text-red-400 border border-red-500/20';
+    statusLabel = "Behind"
+    statusColorClass = "bg-red-500/10 text-red-400 border border-red-500/20"
   } else if (monthlyProgressPct < 90) {
-    statusLabel = 'Attention';
-    statusColorClass = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+    statusLabel = "Attention"
+    statusColorClass =
+      "bg-amber-500/10 text-amber-400 border border-amber-500/20"
   }
 
   const sortedReferences = useMemo(
-    () => [...references].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()),
-    [references]
-  );
+    () =>
+      [...references].sort(
+        (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+      ),
+    [references],
+  )
 
   const handleCopyReferenceLink = async (reference: ClientReference) => {
     try {
-      await navigator.clipboard.writeText(reference.url);
-      toast({ title: 'Link copied' });
+      await navigator.clipboard.writeText(reference.url)
+      toast({ title: "Link copied" })
     } catch {
-      toast({ title: 'Unable to copy link', variant: 'destructive' });
+      toast({ title: "Unable to copy link", variant: "destructive" })
     }
-  };
+  }
 
   const handleDeleteReference = async (reference: ClientReference) => {
     try {
-      console.info('[references][delete]', { clientId: client.id, referenceId: reference.id });
-      await clientReferencesApi.delete(client.id, reference.id);
-      toast({ title: 'Reference deleted' });
-      setReferences((prev) => prev.filter((item) => item.id !== reference.id));
-      clearApiClientCache();
-      router.refresh();
+      console.info("[references][delete]", {
+        clientId: client.id,
+        referenceId: reference.id,
+      })
+      await clientReferencesApi.delete(client.id, reference.id)
+      toast({ title: "Reference deleted" })
+      setReferences((prev) => prev.filter((item) => item.id !== reference.id))
+      clearApiClientCache()
+      router.refresh()
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete reference';
-      toast({ title: 'Unable to delete reference', description: message, variant: 'destructive' });
+      const message =
+        error instanceof Error ? error.message : "Failed to delete reference"
+      toast({
+        title: "Unable to delete reference",
+        description: message,
+        variant: "destructive",
+      })
     }
-  };
+  }
 
   const statCards = [
     {
-      title: 'Total Assets',
+      title: "Total Assets",
       value: assets.length,
       icon: <LayoutGrid className="h-5 w-5 text-emerald-400" />,
-      iconBg: 'bg-[rgba(99,102,241,0.12)]',
+      iconBg: "bg-[rgba(99,102,241,0.12)]",
     },
     {
-      title: 'Completed',
+      title: "Completed",
       value: client.completedDeliverables,
       icon: <CheckCircle2 className="h-5 w-5 text-[#10b981]" />,
-      iconBg: 'bg-[rgba(16,185,129,0.12)]',
+      iconBg: "bg-[rgba(16,185,129,0.12)]",
     },
     {
-      title: 'Remaining Target',
+      title: "Remaining Target",
       value: pendingDeliverables,
       icon: <Clock3 className="h-5 w-5 text-[#f59e0b]" />,
-      iconBg: 'bg-[rgba(245,158,11,0.12)]',
+      iconBg: "bg-[rgba(245,158,11,0.12)]",
     },
     {
-      title: 'Team Size',
+      title: "Team Size",
       value: team.length,
       icon: <Users className="h-5 w-5 text-[#3b82f6]" />,
-      iconBg: 'bg-[rgba(59,130,246,0.12)]',
+      iconBg: "bg-[rgba(59,130,246,0.12)]",
     },
-  ] as const;
+  ] as const
 
-  const clientInitials = client.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('') || 'CL';
+  const clientInitials =
+    client.name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "CL"
 
   return (
     <div className="space-y-6">
@@ -453,13 +627,17 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
               {clientInitials}
             </div>
             <div>
-              <h1 className="text-[22px] font-semibold leading-tight text-white">{client.name}</h1>
-              <p className="text-[13px] text-[#71717a]">{client.instagramHandle}</p>
+              <h1 className="text-[22px] font-semibold leading-tight text-white">
+                {client.name}
+              </h1>
+              <p className="text-[13px] text-[#71717a]">
+                {client.instagramHandle}
+              </p>
             </div>
           </div>
           {client.instagramHandle ? (
             <a
-              href={`https://instagram.com/${client.instagramHandle.replace('@', '')}`}
+              href={`https://instagram.com/${client.instagramHandle.replace("@", "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-[13px] text-[var(--primary)] hover:text-emerald-300"
@@ -482,7 +660,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
             }
           />
 
-          {(currentUser?.role === 'admin' || true) && (
+          {(currentUser?.role === "admin" || true) && (
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(true)}
@@ -497,13 +675,25 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {statCards.map((card) => (
-          <Card key={card.title} className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] px-5 py-4 shadow-none">
+          <Card
+            key={card.title}
+            className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] px-5 py-4 shadow-none"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">{card.title}</p>
-                <p className="mt-2 text-[24px] font-medium leading-none text-white sm:text-[28px]">{card.value}</p>
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">
+                  {card.title}
+                </p>
+                <p className="mt-2 text-[24px] font-medium leading-none text-white sm:text-[28px]">
+                  {card.value}
+                </p>
               </div>
-              <div className={cn('flex h-8 w-8 items-center justify-center rounded-md', card.iconBg)}>
+              <div
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-md",
+                  card.iconBg,
+                )}
+              >
                 {card.icon}
               </div>
             </div>
@@ -514,56 +704,69 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
       {/* Navigation tabs */}
       <div className="flex border-b border-[rgba(255,255,255,0.08)] gap-1 mb-2">
         <button
-          onClick={() => setActiveTab('overview')}
+          onClick={() => setActiveTab("overview")}
           className={cn(
             "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all cursor-pointer",
-            activeTab === 'overview'
+            activeTab === "overview"
               ? "border-[var(--primary)] text-white font-semibold"
-              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]"
+              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]",
           )}
         >
           Overview
         </button>
         <button
-          onClick={() => setActiveTab('assets')}
+          onClick={() => setActiveTab("assets")}
           className={cn(
             "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all cursor-pointer",
-            activeTab === 'assets'
+            activeTab === "assets"
               ? "border-[var(--primary)] text-white font-semibold"
-              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]"
+              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]",
           )}
         >
           Assets
         </button>
         <button
-          onClick={() => setActiveTab('reports')}
+          onClick={() => setActiveTab("reports")}
           className={cn(
             "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all cursor-pointer",
-            activeTab === 'reports'
+            activeTab === "reports"
               ? "border-[var(--primary)] text-white font-semibold"
-              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]"
+              : "border-transparent text-[#71717a] hover:text-[#a1a1aa]",
           )}
         >
           Reports
         </button>
       </div>
 
-      {activeTab === 'overview' && (
+      {activeTab === "overview" && (
         <>
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none xl:col-span-2">
               <div className="flex items-center justify-between gap-4 border-b border-[rgba(255,255,255,0.05)] pb-4 mb-4">
                 <div>
-                  <h2 className="text-[13px] font-medium text-white">Delivery Progress</h2>
-                  <p className="mt-1 text-[12px] text-[#71717a]">Weekly & Monthly targets at a glance.</p>
+                  <h2 className="text-[13px] font-medium text-white">
+                    Delivery Progress
+                  </h2>
+                  <p className="mt-1 text-[12px] text-[#71717a]">
+                    Weekly & Monthly targets at a glance.
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={cn('text-[10px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 uppercase tracking-wider', statusColorClass)}>
+                  <span
+                    className={cn(
+                      "text-[10px] font-semibold px-2.5 py-0.5 rounded-full shrink-0 uppercase tracking-wider",
+                      statusColorClass,
+                    )}
+                  >
                     {statusLabel}
                   </span>
                   <div className="text-right">
-                    <span className="text-[18px] font-medium text-white">{monthlyProgressPct}%</span>
-                    <span className="text-[11px] text-[#71717a] ml-1">Complete</span>
+                    <span className="text-[18px] font-medium text-white">
+                      {monthlyProgressPct}%
+                    </span>
+                    <span className="text-[11px] text-[#71717a] ml-1">
+                      Complete
+                    </span>
                   </div>
                 </div>
               </div>
@@ -572,8 +775,10 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                 {/* Monthly Targets Section */}
                 <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
                   <div>
-                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Monthly Targets</h3>
-                    
+                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">
+                      Monthly Targets
+                    </h3>
+
                     {monthlyTarget === 0 ? (
                       <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
                         ⚠️ Goals Not Configured
@@ -584,10 +789,17 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                         <div className="space-y-1">
                           <div className="flex justify-between text-[11px] font-medium">
                             <span className="text-[#a1a1aa]">Posters</span>
-                            <span className="text-white font-mono">{completedPosters} / {monthlyPostsTarget}</span>
+                            <span className="text-white font-mono">
+                              {completedPosters} / {monthlyPostsTarget}
+                            </span>
                           </div>
                           <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                            <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyPosterProgress)}%` }} />
+                            <div
+                              className="h-full bg-[#3b82f6] rounded-full transition-all duration-150"
+                              style={{
+                                width: `${Math.min(100, monthlyPosterProgress)}%`,
+                              }}
+                            />
                           </div>
                         </div>
 
@@ -595,10 +807,17 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                         <div className="space-y-1">
                           <div className="flex justify-between text-[11px] font-medium">
                             <span className="text-[#a1a1aa]">Reels</span>
-                            <span className="text-white font-mono">{completedReels} / {monthlyReelsTarget}</span>
+                            <span className="text-white font-mono">
+                              {completedReels} / {monthlyReelsTarget}
+                            </span>
                           </div>
                           <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                            <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, monthlyReelProgress)}%` }} />
+                            <div
+                              className="h-full bg-[#ec4899] rounded-full transition-all duration-150"
+                              style={{
+                                width: `${Math.min(100, monthlyReelProgress)}%`,
+                              }}
+                            />
                           </div>
                         </div>
                       </div>
@@ -608,16 +827,28 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                   {/* Monthly KPI Summary */}
                   <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
                     <div>
-                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Target</p>
-                      <p className="text-xs font-semibold text-white mt-0.5">{monthlyTarget}</p>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">
+                        Target
+                      </p>
+                      <p className="text-xs font-semibold text-white mt-0.5">
+                        {monthlyTarget}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
-                      <p className="text-xs font-semibold text-[#10b981] mt-0.5">{monthlyCompleted}</p>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">
+                        Completed
+                      </p>
+                      <p className="text-xs font-semibold text-[#10b981] mt-0.5">
+                        {monthlyCompleted}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
-                      <p className="text-xs font-semibold text-white mt-0.5">{monthlyRemaining}</p>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">
+                        Remaining
+                      </p>
+                      <p className="text-xs font-semibold text-white mt-0.5">
+                        {monthlyRemaining}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -625,8 +856,10 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                 {/* Weekly Targets Section */}
                 <div className="rounded-[10px] border border-[rgba(255,255,255,0.05)] bg-[#1a1a1a] p-4 flex flex-col justify-between space-y-4">
                   <div>
-                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">Weekly Targets</h3>
-                    
+                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-white mb-3">
+                      Weekly Targets
+                    </h3>
+
                     {weeklyGoal === 0 ? (
                       <div className="py-6 text-center text-[12px] text-[#71717a] border border-dashed border-[rgba(255,255,255,0.08)] rounded-md">
                         ⚠️ Goals Not Configured
@@ -637,10 +870,17 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                         <div className="space-y-1">
                           <div className="flex justify-between text-[11px] font-medium">
                             <span className="text-[#a1a1aa]">Posters</span>
-                            <span className="text-white font-mono">{weeklyCompletedPosters} / {weeklyPosterGoal}</span>
+                            <span className="text-white font-mono">
+                              {weeklyCompletedPosters} / {weeklyPosterGoal}
+                            </span>
                           </div>
                           <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                            <div className="h-full bg-[#3b82f6] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyPosterProgress)}%` }} />
+                            <div
+                              className="h-full bg-[#3b82f6] rounded-full transition-all duration-150"
+                              style={{
+                                width: `${Math.min(100, weeklyPosterProgress)}%`,
+                              }}
+                            />
                           </div>
                         </div>
 
@@ -648,10 +888,17 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                         <div className="space-y-1">
                           <div className="flex justify-between text-[11px] font-medium">
                             <span className="text-[#a1a1aa]">Reels</span>
-                            <span className="text-white font-mono">{weeklyCompletedReels} / {weeklyReelGoal}</span>
+                            <span className="text-white font-mono">
+                              {weeklyCompletedReels} / {weeklyReelGoal}
+                            </span>
                           </div>
                           <div className="h-1 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                            <div className="h-full bg-[#ec4899] rounded-full transition-all duration-150" style={{ width: `${Math.min(100, weeklyReelProgress)}%` }} />
+                            <div
+                              className="h-full bg-[#ec4899] rounded-full transition-all duration-150"
+                              style={{
+                                width: `${Math.min(100, weeklyReelProgress)}%`,
+                              }}
+                            />
                           </div>
                         </div>
                       </div>
@@ -661,16 +908,28 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                   {/* Weekly KPI Summary */}
                   <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[rgba(255,255,255,0.05)] text-center">
                     <div>
-                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Goal</p>
-                      <p className="text-xs font-semibold text-white mt-0.5">{weeklyGoal}</p>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">
+                        Goal
+                      </p>
+                      <p className="text-xs font-semibold text-white mt-0.5">
+                        {weeklyGoal}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Completed</p>
-                      <p className="text-xs font-semibold text-[#10b981] mt-0.5">{weeklyCompleted}</p>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">
+                        Completed
+                      </p>
+                      <p className="text-xs font-semibold text-[#10b981] mt-0.5">
+                        {weeklyCompleted}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">Remaining</p>
-                      <p className="text-xs font-semibold text-white mt-0.5">{weeklyRemaining}</p>
+                      <p className="text-[9px] text-[#71717a] uppercase tracking-wider">
+                        Remaining
+                      </p>
+                      <p className="text-xs font-semibold text-white mt-0.5">
+                        {weeklyRemaining}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -679,10 +938,15 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
 
             <div className="space-y-6">
               <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-                <h2 className="text-[13px] font-medium text-white">Assigned Team</h2>
+                <h2 className="text-[13px] font-medium text-white">
+                  Assigned Team
+                </h2>
                 <div className="mt-4 flex flex-wrap gap-3">
                   {team.map((member) => (
-                    <div key={member.id} className="flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5">
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.07)] bg-[rgba(255,255,255,0.03)] px-2 py-1.5"
+                    >
                       <Avatar className="size-7 border border-[rgba(255,255,255,0.08)]">
                         <AvatarImage src={member.avatar} alt={member.name} />
                         <AvatarFallback className="bg-[#1c1c1c] text-[11px] font-semibold text-white">
@@ -690,8 +954,12 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                         </AvatarFallback>
                       </Avatar>
                       <div className="pr-1">
-                        <p className="text-[12px] font-medium text-white">{member.name}</p>
-                        <p className="text-[11px] text-[#71717a] capitalize">{member.role}</p>
+                        <p className="text-[12px] font-medium text-white">
+                          {member.name}
+                        </p>
+                        <p className="text-[11px] text-[#71717a] capitalize">
+                          {member.role}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -699,26 +967,42 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
               </Card>
 
               <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-                <h2 className="text-[13px] font-medium text-white">Contract Information</h2>
+                <h2 className="text-[13px] font-medium text-white">
+                  Contract Information
+                </h2>
                 <div className="mt-4 space-y-4">
                   <div>
-                    <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract Start</p>
+                    <p className="text-[11px] text-[#71717a] uppercase tracking-wider">
+                      Contract Start
+                    </p>
                     <p className="text-[13px] font-medium text-white mt-1">
-                      {client.contractStartDate ? new Date(client.contractStartDate).toLocaleDateString(undefined, {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      }) : 'Not specified'}
+                      {client.contractStartDate
+                        ? new Date(client.contractStartDate).toLocaleDateString(
+                            undefined,
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "Not specified"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[11px] text-[#71717a] uppercase tracking-wider">Contract End</p>
+                    <p className="text-[11px] text-[#71717a] uppercase tracking-wider">
+                      Contract End
+                    </p>
                     <p className="text-[13px] font-medium text-white mt-1">
-                      {client.contractEndDate ? new Date(client.contractEndDate).toLocaleDateString(undefined, {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      }) : 'Not specified'}
+                      {client.contractEndDate
+                        ? new Date(client.contractEndDate).toLocaleDateString(
+                            undefined,
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "Not specified"}
                     </p>
                   </div>
                 </div>
@@ -729,14 +1013,18 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
           <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-5 shadow-none">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-[13px] font-medium text-white">References</h2>
-                <p className="mt-1 text-[12px] text-[#71717a]">Brand links, inspiration, social pages, and creative examples.</p>
+                <h2 className="text-[13px] font-medium text-white">
+                  References
+                </h2>
+                <p className="mt-1 text-[12px] text-[#71717a]">
+                  Brand links, inspiration, social pages, and creative examples.
+                </p>
               </div>
 
               <Button
                 onClick={() => {
-                  setEditingReference(null);
-                  setIsReferenceDialogOpen(true);
+                  setEditingReference(null)
+                  setIsReferenceDialogOpen(true)
                 }}
                 className="h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
               >
@@ -752,11 +1040,14 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                 </div>
               ) : sortedReferences.length === 0 ? (
                 <div className="rounded-[10px] border border-dashed border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center text-[13px] text-[#71717a]">
-                  <p>No references yet. Add links to brand pages, moodboards, competitors, or inspiration.</p>
+                  <p>
+                    No references yet. Add links to brand pages, moodboards,
+                    competitors, or inspiration.
+                  </p>
                   <Button
                     onClick={() => {
-                      setEditingReference(null);
-                      setIsReferenceDialogOpen(true);
+                      setEditingReference(null)
+                      setIsReferenceDialogOpen(true)
                     }}
                     className="mt-4 h-9 rounded-md bg-[var(--primary)] px-3 text-[13px] font-medium text-white shadow-none hover:bg-[#4f46e5]"
                   >
@@ -767,8 +1058,8 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
               ) : (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-2">
                   {sortedReferences.map((reference) => {
-                    const meta = getReferenceTypeMeta(reference.type);
-                    const TypeIcon = meta.icon;
+                    const meta = getReferenceTypeMeta(reference.type)
+                    const TypeIcon = meta.icon
 
                     return (
                       <Card
@@ -777,14 +1068,20 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)]">
-                            <TypeIcon className={cn('h-4 w-4', meta.toneClassName)} />
+                            <TypeIcon
+                              className={cn("h-4 w-4", meta.toneClassName)}
+                            />
                           </div>
 
                           <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <h3 className="truncate text-[14px] font-medium text-white">{reference.title}</h3>
-                                <p className="mt-1 text-[11px] text-[#71717a]">{getReferenceHost(reference)}</p>
+                                <h3 className="truncate text-[14px] font-medium text-white">
+                                  {reference.title}
+                                </h3>
+                                <p className="mt-1 text-[11px] text-[#71717a]">
+                                  {getReferenceHost(reference)}
+                                </p>
                               </div>
                               <Badge variant="secondary" className="shrink-0">
                                 {meta.label}
@@ -792,7 +1089,9 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                             </div>
 
                             {reference.description && (
-                              <p className="text-[13px] leading-5 text-[#a1a1aa]">{reference.description}</p>
+                              <p className="text-[13px] leading-5 text-[#a1a1aa]">
+                                {reference.description}
+                              </p>
                             )}
 
                             <a
@@ -812,7 +1111,11 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                                 className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                                 asChild
                               >
-                                <a href={reference.url} target="_blank" rel="noreferrer">
+                                <a
+                                  href={reference.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
                                   <ExternalLink className="mr-2 h-3.5 w-3.5" />
                                   Open
                                 </a>
@@ -822,7 +1125,9 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                onClick={() => handleCopyReferenceLink(reference)}
+                                onClick={() =>
+                                  handleCopyReferenceLink(reference)
+                                }
                                 className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                               >
                                 <Copy className="mr-2 h-3.5 w-3.5" />
@@ -834,8 +1139,8 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
-                                  setEditingReference(reference);
-                                  setIsReferenceDialogOpen(true);
+                                  setEditingReference(reference)
+                                  setIsReferenceDialogOpen(true)
                                 }}
                                 className="h-8 border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                               >
@@ -857,7 +1162,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                           </div>
                         </div>
                       </Card>
-                    );
+                    )
                   })}
                 </div>
               )}
@@ -866,15 +1171,21 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
 
           {client.brandColor && (
             <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
-              <h2 className="text-[13px] font-medium text-white">Brand Identity</h2>
+              <h2 className="text-[13px] font-medium text-white">
+                Brand Identity
+              </h2>
               <div className="mt-4 flex items-center gap-3">
                 <div
                   className="size-10 rounded-[10px] border border-[rgba(255,255,255,0.07)]"
                   style={{ backgroundColor: client.brandColor }}
                 />
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[#71717a]">Brand Color</p>
-                  <p className="mt-1 text-[13px] font-mono text-white">{client.brandColor}</p>
+                  <p className="text-[11px] uppercase tracking-wide text-[#71717a]">
+                    Brand Color
+                  </p>
+                  <p className="mt-1 text-[13px] font-mono text-white">
+                    {client.brandColor}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -882,11 +1193,14 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         </>
       )}
 
-      {activeTab === 'assets' && (
+      {activeTab === "assets" && (
         <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
           <div className="flex items-center justify-between">
             <h2 className="text-[13px] font-medium text-white">Assets</h2>
-            <Link href="/dashboard/assets" className="text-[13px] font-medium text-[var(--primary)] hover:text-emerald-300">
+            <Link
+              href="/dashboard/assets"
+              className="text-[13px] font-medium text-[var(--primary)] hover:text-emerald-300"
+            >
               View all
             </Link>
           </div>
@@ -898,7 +1212,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         </Card>
       )}
 
-      {activeTab === 'reports' && (
+      {activeTab === "reports" && (
         <ClientReport
           clientId={client.id}
           contractStartDate={client.contractStartDate}
@@ -911,16 +1225,18 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         reference={editingReference}
         open={isReferenceDialogOpen}
         onOpenChange={(open) => {
-          setIsReferenceDialogOpen(open);
+          setIsReferenceDialogOpen(open)
           if (!open) {
-            setEditingReference(null);
+            setEditingReference(null)
           }
         }}
         onSaved={async (savedReference) => {
           setReferences((prev) => {
-            const next = prev.filter((item) => item.id !== savedReference.id);
-            return [savedReference, ...next].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-          });
+            const next = prev.filter((item) => item.id !== savedReference.id)
+            return [savedReference, ...next].sort(
+              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+            )
+          })
         }}
       />
 
@@ -928,7 +1244,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
         <DialogContent className="w-[95vw] max-w-md bg-[#161616] text-white border-[rgba(255,255,255,0.08)]">
           <DialogHeader>
             <DialogTitle className="text-white text-[16px] font-medium">
-              {assets.length > 0 ? 'Cannot Delete Client' : 'Delete Client?'}
+              {assets.length > 0 ? "Cannot Delete Client" : "Delete Client?"}
             </DialogTitle>
             <DialogDescription className="text-[#a1a1aa] mt-2 text-[13px] leading-relaxed">
               {assets.length > 0
@@ -943,7 +1259,7 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
               onClick={() => setShowDeleteDialog(false)}
               className="border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
             >
-              {assets.length > 0 ? 'Close' : 'Cancel'}
+              {assets.length > 0 ? "Close" : "Cancel"}
             </Button>
             {assets.length === 0 && (
               <Button
@@ -951,32 +1267,35 @@ export function ClientDetail({ client: initialClient, assets }: ClientDetailProp
                 disabled={isDeleting}
                 onClick={async () => {
                   try {
-                    setIsDeleting(true);
-                    await clientsApi.delete(client.id);
-                    toast({ title: 'Client deleted successfully' });
-                    setShowDeleteDialog(false);
-                    clearApiClientCache();
-                    router.refresh();
-                    router.push('/dashboard/clients');
+                    setIsDeleting(true)
+                    await clientsApi.delete(client.id)
+                    toast({ title: "Client deleted successfully" })
+                    setShowDeleteDialog(false)
+                    clearApiClientCache()
+                    router.refresh()
+                    router.push("/dashboard/clients")
                   } catch (err) {
-                    const message = err instanceof Error ? err.message : 'Failed to delete client';
+                    const message =
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to delete client"
                     toast({
-                      title: 'Delete failed',
+                      title: "Delete failed",
                       description: message,
-                      variant: 'destructive',
-                    });
+                      variant: "destructive",
+                    })
                   } finally {
-                    setIsDeleting(false);
+                    setIsDeleting(false)
                   }
                 }}
                 className="bg-red-600 hover:bg-red-700 text-white font-medium"
               >
-                {isDeleting ? 'Deleting...' : 'Delete'}
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  );
+  )
 }

@@ -1,48 +1,52 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import type { AssetActivityLog } from '@/types/index';
+import { getCurrentUser } from "@/lib/auth"
+import { emitEvent } from "@/lib/event-bus"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
 import {
   insertActivity,
   listActivityByAssetId,
-} from '@/repositories/asset-activity-repository';
-import { getOrCreateCurrentUserProfile, getUsersByIds } from '@/services/users-service';
-import type { Json } from '@/types/database';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import { emitEvent } from '@/lib/event-bus';
-import { getCurrentUser } from '@/lib/auth';
+} from "@/repositories/asset-activity-repository"
+import {
+  getOrCreateCurrentUserProfile,
+  getUsersByIds,
+} from "@/services/users-service"
+import type { Json } from "@/types/database"
+import type { AssetActivityLog } from "@/types/index"
 
 export interface ActivityInput {
-  assetId: string;
-  action: string;
-  metadata?: Record<string, unknown>;
+  assetId: string
+  action: string
+  metadata?: Record<string, unknown>
 }
 
 function toJson(value: unknown): Json {
   if (
     value === null ||
-    typeof value === 'string' ||
-    typeof value === 'number' ||
-    typeof value === 'boolean'
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
   ) {
-    return value;
+    return value
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => toJson(item));
+    return value.map((item) => toJson(item))
   }
 
-  if (typeof value === 'object') {
+  if (typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
-        key,
-        toJson(nestedValue),
-      ])
-    );
+      Object.entries(value as Record<string, unknown>).map(
+        ([key, nestedValue]) => [key, toJson(nestedValue)],
+      ),
+    )
   }
 
-  return null;
+  return null
 }
 
-function mapActivity(row: Awaited<ReturnType<typeof insertActivity>>): AssetActivityLog {
+function mapActivity(
+  row: Awaited<ReturnType<typeof insertActivity>>,
+): AssetActivityLog {
   return {
     id: row.id,
     assetId: row.asset_id,
@@ -50,41 +54,48 @@ function mapActivity(row: Awaited<ReturnType<typeof insertActivity>>): AssetActi
     action: row.action,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
     createdAt: new Date(row.created_at),
-  };
+  }
 }
 
 export async function getAssetActivity(
   assetId: string,
-  options?: { limit?: number }
+  options?: { limit?: number },
 ): Promise<AssetActivityLog[]> {
   try {
-    const rows = await listActivityByAssetId(assetId, undefined, options);
-    return rows.map((row) => mapActivity(row));
+    const rows = await listActivityByAssetId(assetId, undefined, options)
+    return rows.map((row) => mapActivity(row))
   } catch (error) {
-    logProductionRuntimeError('activity-loader', error, { assetId });
-    return [];
+    logProductionRuntimeError("activity-loader", error, { assetId })
+    return []
   }
 }
 
 export async function getAssetActivityWithUsers(
   assetId: string,
-  options?: { limit?: number }
-): Promise<{ activity: AssetActivityLog[]; users: Awaited<ReturnType<typeof getUsersByIds>> }> {
-  const activity = await getAssetActivity(assetId, options);
-  const userIds = Array.from(new Set(activity.map((entry) => entry.userId).filter(Boolean))) as string[];
-  const users = await getUsersByIds(userIds);
-  return { activity, users };
+  options?: { limit?: number },
+): Promise<{
+  activity: AssetActivityLog[]
+  users: Awaited<ReturnType<typeof getUsersByIds>>
+}> {
+  const activity = await getAssetActivity(assetId, options)
+  const userIds = Array.from(
+    new Set(activity.map((entry) => entry.userId).filter(Boolean)),
+  ) as string[]
+  const users = await getUsersByIds(userIds)
+  return { activity, users }
 }
 
-export async function logAssetActivity(input: ActivityInput): Promise<AssetActivityLog> {
-  const user = await getCurrentUser();
+export async function logAssetActivity(
+  input: ActivityInput,
+): Promise<AssetActivityLog> {
+  const user = await getCurrentUser()
   if (!user) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient()
 
-  await getOrCreateCurrentUserProfile();
+  await getOrCreateCurrentUserProfile()
 
   const record = await insertActivity(
     {
@@ -93,14 +104,14 @@ export async function logAssetActivity(input: ActivityInput): Promise<AssetActiv
       action: input.action,
       metadata: toJson(input.metadata ?? {}),
     },
-    supabase
-  );
+    supabase,
+  )
 
-  const mapped = mapActivity(record);
+  const mapped = mapActivity(record)
 
   try {
     emitEvent({
-      type: 'asset.activity',
+      type: "asset.activity",
       payload: {
         id: mapped.id,
         assetId: input.assetId,
@@ -108,10 +119,10 @@ export async function logAssetActivity(input: ActivityInput): Promise<AssetActiv
         metadata: input.metadata ?? {},
         createdAt: mapped.createdAt.toISOString(),
       },
-    });
+    })
   } catch (_err) {
     // non-blocking - event bus is in-memory only
   }
 
-  return mapped;
+  return mapped
 }

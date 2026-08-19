@@ -1,34 +1,14 @@
-'use client';
+"use client"
 
-import React, { useState, useCallback } from 'react';
-import { Asset, User } from '@/types/index';
-import { Card } from '@/components/ui/card';
-import Link from 'next/link';
-import {
-  Download,
-  Eye,
-  Pencil,
-  Upload,
-  FileText,
-  MoreVertical,
-  Trash2,
-} from 'lucide-react';
-import { StatusBadge } from '@/components/assets/status-badge';
-import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
-import { canUploadFromStatus } from '@/lib/asset-workflow';
-import { cn } from '@/lib/utils';
-import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
-import { authApi, assetsApi, clearApiClientCache } from '@/lib/api-client';
-import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
-import { mutate } from 'swr';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+import { Eye, MoreVertical, Pencil, Upload } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import React, { useCallback, useState } from "react"
+import { mutate } from "swr"
+import { AssetFormDialog } from "@/components/assets/asset-form-dialog"
+import { StatusBadge } from "@/components/assets/status-badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -36,123 +16,147 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+import { assetsApi, clearApiClientCache } from "@/lib/api-client"
+import { getAssetIcon, getAssetPreviewType } from "@/lib/asset-display"
+import { canUploadFromStatus } from "@/lib/asset-workflow"
+import { cn } from "@/lib/utils"
+import type { Asset } from "@/types/index"
 
 interface AssetCardProps {
-  asset: Asset;
+  asset: Asset
 }
 
-function getDimensionLabel(asset: Asset): string | null {
+function _getDimensionLabel(asset: Asset): string | null {
   if (asset.mediaWidth && asset.mediaHeight) {
-    return `${asset.mediaWidth} × ${asset.mediaHeight}`;
+    return `${asset.mediaWidth} × ${asset.mediaHeight}`
   }
 
-  return null;
+  return null
 }
 
 function getDurationLabel(asset: Asset): string | null {
   if (asset.durationSeconds == null) {
-    return null;
+    return null
   }
 
-  const rounded = Math.max(1, Math.round(asset.durationSeconds));
-  const minutes = Math.floor(rounded / 60);
-  const seconds = rounded % 60;
+  const rounded = Math.max(1, Math.round(asset.durationSeconds))
+  const minutes = Math.floor(rounded / 60)
+  const seconds = rounded % 60
 
   if (minutes <= 0) {
-    return `${seconds}s`;
+    return `${seconds}s`
   }
 
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`
 }
 
 function getExtensionLabel(asset: Asset): string {
-  return (asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type).toUpperCase();
+  return (
+    asset.fileExtension ??
+    asset.mimeType?.split("/").pop() ??
+    asset.type
+  ).toUpperCase()
 }
 
 function AssetCardImpl({ asset }: AssetCardProps) {
-  const router = useRouter();
-  const previewType = getAssetPreviewType(asset);
-  const AssetIcon = getAssetIcon(asset);
-  const durationLabel = getDurationLabel(asset);
-  const detailUrl = `/dashboard/assets/${asset.id}`;
-  const uploadEligible = canUploadFromStatus(asset.status);
+  const router = useRouter()
+  const previewType = getAssetPreviewType(asset)
+  const AssetIcon = getAssetIcon(asset)
+  const durationLabel = getDurationLabel(asset)
+  const detailUrl = `/dashboard/assets/${asset.id}`
+  const uploadEligible = canUploadFromStatus(asset.status)
 
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const { toast } = useToast()
   // Removed per-card current user fetch and debug logging to avoid per-card async work and noisy renders
 
   const openAsset = () => {
     try {
-      window.location.href = detailUrl;
+      window.location.href = detailUrl
     } catch (_) {
       // ignore open errors
     }
-  };
+  }
 
   const previewAsset = () => {
     try {
-      window.open(detailUrl, '_blank', 'noopener,noreferrer');
+      window.open(detailUrl, "_blank", "noopener,noreferrer")
     } catch (_) {
       // ignore open errors
     }
-  };
+  }
 
-  const handlePreview = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    previewAsset();
-  }, [asset.id]);
+  const handlePreview = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      previewAsset()
+    },
+    [previewAsset],
+  )
 
-  const handleOpen = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openAsset();
-  }, [asset.id]);
+  const handleOpen = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      openAsset()
+    },
+    [openAsset],
+  )
 
   const copyDriveLink = async () => {
     try {
-      const shareUrl = asset.driveFileUrl ?? `${window.location.origin}/dashboard/assets/${asset.id}`;
-      await navigator.clipboard.writeText(shareUrl);
-      toast({ title: 'Link copied' });
+      const shareUrl =
+        asset.driveFileUrl ??
+        `${window.location.origin}/dashboard/assets/${asset.id}`
+      await navigator.clipboard.writeText(shareUrl)
+      toast({ title: "Link copied" })
     } catch {
-      toast({ title: 'Failed to copy link', variant: 'destructive' });
+      toast({ title: "Failed to copy link", variant: "destructive" })
     }
-  };
+  }
 
-  const downloadAsset = () => {
-    const targetUrl = asset.driveFileUrl ?? asset.thumbnailUrl;
+  const _downloadAsset = () => {
+    const targetUrl = asset.driveFileUrl ?? asset.thumbnailUrl
     if (!targetUrl) {
-      return;
+      return
     }
 
     try {
-      const link = document.createElement('a');
-      link.href = targetUrl;
-      link.download = asset.title;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      const link = document.createElement("a")
+      link.href = targetUrl
+      link.download = asset.title
+      link.target = "_blank"
+      link.rel = "noopener noreferrer"
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
     } catch (_) {
       // ignore download errors
     }
-  };
+  }
 
   return (
     <Link href={`/dashboard/assets/${asset.id}`}>
       <Card
         className={cn(
-          'group overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] cursor-pointer h-full flex flex-col shadow-none transition-colors duration-150',
-          'hover:border-[rgba(255,255,255,0.18)] hover:bg-[#1a1a1a] focus-within:border-[rgba(255,255,255,0.18)] focus-within:bg-[#1a1a1a]'
+          "group overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] cursor-pointer h-full flex flex-col shadow-none transition-colors duration-150",
+          "hover:border-[rgba(255,255,255,0.18)] hover:bg-[#1a1a1a] focus-within:border-[rgba(255,255,255,0.18)] focus-within:bg-[#1a1a1a]",
         )}
       >
         <div className="relative overflow-hidden bg-[#0f0f0f]">
           <div className="aspect-[16/9] w-full">
-            {previewType === 'image' && asset.thumbnailUrl ? (
+            {previewType === "image" && asset.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={asset.thumbnailUrl}
@@ -166,15 +170,17 @@ function AssetCardImpl({ asset }: AssetCardProps) {
                   <AssetIcon className="h-7 w-7 text-[#71717a]" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-white">{asset.title}</p>
+                  <p className="text-sm font-medium text-white">
+                    {asset.title}
+                  </p>
                   <p className="text-xs text-[#71717a] capitalize">
-                    {previewType === 'document'
-                      ? 'Document preview'
-                      : previewType === 'video'
-                        ? 'Video preview'
-                        : previewType === 'audio'
-                          ? 'Audio preview'
-                          : 'File preview'}
+                    {previewType === "document"
+                      ? "Document preview"
+                      : previewType === "video"
+                        ? "Video preview"
+                        : previewType === "audio"
+                          ? "Audio preview"
+                          : "File preview"}
                   </p>
                 </div>
               </div>
@@ -212,8 +218,8 @@ function AssetCardImpl({ asset }: AssetCardProps) {
                   <button
                     type="button"
                     onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                      e.preventDefault()
+                      e.stopPropagation()
                     }}
                     className="flex size-8 items-center justify-center rounded-full bg-black/70 text-white transition-transform duration-150 hover:scale-105"
                     aria-label="Upload asset"
@@ -240,7 +246,9 @@ function AssetCardImpl({ asset }: AssetCardProps) {
 
         <div className="flex items-start justify-between gap-2 p-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium leading-5 text-white">{asset.title}</p>
+            <p className="truncate text-[13px] font-medium leading-5 text-white">
+              {asset.title}
+            </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex h-[18px] items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2 text-[10px] uppercase tracking-wide text-[#a1a1aa]">
                 {getExtensionLabel(asset)}
@@ -251,8 +259,8 @@ function AssetCardImpl({ asset }: AssetCardProps) {
 
           <div
             onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+              e.preventDefault()
+              e.stopPropagation()
             }}
             className="shrink-0"
           >
@@ -265,7 +273,10 @@ function AssetCardImpl({ asset }: AssetCardProps) {
                   <MoreVertical className="h-3.5 w-3.5" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white w-36">
+              <DropdownMenuContent
+                align="end"
+                className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white w-36"
+              >
                 <DropdownMenuItem
                   onClick={() => openAsset()}
                   className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white"
@@ -310,19 +321,23 @@ function AssetCardImpl({ asset }: AssetCardProps) {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent
           onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault()
+            e.stopPropagation()
           }}
           className="w-[95vw] max-w-md bg-[#161616] text-white border-[rgba(255,255,255,0.08)]"
         >
           <DialogHeader>
-            <DialogTitle className="text-white text-[16px] font-medium">Delete Asset?</DialogTitle>
+            <DialogTitle className="text-white text-[16px] font-medium">
+              Delete Asset?
+            </DialogTitle>
             <DialogDescription className="text-[#a1a1aa] mt-2 text-[13px] leading-relaxed">
               This will permanently remove:
               <span className="block mt-2 pl-3 list-item">revisions</span>
               <span className="block pl-3 list-item">comments</span>
               <span className="block pl-3 list-item">activity history</span>
-              <span className="block pl-3 list-item">calendar sync metadata</span>
+              <span className="block pl-3 list-item">
+                calendar sync metadata
+              </span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4 gap-2">
@@ -339,33 +354,36 @@ function AssetCardImpl({ asset }: AssetCardProps) {
               disabled={isDeleting}
               onClick={async () => {
                 try {
-                  setIsDeleting(true);
-                  await assetsApi.delete(asset.id);
-                  toast({ title: 'Asset deleted successfully' });
-                  setShowDeleteDialog(false);
-                  mutate('/api/assets');
-                  clearApiClientCache();
-                  router.refresh();
+                  setIsDeleting(true)
+                  await assetsApi.delete(asset.id)
+                  toast({ title: "Asset deleted successfully" })
+                  setShowDeleteDialog(false)
+                  mutate("/api/assets")
+                  clearApiClientCache()
+                  router.refresh()
                 } catch (err) {
-                  const message = err instanceof Error ? err.message : 'Failed to delete asset';
+                  const message =
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to delete asset"
                   toast({
-                    title: 'Delete failed',
+                    title: "Delete failed",
                     description: message,
-                    variant: 'destructive',
-                  });
+                    variant: "destructive",
+                  })
                 } finally {
-                  setIsDeleting(false);
+                  setIsDeleting(false)
                 }
               }}
               className="bg-red-600 hover:bg-red-700 text-white font-medium"
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isDeleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </Link>
-  );
+  )
 }
 
-export const AssetCard = React.memo(AssetCardImpl);
+export const AssetCard = React.memo(AssetCardImpl)

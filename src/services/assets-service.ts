@@ -1,19 +1,19 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { canTransitionStatus, canUploadRevisionFromStatus } from '@/lib/asset-workflow';
-import type { Asset, AssetRevision, AssetStatus } from '@/types/index';
-import { getOrCreateCurrentUserProfile } from '@/services/users-service';
-import { logAssetActivity } from '@/services/activity-service';
-import { logAuditEvent } from '@/services/audit-log-service';
-import { uploadFile, deleteFile, generatePublicUrl, getFileMetadata } from '@/integrations/r2/r2-service';
-import type { R2UploadResult } from '@/integrations/r2/types';
-import { extractAssetMetadata } from '@/lib/asset-metadata';
+import { deleteFile, uploadFile } from "@/integrations/r2/r2-service"
+import { extractAssetMetadata } from "@/lib/asset-metadata"
+import {
+  canTransitionStatus,
+  canUploadRevisionFromStatus,
+} from "@/lib/asset-workflow"
+import { getCurrentUser } from "@/lib/auth"
+import { emitEvent } from "@/lib/event-bus"
 import {
   sendAssetUploadNotification,
-  sendRevisionUploadNotification,
   sendDesignerNotification,
-} from '@/lib/notifications/mailgun';
-import { listCommentsByAssetId } from '@/repositories/asset-comments-repository';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
+  sendRevisionUploadNotification,
+} from "@/lib/notifications/mailgun"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
 import {
   deleteAsset as deleteAssetRow,
   getAssetById,
@@ -21,74 +21,86 @@ import {
   listAssets,
   listAssetsByClientId,
   listAssetsByStatuses,
-  updateAsset as updateAssetRow,
   listRevisionsByAssetId,
-} from '@/repositories/assets-repository';
-import { emitEvent } from '@/lib/event-bus';
-import { getClientById } from '@/repositories/clients-repository';
-import { getUserById } from '@/repositories/users-repository';
-import type { Database } from '@/types/database';
-import { getCurrentUser } from '@/lib/auth';
+  updateAsset as updateAssetRow,
+} from "@/repositories/assets-repository"
+import { getClientById } from "@/repositories/clients-repository"
+import { getUserById } from "@/repositories/users-repository"
+import { logAssetActivity } from "@/services/activity-service"
+import { logAuditEvent } from "@/services/audit-log-service"
+import { getOrCreateCurrentUserProfile } from "@/services/users-service"
+import type { Database, Json } from "@/types/database"
+import type { Asset, AssetRevision, AssetStatus } from "@/types/index"
 
 export interface AssetInput {
-  clientId: string;
-  title: string;
-  type: Database['public']['Enums']['asset_type'];
-  status?: Database['public']['Enums']['asset_status'];
-  driveFileUrl?: string;
-  thumbnailUrl?: string;
-  assignedTo?: string | null;
-  scheduledAt?: string | null;
-  publishDate?: string | null;
-  publishTime?: string | null;
-  scheduledBy?: string | null;
-  publishedAt?: string | null;
-  approvedAt?: string | null;
-  approvedBy?: string | null;
+  clientId: string
+  title: string
+  type: Database["public"]["Enums"]["asset_type"]
+  status?: Database["public"]["Enums"]["asset_status"]
+  driveFileUrl?: string
+  thumbnailUrl?: string
+  assignedTo?: string | null
+  scheduledAt?: string | null
+  publishDate?: string | null
+  publishTime?: string | null
+  scheduledBy?: string | null
+  publishedAt?: string | null
+  approvedAt?: string | null
+  approvedBy?: string | null
+  recurrence?: Json | null
 }
 
-function splitScheduledAt(value?: string | null): { publishDate: string | null; publishTime: string | null } {
+function splitScheduledAt(value?: string | null): {
+  publishDate: string | null
+  publishTime: string | null
+} {
   if (!value) {
-    return { publishDate: null, publishTime: null };
+    return { publishDate: null, publishTime: null }
   }
 
-  const parsed = new Date(value);
+  const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) {
-    return { publishDate: null, publishTime: null };
+    return { publishDate: null, publishTime: null }
   }
 
   return {
     publishDate: parsed.toISOString().slice(0, 10),
     publishTime: parsed.toISOString().slice(11, 19),
-  };
+  }
 }
 
 function combinePublishDateTime(
   publishDate?: string | null,
   publishTime?: string | null,
-  scheduledAt?: string | null
+  scheduledAt?: string | null,
 ): Date | null {
   if (scheduledAt) {
-    const fallback = new Date(scheduledAt);
+    const fallback = new Date(scheduledAt)
     if (!Number.isNaN(fallback.getTime())) {
-      return fallback;
+      return fallback
     }
   }
 
   if (!publishDate) {
-    return null;
+    return null
   }
 
-  const parsed = new Date(`${publishDate}T${publishTime ?? '00:00:00'}`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const parsed = new Date(`${publishDate}T${publishTime ?? "00:00:00"}`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function mapAsset(asset: Awaited<ReturnType<typeof getAssetById>>): Asset | null {
+function mapAsset(
+  asset: Awaited<ReturnType<typeof getAssetById>>,
+): Asset | null {
   if (!asset) {
-    return null;
+    return null
   }
 
-  const scheduledAt = combinePublishDateTime(asset.publish_date, asset.publish_time, asset.scheduled_at);
+  const scheduledAt = combinePublishDateTime(
+    asset.publish_date,
+    asset.publish_time,
+    asset.scheduled_at,
+  )
 
   return {
     id: asset.id,
@@ -125,11 +137,11 @@ function mapAsset(asset: Awaited<ReturnType<typeof getAssetById>>): Asset | null
     latestRevision: undefined,
     revisionCount: asset.revision_count ?? undefined,
     comments: [],
-  };
+  }
 }
 
 function mapAssetRevisions(
-  revisions: Awaited<ReturnType<typeof listRevisionsByAssetId>>
+  revisions: Awaited<ReturnType<typeof listRevisionsByAssetId>>,
 ): AssetRevision[] {
   return revisions.map((rev) => ({
     id: rev.id,
@@ -147,115 +159,129 @@ function mapAssetRevisions(
     changeNote: rev.change_note ?? undefined,
     metadata: (rev.metadata as Record<string, unknown>) ?? undefined,
     createdAt: new Date(rev.created_at),
-  }));
+  }))
 }
 
-function logUploadFailure(stage: string, error: unknown, assetId: string, extra: Record<string, unknown> = {}) {
-  const message = error instanceof Error ? error.message : 'Unknown upload error';
-  const stack = error instanceof Error ? error.stack ?? null : null;
+function logUploadFailure(
+  stage: string,
+  error: unknown,
+  assetId: string,
+  extra: Record<string, unknown> = {},
+) {
+  const message =
+    error instanceof Error ? error.message : "Unknown upload error"
+  const stack = error instanceof Error ? (error.stack ?? null) : null
 
-  console.error('[upload][failure]', {
+  console.error("[upload][failure]", {
     assetId,
     stage,
     message,
     stack,
     ...extra,
-  });
+  })
 }
 
 function logAssetStatusTransition(
   assetId: string,
   previousStatus: AssetStatus,
   nextStatus: AssetStatus,
-  triggerSource: string
+  triggerSource: string,
 ) {
-  console.info('[asset][status-transition]', {
+  console.info("[asset][status-transition]", {
     assetId,
     previousStatus,
     nextStatus,
     triggerSource,
-  });
+  })
 }
 
 async function transitionAssetStatus(
   assetId: string,
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   nextStatus: AssetStatus,
-  triggerSource: string
+  _triggerSource: string,
 ): Promise<void> {
-  const currentAsset = await getAssetById(assetId, supabase);
+  const currentAsset = await getAssetById(assetId, supabase)
   if (!currentAsset) {
-    throw new Error('Asset not found');
+    throw new Error("Asset not found")
   }
 
   if (!canTransitionStatus(currentAsset.status, nextStatus)) {
-    throw new Error(`Invalid status transition from ${currentAsset.status} to ${nextStatus}`);
+    throw new Error(
+      `Invalid status transition from ${currentAsset.status} to ${nextStatus}`,
+    )
   }
 
   if (currentAsset.status !== nextStatus) {
   }
 
-  await updateAssetRow(assetId, { status: nextStatus }, supabase);
+  await updateAssetRow(assetId, { status: nextStatus }, supabase)
 
   emitEvent({
-    type: 'asset:status-changed',
+    type: "asset:status-changed",
     payload: { assetId, previousStatus: currentAsset.status, nextStatus },
-  });
+  })
 }
 
-export function getAssetR2Key(clientId: string, assetId: string, fileName: string): string {
-  return `clients/${clientId}/assets/${assetId}/${fileName}`;
+export function getAssetR2Key(
+  clientId: string,
+  assetId: string,
+  fileName: string,
+): string {
+  return `clients/${clientId}/assets/${assetId}/${fileName}`
 }
 
 export async function getAssets(): Promise<Asset[]> {
   try {
-    const rows = await listAssets();
+    const rows = await listAssets()
     return rows
       .map((asset) => mapAsset(asset))
-      .filter((asset): asset is Asset => Boolean(asset));
+      .filter((asset): asset is Asset => Boolean(asset))
   } catch (error) {
-    logProductionRuntimeError('assets-loader', error);
-    return [];
+    logProductionRuntimeError("assets-loader", error)
+    return []
   }
 }
 
-export async function getAssetsByStatuses(statuses: readonly AssetStatus[]): Promise<Asset[]> {
+export async function getAssetsByStatuses(
+  statuses: readonly AssetStatus[],
+): Promise<Asset[]> {
   try {
-    const rows = await listAssetsByStatuses(statuses);
+    const rows = await listAssetsByStatuses(statuses)
     return rows
       .map((asset) => mapAsset(asset))
-      .filter((asset): asset is Asset => Boolean(asset));
+      .filter((asset): asset is Asset => Boolean(asset))
   } catch (error) {
-    logProductionRuntimeError('assets-by-statuses-loader', error);
-    return [];
+    logProductionRuntimeError("assets-by-statuses-loader", error)
+    return []
   }
 }
 
 export async function getAssetsByClientId(clientId: string): Promise<Asset[]> {
   try {
-    const rows = await listAssetsByClientId(clientId);
+    const rows = await listAssetsByClientId(clientId)
     return rows
       .map((asset) => mapAsset(asset))
-      .filter((asset): asset is Asset => Boolean(asset));
+      .filter((asset): asset is Asset => Boolean(asset))
   } catch (error) {
-    logProductionRuntimeError('assets-by-client-loader', error, { clientId });
-    return [];
+    logProductionRuntimeError("assets-by-client-loader", error, { clientId })
+    return []
   }
 }
 
 export async function getAssetDetail(assetId: string): Promise<Asset | null> {
   try {
-    const row = await getAssetById(assetId);
-    const mapped = mapAsset(row);
-    if (!mapped) return null;
+    const row = await getAssetById(assetId)
+    const mapped = mapAsset(row)
+    if (!mapped) return null
     try {
-      const revisions = await listRevisionsByAssetId(assetId);
-      mapped.revisions = mapAssetRevisions(revisions);
+      const revisions = await listRevisionsByAssetId(assetId)
+      mapped.revisions = mapAssetRevisions(revisions)
       // populate revision pointers/count from asset row
-      mapped.currentRevisionId = row?.current_revision_id ?? undefined;
-      mapped.revisionCount = row?.revision_count ?? mapped.revisions.length;
+      mapped.currentRevisionId = row?.current_revision_id ?? undefined
+      mapped.revisionCount = row?.revision_count ?? mapped.revisions.length
       if (row?.latest_revision_id) {
-        const latest = revisions.find((r) => r.id === row.latest_revision_id);
+        const latest = revisions.find((r) => r.id === row.latest_revision_id)
         if (latest) {
           mapped.latestRevision = {
             id: latest.id,
@@ -273,97 +299,102 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
             changeNote: latest.change_note ?? undefined,
             metadata: (latest.metadata as Record<string, unknown>) ?? undefined,
             createdAt: new Date(latest.created_at),
-          };
+          }
         }
       }
     } catch (error) {
-      logProductionRuntimeError('asset-revisions-loader', error, { assetId });
-      mapped.revisions = [];
+      logProductionRuntimeError("asset-revisions-loader", error, { assetId })
+      mapped.revisions = []
     }
 
-    return mapped;
+    return mapped
   } catch (error) {
-    logProductionRuntimeError('asset-detail-loader', error, { assetId });
-    return null;
+    logProductionRuntimeError("asset-detail-loader", error, { assetId })
+    return null
   }
 }
 
 export async function getAssetSummary(assetId: string): Promise<Asset | null> {
   try {
-    const row = await getAssetById(assetId);
-    return mapAsset(row);
+    const row = await getAssetById(assetId)
+    return mapAsset(row)
   } catch (error) {
-    logProductionRuntimeError('asset-summary-loader', error, { assetId });
-    return null;
+    logProductionRuntimeError("asset-summary-loader", error, { assetId })
+    return null
   }
 }
 
-export async function getAssetRevisions(assetId: string): Promise<AssetRevision[]> {
+export async function getAssetRevisions(
+  assetId: string,
+): Promise<AssetRevision[]> {
   try {
-    const revisions = await listRevisionsByAssetId(assetId);
-    return mapAssetRevisions(revisions);
+    const revisions = await listRevisionsByAssetId(assetId)
+    return mapAssetRevisions(revisions)
   } catch (error) {
-    logProductionRuntimeError('asset-revisions-loader', error, { assetId });
-    return [];
+    logProductionRuntimeError("asset-revisions-loader", error, { assetId })
+    return []
   }
 }
 
-export async function setAssetCurrentRevision(assetId: string, revisionId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient();
+export async function setAssetCurrentRevision(
+  assetId: string,
+  revisionId: string,
+): Promise<void> {
+  const supabase = await createServerSupabaseClient()
   // Ensure the revision belongs to the asset
   const { data: rev, error: revError } = await supabase
-    .from('asset_revisions')
-    .select('id,asset_id')
-    .eq('id', revisionId)
-    .maybeSingle();
+    .from("asset_revisions")
+    .select("id,asset_id")
+    .eq("id", revisionId)
+    .maybeSingle()
   if (revError) {
-    throw new Error(revError.message);
+    throw new Error(revError.message)
   }
   if (!rev || rev.asset_id !== assetId) {
-    throw new Error('Revision not found for asset');
+    throw new Error("Revision not found for asset")
   }
 
-  await updateAssetRow(assetId, { current_revision_id: revisionId }, supabase);
+  await updateAssetRow(assetId, { current_revision_id: revisionId }, supabase)
   try {
     await logAssetActivity({
       assetId,
-      action: 'revision_activated',
+      action: "revision_activated",
       metadata: { revisionId },
-    });
+    })
   } catch (_err) {
     // non-blocking
   }
 }
 
 export async function createAsset(input: AssetInput): Promise<Asset> {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser()
   if (!user) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient()
 
-  await getOrCreateCurrentUserProfile();
+  await getOrCreateCurrentUserProfile()
 
-  if (input.status === 'scheduled' && !input.scheduledAt) {
-    throw new Error('Scheduled assets require a scheduled date');
+  if (input.status === "scheduled" && !input.scheduledAt) {
+    throw new Error("Scheduled assets require a scheduled date")
   }
 
   if (input.assignedTo) {
-    const assignedUser = await getUserById(input.assignedTo, supabase);
+    const assignedUser = await getUserById(input.assignedTo, supabase)
     if (!assignedUser) {
-      throw new Error('Assigned user not found');
+      throw new Error("Assigned user not found")
     }
   }
 
-  const scheduledFields = splitScheduledAt(input.scheduledAt);
+  const scheduledFields = splitScheduledAt(input.scheduledAt)
 
   const record = await insertAsset(
     {
       client_id: input.clientId,
       title: input.title,
       type: input.type,
-      status: input.status ?? 'draft',
+      status: input.status ?? "draft",
       drive_file_url: input.driveFileUrl ?? null,
       thumbnail_url: input.thumbnailUrl ?? null,
       assigned_to: input.assignedTo ?? null,
@@ -376,135 +407,144 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
       approved_at: input.approvedAt ?? null,
       approved_by: input.approvedBy ?? null,
     },
-    supabase
-  );
+    supabase,
+  )
 
-  let storedRecord = record;
+  const storedRecord = record
 
-  const mapped = mapAsset(storedRecord);
+  const mapped = mapAsset(storedRecord)
   if (!mapped) {
-    throw new Error('Failed to map asset');
+    throw new Error("Failed to map asset")
   }
 
   try {
     await logAssetActivity({
       assetId: mapped.id,
-      action: 'asset_created',
+      action: "asset_created",
       metadata: {
         title: mapped.title,
         type: mapped.type,
         status: mapped.status,
       },
-    });
+    })
   } catch (_error) {
     // Activity logging should not block asset creation.
   }
 
   try {
     await logAuditEvent({
-      action: 'asset_created',
-      entityType: 'asset',
+      action: "asset_created",
+      entityType: "asset",
       entityId: mapped.id,
-      entityName: mapped.title ?? 'Untitled',
-      metadata: { type: mapped.type, status: mapped.status, clientId: mapped.clientId },
-    });
+      entityName: mapped.title ?? "Untitled",
+      metadata: {
+        type: mapped.type,
+        status: mapped.status,
+        clientId: mapped.clientId,
+      },
+    })
   } catch (_error) {
     // Audit logging should not block asset creation.
   }
 
-  return mapped;
+  return mapped
 }
 
 export interface AssetUploadResult {
-  asset: Asset;
+  asset: Asset
   upload: {
-    r2Key: string;
-    fileUrl: string;
-    mimeType: string;
-    fileSize: number;
-    uploadStatus: 'uploaded';
-  };
+    r2Key: string
+    fileUrl: string
+    mimeType: string
+    fileSize: number
+    uploadStatus: "uploaded"
+  }
 }
 
 export interface UploadFinalizationMetadata {
-  mimeType: string;
-  fileSize: number;
-  uploadStatus: 'uploaded';
-  thumbnailLink?: string | null;
-  mediaWidth?: number | null;
-  mediaHeight?: number | null;
-  durationSeconds?: number | null;
+  mimeType: string
+  fileSize: number
+  uploadStatus: "uploaded"
+  thumbnailLink?: string | null
+  mediaWidth?: number | null
+  mediaHeight?: number | null
+  durationSeconds?: number | null
 }
 
 export interface AssetUploadFinalizationInput {
-  fileName: string;
+  fileName: string
   uploadResult: {
-    key: string;
-    url: string;
-  } & UploadFinalizationMetadata;
+    key: string
+    url: string
+  } & UploadFinalizationMetadata
 }
 
 export async function finalizeAssetUpload(
   assetId: string,
-  input: AssetUploadFinalizationInput
+  input: AssetUploadFinalizationInput,
 ): Promise<AssetUploadResult> {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser()
   if (!user) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized")
   }
 
-  await getOrCreateCurrentUserProfile();
-  const supabase = await createServerSupabaseClient();
+  await getOrCreateCurrentUserProfile()
+  const supabase = await createServerSupabaseClient()
 
   console.info(
-    '[upload][auth] ' +
+    "[upload][auth] " +
       JSON.stringify({
         assetId,
-        authSource: 'service-cookie-store',
+        authSource: "service-cookie-store",
         userExists: Boolean(user),
         sessionExists: true,
-        cookiesPresent: 'unknown',
-      })
-  );
+        cookiesPresent: "unknown",
+      }),
+  )
 
-  await getOrCreateCurrentUserProfile();
+  await getOrCreateCurrentUserProfile()
 
-  const asset = await getAssetById(assetId, supabase);
+  const asset = await getAssetById(assetId, supabase)
   if (!asset) {
-    throw new Error('Asset not found');
+    throw new Error("Asset not found")
   }
 
-  let clientName = asset.client_id;
+  let clientName = asset.client_id
   try {
-    const client = await getClientById(asset.client_id, supabase);
-    clientName = client?.name ?? clientName;
+    const client = await getClientById(asset.client_id, supabase)
+    clientName = client?.name ?? clientName
   } catch (_error) {
     // Non-blocking: email can fall back to the client id.
   }
 
-  const isRevisionUpload = Boolean(asset.drive_file_id || asset.uploaded_at || (asset.revision_count ?? 0) > 0);
-  let revisionNotificationVersion: number | null = null;
+  const isRevisionUpload = Boolean(
+    asset.drive_file_id || asset.uploaded_at || (asset.revision_count ?? 0) > 0,
+  )
+  let revisionNotificationVersion: number | null = null
 
   if (!isRevisionUpload) {
-    await transitionAssetStatus(assetId, supabase, 'uploading', 'upload-start');
+    await transitionAssetStatus(assetId, supabase, "uploading", "upload-start")
   }
 
-  console.info('[upload][asset-check]', {
+  console.info("[upload][asset-check]", {
     assetId,
     clientId: asset.client_id,
     assetType: asset.type,
     fileName: input.fileName,
-    mimeType: input.uploadResult.mimeType || 'application/octet-stream',
+    mimeType: input.uploadResult.mimeType || "application/octet-stream",
     fileSize: input.uploadResult.fileSize,
-  });
+  })
 
-  const uploadedAt = new Date().toISOString();
-  const fileExtension = input.fileName.includes('.') ? input.fileName.split('.').pop()?.toLowerCase() ?? null : null;
+  const uploadedAt = new Date().toISOString()
+  const fileExtension = input.fileName.includes(".")
+    ? (input.fileName.split(".").pop()?.toLowerCase() ?? null)
+    : null
 
   const updates: Parameters<typeof updateAssetRow>[1] = {
     drive_file_id: input.uploadResult.key,
     drive_file_url: input.uploadResult.url,
-    thumbnail_url: input.uploadResult.thumbnailLink ?? asset.thumbnail_url ?? null,
+    thumbnail_url:
+      input.uploadResult.thumbnailLink ?? asset.thumbnail_url ?? null,
     mime_type: input.uploadResult.mimeType,
     file_size: input.uploadResult.fileSize,
     file_extension: fileExtension,
@@ -513,33 +553,33 @@ export async function finalizeAssetUpload(
     media_width: input.uploadResult.mediaWidth ?? null,
     media_height: input.uploadResult.mediaHeight ?? null,
     duration_seconds: input.uploadResult.durationSeconds ?? null,
-  };
+  }
 
   if (!isRevisionUpload) {
-    logAssetStatusTransition(assetId, 'uploading', 'uploaded', 'upload-success');
-    updates.status = 'uploaded';
+    logAssetStatusTransition(assetId, "uploading", "uploaded", "upload-success")
+    updates.status = "uploaded"
   } else {
-    console.info('[asset][revision-upload]', {
+    console.info("[asset][revision-upload]", {
       assetId,
       statusPreserved: asset.status,
-    });
+    })
   }
 
-  const updated = await updateAssetRow(assetId, updates, supabase);
-  const persisted = await getAssetById(assetId, supabase);
-  let mapped = mapAsset(persisted ?? updated);
+  const updated = await updateAssetRow(assetId, updates, supabase)
+  const persisted = await getAssetById(assetId, supabase)
+  const mapped = mapAsset(persisted ?? updated)
 
   if (!mapped) {
-    throw new Error('Failed to map asset');
+    throw new Error("Failed to map asset")
   }
 
-  console.info('[asset][metadata-extraction]', {
+  console.info("[asset][metadata-extraction]", {
     assetId,
-    mediaType: input.uploadResult.mimeType.startsWith('video/')
-      ? 'video'
-      : input.uploadResult.mimeType.startsWith('image/')
-        ? 'image'
-        : 'other',
+    mediaType: input.uploadResult.mimeType.startsWith("video/")
+      ? "video"
+      : input.uploadResult.mimeType.startsWith("image/")
+        ? "image"
+        : "other",
     extractedFields: {
       mimeType: updates.mime_type,
       fileSize: updates.file_size,
@@ -555,80 +595,88 @@ export async function finalizeAssetUpload(
     },
     extractionDurationMs: 0,
     partialFailures: [],
-  });
+  })
 
   // Create an immutable revision record for this upload and update the asset's revision pointers
   try {
-    const persistedAfterUpdate = persisted;
-    const currentCount = persistedAfterUpdate?.revision_count ?? 0;
-    const versionNumber = (currentCount ?? 0) + 1;
+    const persistedAfterUpdate = persisted
+    const currentCount = persistedAfterUpdate?.revision_count ?? 0
+    const versionNumber = (currentCount ?? 0) + 1
 
-      const revisionInsert = {
-        asset_id: assetId,
-        version_number: versionNumber,
-        uploaded_by: user.id,
-        uploaded_at: uploadedAt,
-        drive_file_id: input.uploadResult.key,
-        drive_file_url: input.uploadResult.url,
-        file_size: input.uploadResult.fileSize,
-        mime_type: input.uploadResult.mimeType,
-        media_width: input.uploadResult.mediaWidth ?? null,
-        media_height: input.uploadResult.mediaHeight ?? null,
-        duration_seconds: input.uploadResult.durationSeconds ?? null,
-        change_note: null,
-        metadata: {
-          fileName: input.fileName,
-          mimeType: input.uploadResult.mimeType,
-          fileSize: input.uploadResult.fileSize,
-          mediaWidth: input.uploadResult.mediaWidth ?? null,
-          mediaHeight: input.uploadResult.mediaHeight ?? null,
-          durationSeconds: input.uploadResult.durationSeconds ?? null,
+    const revisionInsert = {
+      asset_id: assetId,
+      version_number: versionNumber,
+      uploaded_by: user.id,
+      uploaded_at: uploadedAt,
+      drive_file_id: input.uploadResult.key,
+      drive_file_url: input.uploadResult.url,
+      file_size: input.uploadResult.fileSize,
+      mime_type: input.uploadResult.mimeType,
+      media_width: input.uploadResult.mediaWidth ?? null,
+      media_height: input.uploadResult.mediaHeight ?? null,
+      duration_seconds: input.uploadResult.durationSeconds ?? null,
+      change_note: null,
+      metadata: {
+        fileName: input.fileName,
+        mimeType: input.uploadResult.mimeType,
+        fileSize: input.uploadResult.fileSize,
+        mediaWidth: input.uploadResult.mediaWidth ?? null,
+        mediaHeight: input.uploadResult.mediaHeight ?? null,
+        durationSeconds: input.uploadResult.durationSeconds ?? null,
+      },
+    } as const
+
+    const { data: revisionData, error: revisionError } = await supabase
+      .from("asset_revisions")
+      .insert(revisionInsert)
+      .select("id")
+      .single()
+    if (revisionError) {
+      console.error("[revision][create][failed]", {
+        assetId,
+        error: revisionError,
+      })
+    } else if (revisionData) {
+      revisionNotificationVersion = versionNumber
+
+      // update asset pointers to reference this new revision
+      await updateAssetRow(
+        assetId,
+        {
+          latest_revision_id: revisionData.id,
+          current_revision_id: revisionData.id,
+          revision_count: versionNumber,
         },
-      } as const;
+        supabase,
+      )
 
-      const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert).select('id').single();
-      if (revisionError) {
-        console.error('[revision][create][failed]', { assetId, error: revisionError });
-      } else if (revisionData) {
-        revisionNotificationVersion = versionNumber;
-
-        // update asset pointers to reference this new revision
-        await updateAssetRow(
-          assetId,
-          {
-            latest_revision_id: revisionData.id,
-            current_revision_id: revisionData.id,
-            revision_count: versionNumber,
-          },
-          supabase
-        );
-
-        try {
-          const shouldLogRevision = asset.status === 'revision_requested' || isRevisionUpload;
-          if (shouldLogRevision) {
-            await logAssetActivity({
+      try {
+        const shouldLogRevision =
+          asset.status === "revision_requested" || isRevisionUpload
+        if (shouldLogRevision) {
+          await logAssetActivity({
+            assetId,
+            action: "revision_created",
+            metadata: {
               assetId,
-              action: 'revision_created',
-                metadata: {
-                assetId,
-                revisionId: revisionData.id,
-                revisionNumber: versionNumber,
-                r2Key: input.uploadResult.key,
-              },
-            });
-          }
-        } catch (_err) {
-          // non-blocking
+              revisionId: revisionData.id,
+              revisionNumber: versionNumber,
+              r2Key: input.uploadResult.key,
+            },
+          })
         }
+      } catch (_err) {
+        // non-blocking
       }
-    } catch (error) {
-      console.error('[revision][create][error]', { assetId, error });
     }
+  } catch (error) {
+    console.error("[revision][create][error]", { assetId, error })
+  }
 
   try {
     await logAssetActivity({
       assetId,
-      action: 'file_uploaded',
+      action: "file_uploaded",
       metadata: {
         r2Key: input.uploadResult.key,
         fileUrl: input.uploadResult.url,
@@ -636,19 +684,19 @@ export async function finalizeAssetUpload(
         fileSize: input.uploadResult.fileSize,
         uploadStatus: input.uploadResult.uploadStatus,
       },
-    });
+    })
   } catch (error) {
-    logUploadFailure('metadata-persistence', error, assetId, {
+    logUploadFailure("metadata-persistence", error, assetId, {
       clientId: asset.client_id,
       r2Key: input.uploadResult.key,
       fileUrl: input.uploadResult.url,
       mimeType: input.uploadResult.mimeType,
       fileSize: input.uploadResult.fileSize,
-      activity: 'file_uploaded',
-    });
+      activity: "file_uploaded",
+    })
   }
 
-  console.info('[upload][success]', {
+  console.info("[upload][success]", {
     assetId,
     clientId: asset.client_id,
     r2Key: input.uploadResult.key,
@@ -656,7 +704,7 @@ export async function finalizeAssetUpload(
     mimeType: input.uploadResult.mimeType,
     fileSize: input.uploadResult.fileSize,
     uploadStatus: input.uploadResult.uploadStatus,
-  });
+  })
 
   if (isRevisionUpload) {
     if (revisionNotificationVersion != null) {
@@ -669,7 +717,7 @@ export async function finalizeAssetUpload(
           name: user.name ?? null,
         },
         uploadedAt,
-      });
+      })
     }
   } else {
     void sendAssetUploadNotification({
@@ -683,7 +731,7 @@ export async function finalizeAssetUpload(
         name: user.name ?? null,
       },
       uploadedAt,
-    });
+    })
   }
 
   return {
@@ -695,135 +743,149 @@ export async function finalizeAssetUpload(
       fileSize: input.uploadResult.fileSize,
       uploadStatus: input.uploadResult.uploadStatus,
     },
-  };
+  }
 }
 
-export async function uploadAssetFile(assetId: string, file: File): Promise<AssetUploadResult> {
-  const user = await getCurrentUser();
+export async function uploadAssetFile(
+  assetId: string,
+  file: File,
+): Promise<AssetUploadResult> {
+  const user = await getCurrentUser()
   if (!user) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized")
   }
 
-  await getOrCreateCurrentUserProfile();
-  const supabase = await createServerSupabaseClient();
+  await getOrCreateCurrentUserProfile()
+  const supabase = await createServerSupabaseClient()
 
   console.info(
-    '[upload][auth] ' +
+    "[upload][auth] " +
       JSON.stringify({
         assetId,
-        authSource: 'service-cookie-store',
+        authSource: "service-cookie-store",
         userExists: Boolean(user),
         sessionExists: true,
-        cookiesPresent: 'unknown',
-      })
-  );
+        cookiesPresent: "unknown",
+      }),
+  )
 
-  await getOrCreateCurrentUserProfile();
+  await getOrCreateCurrentUserProfile()
 
-  const asset = await getAssetById(assetId, supabase);
+  const asset = await getAssetById(assetId, supabase)
   if (!asset) {
-    throw new Error('Asset not found');
+    throw new Error("Asset not found")
   }
 
-  let clientName = asset.client_id;
+  let clientName = asset.client_id
   try {
-    const client = await getClientById(asset.client_id, supabase);
-    clientName = client?.name ?? clientName;
+    const client = await getClientById(asset.client_id, supabase)
+    clientName = client?.name ?? clientName
   } catch (_error) {
     // Non-blocking: email can fall back to the client id.
   }
 
-  const isRevisionUpload = Boolean(asset.drive_file_id || asset.uploaded_at || (asset.revision_count ?? 0) > 0);
-  let revisionNotificationVersion: number | null = null;
+  const isRevisionUpload = Boolean(
+    asset.drive_file_id || asset.uploaded_at || (asset.revision_count ?? 0) > 0,
+  )
+  let revisionNotificationVersion: number | null = null
 
   if (isRevisionUpload && !canUploadRevisionFromStatus(asset.status)) {
-    throw new Error(`Cannot upload revision to an asset with status "${asset.status}"`);
+    throw new Error(
+      `Cannot upload revision to an asset with status "${asset.status}"`,
+    )
   }
 
   if (!isRevisionUpload) {
-    await transitionAssetStatus(assetId, supabase, 'uploading', 'upload-start');
+    await transitionAssetStatus(assetId, supabase, "uploading", "upload-start")
   }
 
-  console.info('[upload][asset-check]', {
+  console.info("[upload][asset-check]", {
     assetId,
     clientId: asset.client_id,
     assetType: asset.type,
     fileName: file.name,
-    mimeType: file.type || 'application/octet-stream',
+    mimeType: file.type || "application/octet-stream",
     fileSize: file.size,
-  });
+  })
 
   try {
-    const r2Key = getAssetR2Key(asset.client_id, assetId, file.name);
-    const arrayBuffer = await file.arrayBuffer();
+    const r2Key = getAssetR2Key(asset.client_id, assetId, file.name)
+    const arrayBuffer = await file.arrayBuffer()
 
     const uploadResult = await uploadFile({
       key: r2Key,
       body: Buffer.from(arrayBuffer),
-      contentType: file.type || 'application/octet-stream',
+      contentType: file.type || "application/octet-stream",
       contentLength: file.size,
       metadata: {
         assetId,
         clientId: asset.client_id,
         fileName: file.name,
       },
-    });
+    })
 
-    const uploadedAt = new Date().toISOString();
-    const fileExtension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() ?? null : null;
+    const uploadedAt = new Date().toISOString()
+    const fileExtension = file.name.includes(".")
+      ? (file.name.split(".").pop()?.toLowerCase() ?? null)
+      : null
 
     const updates: Parameters<typeof updateAssetRow>[1] = {
       drive_file_id: uploadResult.key,
       drive_file_url: uploadResult.url,
       thumbnail_url: asset.thumbnail_url ?? null,
-      mime_type: file.type || 'application/octet-stream',
+      mime_type: file.type || "application/octet-stream",
       file_size: file.size,
       file_extension: fileExtension,
       uploaded_at: uploadedAt,
       uploaded_by: user.id,
-    };
-
-    if (!isRevisionUpload) {
-      logAssetStatusTransition(assetId, 'uploading', 'uploaded', 'upload-success');
-      updates.status = 'uploaded';
-    } else {
-      console.info('[asset][revision-upload]', {
-        assetId,
-        statusPreserved: asset.status,
-      });
     }
 
-    const updated = await updateAssetRow(assetId, updates, supabase);
-    const persisted = await getAssetById(assetId, supabase);
-    let mapped = mapAsset(persisted ?? updated);
+    if (!isRevisionUpload) {
+      logAssetStatusTransition(
+        assetId,
+        "uploading",
+        "uploaded",
+        "upload-success",
+      )
+      updates.status = "uploaded"
+    } else {
+      console.info("[asset][revision-upload]", {
+        assetId,
+        statusPreserved: asset.status,
+      })
+    }
+
+    const updated = await updateAssetRow(assetId, updates, supabase)
+    const persisted = await getAssetById(assetId, supabase)
+    let mapped = mapAsset(persisted ?? updated)
 
     if (!mapped) {
-      throw new Error('Failed to map asset');
+      throw new Error("Failed to map asset")
     }
 
     try {
       const metadata = await extractAssetMetadata({
         assetId,
         file,
-        mimeType: file.type || 'application/octet-stream',
+        mimeType: file.type || "application/octet-stream",
         fileSize: file.size,
         driveFileId: uploadResult.key,
         driveFileUrl: uploadResult.url,
         thumbnailUrl: asset.thumbnail_url ?? null,
         uploadedBy: user.id,
         uploadedAt,
-      });
+      })
 
-      await updateAssetRow(assetId, metadata.updates, supabase);
-      const refreshed = await getAssetById(assetId, supabase);
-      const refreshedMapped = mapAsset(refreshed);
+      await updateAssetRow(assetId, metadata.updates, supabase)
+      const refreshed = await getAssetById(assetId, supabase)
+      const refreshedMapped = mapAsset(refreshed)
       if (refreshedMapped) {
-        mapped = refreshedMapped;
+        mapped = refreshedMapped
       }
       try {
-        const persistedAfterUpdate = refreshed ?? persisted;
-        const currentCount = persistedAfterUpdate?.revision_count ?? 0;
-        const versionNumber = (currentCount ?? 0) + 1;
+        const persistedAfterUpdate = refreshed ?? persisted
+        const currentCount = persistedAfterUpdate?.revision_count ?? 0
+        const versionNumber = (currentCount ?? 0) + 1
 
         const revisionInsert = {
           asset_id: assetId,
@@ -833,19 +895,26 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           drive_file_id: uploadResult.key,
           drive_file_url: uploadResult.url,
           file_size: file.size,
-          mime_type: file.type || 'application/octet-stream',
+          mime_type: file.type || "application/octet-stream",
           media_width: metadata.extractedFields.mediaWidth ?? null,
           media_height: metadata.extractedFields.mediaHeight ?? null,
           duration_seconds: metadata.extractedFields.durationSeconds ?? null,
           change_note: null,
           metadata: metadata.extractedFields,
-        };
+        }
 
-        const { data: revisionData, error: revisionError } = await supabase.from('asset_revisions').insert(revisionInsert as any).select('id').single();
+        const { data: revisionData, error: revisionError } = await supabase
+          .from("asset_revisions")
+          .insert(revisionInsert as any)
+          .select("id")
+          .single()
         if (revisionError) {
-          console.error('[revision][create][failed]', { assetId, error: revisionError });
+          console.error("[revision][create][failed]", {
+            assetId,
+            error: revisionError,
+          })
         } else if (revisionData) {
-          revisionNotificationVersion = versionNumber;
+          revisionNotificationVersion = versionNumber
 
           await updateAssetRow(
             assetId,
@@ -854,80 +923,85 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
               current_revision_id: revisionData.id,
               revision_count: versionNumber,
             },
-            supabase
-          );
+            supabase,
+          )
 
           try {
-            console.log('[activity-log][revision]', {
+            console.log("[activity-log][revision]", {
               assetId,
               currentStatus: asset.status,
-              eventType: 'revision_created'
-            });
-            const shouldLogRevision = asset.status === 'revision_requested' || isRevisionUpload;
+              eventType: "revision_created",
+            })
+            const shouldLogRevision =
+              asset.status === "revision_requested" || isRevisionUpload
             if (shouldLogRevision) {
               await logAssetActivity({
                 assetId,
-                action: 'revision_created',
+                action: "revision_created",
                 metadata: {
                   assetId,
                   revisionId: revisionData.id,
                   revisionNumber: versionNumber,
                   r2Key: uploadResult.key,
                 },
-              });
+              })
             }
           } catch (_err) {
             // non-blocking
           }
         }
       } catch (error) {
-        console.error('[revision][create][error]', { assetId, error });
+        console.error("[revision][create][error]", { assetId, error })
       }
     } catch (error) {
-      logUploadFailure('metadata-extraction', error, assetId, {
+      logUploadFailure("metadata-extraction", error, assetId, {
         clientId: asset.client_id,
-        mediaType: file.type.startsWith('video/') ? 'video' : file.type.startsWith('image/') ? 'image' : 'other',
-        triggerSource: 'post-upload-enrichment',
-      });
+        mediaType: file.type.startsWith("video/")
+          ? "video"
+          : file.type.startsWith("image/")
+            ? "image"
+            : "other",
+        triggerSource: "post-upload-enrichment",
+      })
     }
 
     try {
-      console.log('[activity-log][upload]', {
+      console.log("[activity-log][upload]", {
         assetId,
         currentStatus: mapped.status,
-        eventType: 'file_uploaded'
-      });
+        eventType: "file_uploaded",
+      })
       await logAssetActivity({
         assetId,
-        action: 'file_uploaded',
+        action: "file_uploaded",
         metadata: {
           r2Key: uploadResult.key,
           fileUrl: uploadResult.url,
-          mimeType: file.type || 'application/octet-stream',
+          mimeType: file.type || "application/octet-stream",
           fileSize: file.size,
-          uploadStatus: 'uploaded',
+          uploadStatus: "uploaded",
         },
-      });
+      })
     } catch (error) {
-      logUploadFailure('metadata-persistence', error, assetId, {
+      logUploadFailure("metadata-persistence", error, assetId, {
         clientId: asset.client_id,
         r2Key: uploadResult.key,
         fileUrl: uploadResult.url,
-        mimeType: file.type || 'application/octet-stream',
+        mimeType: file.type || "application/octet-stream",
         fileSize: file.size,
-        activity: 'file_uploaded',
-      });
+        activity: "file_uploaded",
+      })
     }
 
-    console.info('[upload][success]', {
+    console.info("[upload][success]", {
       assetId,
       clientId: asset.client_id,
       r2Key: uploadResult.key,
       fileUrl: uploadResult.url,
-      mimeType: file.type || 'application/octet-stream',
+      mimeType: file.type || "application/octet-stream",
       fileSize: file.size,
-      uploadStatus: 'uploaded',
-    });
+      uploadStatus: "uploaded",
+    })
 
     if (isRevisionUpload) {
       if (revisionNotificationVersion != null) {
@@ -940,7 +1014,7 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
             name: user.name ?? null,
           },
           uploadedAt,
-        });
+        })
       }
     } else {
       void sendAssetUploadNotification({
@@ -954,17 +1028,22 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
           name: user.name ?? null,
         },
         uploadedAt,
-      });
+      })
     }
 
     try {
       await logAuditEvent({
-        action: isRevisionUpload ? 'revision_uploaded' : 'file_uploaded',
-        entityType: 'asset',
+        action: isRevisionUpload ? "revision_uploaded" : "file_uploaded",
+        entityType: "asset",
         entityId: assetId,
-        entityName: asset.title ?? 'Untitled',
-        metadata: { fileName: file.name, r2Key: uploadResult.key, fileSize: file.size, isRevision: isRevisionUpload },
-      });
+        entityName: asset.title ?? "Untitled",
+        metadata: {
+          fileName: file.name,
+          r2Key: uploadResult.key,
+          fileSize: file.size,
+          isRevision: isRevisionUpload,
+        },
+      })
     } catch (_error) {
       // Audit logging should not block upload.
     }
@@ -974,141 +1053,170 @@ export async function uploadAssetFile(assetId: string, file: File): Promise<Asse
       upload: {
         r2Key: uploadResult.key,
         fileUrl: uploadResult.url,
-        mimeType: file.type || 'application/octet-stream',
+        mimeType: file.type || "application/octet-stream",
         fileSize: file.size,
-        uploadStatus: 'uploaded' as const,
+        uploadStatus: "uploaded" as const,
       },
-    };
+    }
   } catch (error) {
     try {
-      const currentAsset = await getAssetById(assetId, supabase);
-      if (!isRevisionUpload && currentAsset && currentAsset.status !== 'failed' && canTransitionStatus(currentAsset.status, 'failed')) {
-        logAssetStatusTransition(assetId, currentAsset.status, 'failed', 'upload-failure');
-        await updateAssetRow(assetId, { status: 'failed' }, supabase);
+      const currentAsset = await getAssetById(assetId, supabase)
+      if (
+        !isRevisionUpload &&
+        currentAsset &&
+        currentAsset.status !== "failed" &&
+        canTransitionStatus(currentAsset.status, "failed")
+      ) {
+        logAssetStatusTransition(
+          assetId,
+          currentAsset.status,
+          "failed",
+          "upload-failure",
+        )
+        await updateAssetRow(assetId, { status: "failed" }, supabase)
       }
     } catch (rollbackError) {
-      logUploadFailure('status-transition', rollbackError, assetId, {
-        triggerSource: 'upload-failure',
-      });
+      logUploadFailure("status-transition", rollbackError, assetId, {
+        triggerSource: "upload-failure",
+      })
     }
 
-    logUploadFailure('upload-failure', error, assetId, {
+    logUploadFailure("upload-failure", error, assetId, {
       clientId: asset.client_id,
-      triggerSource: 'upload-failure',
-    });
-    throw error;
+      triggerSource: "upload-failure",
+    })
+    throw error
   }
 }
 
 export async function updateAsset(
   assetId: string,
-  input: Partial<AssetInput>
+  input: Partial<AssetInput>,
 ): Promise<Asset> {
-  const user = await getCurrentUser();
-  const supabase = await createServerSupabaseClient();
+  const user = await getCurrentUser()
+  const supabase = await createServerSupabaseClient()
 
   if (user) {
-    await getOrCreateCurrentUserProfile();
+    await getOrCreateCurrentUserProfile()
   }
 
-  const existing = await getAssetById(assetId);
+  const existing = await getAssetById(assetId)
   if (!existing) {
-    throw new Error('Asset not found');
+    throw new Error("Asset not found")
   }
 
   if (input.status !== undefined) {
     if (!canTransitionStatus(existing.status, input.status)) {
-      throw new Error('Invalid status transition');
+      throw new Error("Invalid status transition")
     }
 
-    const scheduledAt = input.scheduledAt ?? existing.scheduled_at;
-    if (input.status === 'scheduled' && !scheduledAt) {
-      throw new Error('Scheduled assets require a scheduled date');
+    const scheduledAt = input.scheduledAt ?? existing.scheduled_at
+    if (input.status === "scheduled" && !scheduledAt) {
+      throw new Error("Scheduled assets require a scheduled date")
     }
   }
 
-  const updates: Record<string, unknown> = {};
-  if (input.clientId !== undefined) updates.client_id = input.clientId;
-  if (input.title !== undefined) updates.title = input.title;
-  if (input.type !== undefined) updates.type = input.type;
-  if (input.status !== undefined) updates.status = input.status;
-  if (input.driveFileUrl !== undefined) updates.drive_file_url = input.driveFileUrl;
-  if (input.thumbnailUrl !== undefined) updates.thumbnail_url = input.thumbnailUrl;
-  if (input.assignedTo !== undefined) updates.assigned_to = input.assignedTo;
+  const updates: Record<string, unknown> = {}
+  if (input.clientId !== undefined) updates.client_id = input.clientId
+  if (input.title !== undefined) updates.title = input.title
+  if (input.type !== undefined) updates.type = input.type
+  if (input.status !== undefined) updates.status = input.status
+  if (input.driveFileUrl !== undefined)
+    updates.drive_file_url = input.driveFileUrl
+  if (input.thumbnailUrl !== undefined)
+    updates.thumbnail_url = input.thumbnailUrl
+  if (input.assignedTo !== undefined) updates.assigned_to = input.assignedTo
   if (input.scheduledAt !== undefined) {
-    const scheduledFields = splitScheduledAt(input.scheduledAt);
-    updates.scheduled_at = input.scheduledAt;
-    updates.publish_date = scheduledFields.publishDate;
-    updates.publish_time = scheduledFields.publishTime;
-    updates.scheduled_by = input.scheduledBy ?? user?.id ?? existing.scheduled_by ?? null;
+    const scheduledFields = splitScheduledAt(input.scheduledAt)
+    updates.scheduled_at = input.scheduledAt
+    updates.publish_date = scheduledFields.publishDate
+    updates.publish_time = scheduledFields.publishTime
+    updates.scheduled_by =
+      input.scheduledBy ?? user?.id ?? existing.scheduled_by ?? null
   }
-  if (input.publishDate !== undefined) updates.publish_date = input.publishDate;
-  if (input.publishTime !== undefined) updates.publish_time = input.publishTime;
-  if (input.scheduledBy !== undefined) updates.scheduled_by = input.scheduledBy;
-  if (input.publishedAt !== undefined) updates.published_at = input.publishedAt;
-  if (input.approvedAt !== undefined) updates.approved_at = input.approvedAt;
-  if (input.approvedBy !== undefined) updates.approved_by = input.approvedBy;
+  if (input.publishDate !== undefined) updates.publish_date = input.publishDate
+  if (input.publishTime !== undefined) updates.publish_time = input.publishTime
+  if (input.scheduledBy !== undefined) updates.scheduled_by = input.scheduledBy
+  if (input.publishedAt !== undefined) updates.published_at = input.publishedAt
+  if (input.approvedAt !== undefined) updates.approved_at = input.approvedAt
+  if (input.approvedBy !== undefined) updates.approved_by = input.approvedBy
+  if (input.recurrence !== undefined) updates.recurrence = input.recurrence
 
-  if (input.status === 'approved') {
-    updates.approved_at = input.approvedAt ?? new Date().toISOString();
-    updates.approved_by = input.approvedBy ?? user?.id ?? existing.approved_by ?? null;
+  if (input.status === "approved") {
+    updates.approved_at = input.approvedAt ?? new Date().toISOString()
+    updates.approved_by =
+      input.approvedBy ?? user?.id ?? existing.approved_by ?? null
   }
 
-  if (input.status === 'published') {
-    updates.published_at = input.publishedAt ?? new Date().toISOString();
+  if (input.status === "published") {
+    updates.published_at = input.publishedAt ?? new Date().toISOString()
   }
 
-  let record = await updateAssetRow(assetId, updates as Parameters<typeof updateAssetRow>[1], supabase);
+  const record = await updateAssetRow(
+    assetId,
+    updates as Parameters<typeof updateAssetRow>[1],
+    supabase,
+  )
 
-  const mapped = mapAsset(record);
+  const mapped = mapAsset(record)
   if (!mapped) {
-    throw new Error('Failed to map asset');
+    throw new Error("Failed to map asset")
   }
 
-  const statusChanged = input.status !== undefined && input.status !== existing.status;
+  const statusChanged =
+    input.status !== undefined && input.status !== existing.status
   const assignmentChanged =
-    input.assignedTo !== undefined && input.assignedTo !== existing.assigned_to;
+    input.assignedTo !== undefined && input.assignedTo !== existing.assigned_to
 
   if (statusChanged) {
-    logAssetStatusTransition(assetId, existing.status as AssetStatus, input.status as AssetStatus, 'api-update');
+    logAssetStatusTransition(
+      assetId,
+      existing.status as AssetStatus,
+      input.status as AssetStatus,
+      "api-update",
+    )
 
     emitEvent({
-      type: 'asset:status-changed',
-      payload: { assetId, previousStatus: existing.status, nextStatus: input.status },
-    });
+      type: "asset:status-changed",
+      payload: {
+        assetId,
+        previousStatus: existing.status,
+        nextStatus: input.status,
+      },
+    })
 
     try {
       await logAssetActivity({
         assetId,
-        action: 'status_changed',
+        action: "status_changed",
         metadata: {
           from: existing.status,
           to: input.status,
         },
-      });
+      })
     } catch (_error) {
       // Activity logging should not block updates.
     }
     try {
       await logAuditEvent({
-        action: 'status_changed',
-        entityType: 'asset',
+        action: "status_changed",
+        entityType: "asset",
         entityId: assetId,
         entityName: existing.title,
         metadata: { from: existing.status, to: input.status },
-      });
+      })
     } catch (_error) {
       // Audit logging should not block updates.
     }
   } else if (input.title && input.title !== existing.title) {
     try {
       await logAuditEvent({
-        action: 'asset_updated',
-        entityType: 'asset',
+        action: "asset_updated",
+        entityType: "asset",
         entityId: assetId,
         entityName: existing.title,
-        metadata: { field: 'title', from: existing.title, to: input.title },
-      });
+        metadata: { field: "title", from: existing.title, to: input.title },
+      })
     } catch (_error) {
       // Audit logging should not block updates.
     }
@@ -1118,142 +1226,158 @@ export async function updateAsset(
     try {
       await logAssetActivity({
         assetId,
-        action: 'assignment_changed',
+        action: "assignment_changed",
         metadata: {
           from: existing.assigned_to ?? null,
           to: input.assignedTo ?? null,
         },
-      });
+      })
     } catch (_error) {
       // Activity logging should not block updates.
     }
   }
 
-  return mapped;
+  return mapped
 }
 
-const approvalEligibleStatuses = new Set<AssetStatus>(['draft', 'ready_for_review', 'revision_requested']);
+const approvalEligibleStatuses = new Set<AssetStatus>([
+  "draft",
+  "ready_for_review",
+  "revision_requested",
+])
 
-export async function approveAsset(assetId: string, userId: string): Promise<Asset> {
-  await getOrCreateCurrentUserProfile();
-  const supabase = await createServerSupabaseClient();
-  const existing = await getAssetById(assetId, supabase);
+export async function approveAsset(
+  assetId: string,
+  userId: string,
+): Promise<Asset> {
+  await getOrCreateCurrentUserProfile()
+  const supabase = await createServerSupabaseClient()
+  const existing = await getAssetById(assetId, supabase)
   if (!existing) {
-    throw new Error('Asset not found');
+    throw new Error("Asset not found")
   }
 
-  if (existing.status === 'approved') {
-    const mapped = mapAsset(existing);
+  if (existing.status === "approved") {
+    const mapped = mapAsset(existing)
     if (!mapped) {
-      throw new Error('Failed to map asset');
+      throw new Error("Failed to map asset")
     }
-    return mapped;
+    return mapped
   }
 
   if (!approvalEligibleStatuses.has(existing.status)) {
-    throw new Error('Asset is not eligible for approval');
+    throw new Error("Asset is not eligible for approval")
   }
 
   if (!existing.drive_file_id) {
-    throw new Error('Asset has no uploaded file and cannot be approved');
+    throw new Error("Asset has no uploaded file and cannot be approved")
   }
 
-  const approvedAt = new Date().toISOString();
+  const approvedAt = new Date().toISOString()
   const updated = await updateAssetRow(
     assetId,
     {
-      status: 'approved',
+      status: "approved",
       approved_at: approvedAt,
       approved_by: userId,
     },
-    supabase
-  );
+    supabase,
+  )
 
-  const mapped = mapAsset(updated);
+  const mapped = mapAsset(updated)
   if (!mapped) {
-    throw new Error('Failed to map asset');
+    throw new Error("Failed to map asset")
   }
 
   emitEvent({
-    type: 'asset:status-changed',
-    payload: { assetId, previousStatus: existing.status, nextStatus: 'approved' },
-  });
+    type: "asset:status-changed",
+    payload: {
+      assetId,
+      previousStatus: existing.status,
+      nextStatus: "approved",
+    },
+  })
 
   try {
     await logAuditEvent({
-      action: 'asset_approved',
-      entityType: 'asset',
+      action: "asset_approved",
+      entityType: "asset",
       entityId: assetId,
-      entityName: existing.title ?? 'Untitled',
-      metadata: { from: existing.status, to: 'approved' },
-    });
+      entityName: existing.title ?? "Untitled",
+      metadata: { from: existing.status, to: "approved" },
+    })
   } catch (_error) {
     // Audit logging should not block approval.
   }
 
-  return mapped;
+  return mapped
 }
 
-export async function rejectAsset(assetId: string, userId: string): Promise<Asset> {
-  await getOrCreateCurrentUserProfile();
-  const supabase = await createServerSupabaseClient();
-  const existing = await getAssetById(assetId, supabase);
+export async function rejectAsset(
+  assetId: string,
+  userId: string,
+): Promise<Asset> {
+  await getOrCreateCurrentUserProfile()
+  const supabase = await createServerSupabaseClient()
+  const existing = await getAssetById(assetId, supabase)
   if (!existing) {
-    throw new Error('Asset not found');
+    throw new Error("Asset not found")
   }
 
-  if (existing.status === 'revision_requested') {
-    const mapped = mapAsset(existing);
+  if (existing.status === "revision_requested") {
+    const mapped = mapAsset(existing)
     if (!mapped) {
-      throw new Error('Failed to map asset');
+      throw new Error("Failed to map asset")
     }
-    return mapped;
+    return mapped
   }
 
   if (!approvalEligibleStatuses.has(existing.status)) {
-    throw new Error('Asset is not eligible for rejection');
+    throw new Error("Asset is not eligible for rejection")
   }
 
   const updated = await updateAssetRow(
     assetId,
     {
-      status: 'revision_requested',
+      status: "revision_requested",
       approved_at: null,
       approved_by: null,
     },
-    supabase
-  );
+    supabase,
+  )
 
   // Handle Notifications
   try {
     if (existing.assigned_to) {
-      const assignedDesigner = await getUserById(existing.assigned_to, supabase);
-      
+      const assignedDesigner = await getUserById(existing.assigned_to, supabase)
+
       // Do not send if the user rejecting is the assigned designer
       if (assignedDesigner?.email && userId !== assignedDesigner.id) {
-        let clientName = 'Unknown Client';
+        let clientName = "Unknown Client"
         if (existing.client_id) {
-          const client = await getClientById(existing.client_id, supabase);
+          const client = await getClientById(existing.client_id, supabase)
           if (client) {
-            clientName = client.name;
+            clientName = client.name
           }
         }
 
-        const requestingUser = await getUserById(userId, supabase);
+        const requestingUser = await getUserById(userId, supabase)
 
         // Fetch latest comment to include in the email
-        let latestCommentText = null;
+        let latestCommentText = null
         try {
-          const comments = await listCommentsByAssetId(assetId, supabase, { limit: 1 });
+          const comments = await listCommentsByAssetId(assetId, supabase, {
+            limit: 1,
+          })
           if (comments && comments.length > 0) {
-            latestCommentText = comments[0].message;
+            latestCommentText = comments[0].message
           }
         } catch (_err) {
           // non-blocking
         }
 
         void sendDesignerNotification({
-          notificationType: 'revision_requested',
+          notificationType: "revision_requested",
           assetId: existing.id,
           assetTitle: existing.title,
           assetType: existing.type,
@@ -1264,62 +1388,72 @@ export async function rejectAsset(assetId: string, userId: string): Promise<Asse
           designerEmail: assignedDesigner.email,
           designerName: assignedDesigner.full_name || null,
           requestedBy: {
-            email: requestingUser?.email || 'unknown',
+            email: requestingUser?.email || "unknown",
             name: requestingUser?.full_name || null,
           },
           timestamp: new Date().toISOString(),
-        });
+        })
       }
     }
   } catch (err) {
-    console.error('[assets-service] Failed to send designer notification on reject', err);
+    console.error(
+      "[assets-service] Failed to send designer notification on reject",
+      err,
+    )
   }
 
-  const mapped = mapAsset(updated);
+  const mapped = mapAsset(updated)
   if (!mapped) {
-    throw new Error('Failed to map asset');
+    throw new Error("Failed to map asset")
   }
 
   emitEvent({
-    type: 'asset:status-changed',
-    payload: { assetId, previousStatus: existing.status, nextStatus: 'revision_requested' },
-  });
+    type: "asset:status-changed",
+    payload: {
+      assetId,
+      previousStatus: existing.status,
+      nextStatus: "revision_requested",
+    },
+  })
 
   try {
     await logAuditEvent({
-      action: 'asset_rejected',
-      entityType: 'asset',
+      action: "asset_rejected",
+      entityType: "asset",
       entityId: assetId,
-      entityName: existing.title ?? 'Untitled',
-      metadata: { from: existing.status, to: 'revision_requested' },
-    });
+      entityName: existing.title ?? "Untitled",
+      metadata: { from: existing.status, to: "revision_requested" },
+    })
   } catch (_error) {
     // Audit logging should not block rejection.
   }
 
-  return mapped;
+  return mapped
 }
 
 export async function removeAsset(assetId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient();
-  const asset = await getAssetById(assetId, supabase);
+  const supabase = await createServerSupabaseClient()
+  const asset = await getAssetById(assetId, supabase)
   if (asset?.drive_file_id) {
     try {
-      await deleteFile(asset.drive_file_id);
+      await deleteFile(asset.drive_file_id)
     } catch (_e) {
-      console.warn('[asset][delete][r2-cleanup-failed]', { assetId, key: asset.drive_file_id });
+      console.warn("[asset][delete][r2-cleanup-failed]", {
+        assetId,
+        key: asset.drive_file_id,
+      })
     }
   }
   try {
     await logAuditEvent({
-      action: 'asset_deleted',
-      entityType: 'asset',
+      action: "asset_deleted",
+      entityType: "asset",
       entityId: assetId,
-      entityName: asset?.title ?? '',
+      entityName: asset?.title ?? "",
       metadata: { driveFileId: asset?.drive_file_id ?? null },
-    });
+    })
   } catch (_error) {
     // Audit logging should not block deletion.
   }
-  await deleteAssetRow(assetId);
+  await deleteAssetRow(assetId)
 }

@@ -1,15 +1,15 @@
 export type EventPayload = {
-  type: string;
-  payload?: unknown;
-  timestamp?: string;
-};
+  type: string
+  payload?: unknown
+  timestamp?: string
+}
 
-const listeners = new Set<(e: EventPayload) => void>();
+const listeners = new Set<(e: EventPayload) => void>()
 
 export function emitEvent(event: EventPayload) {
   for (const listener of Array.from(listeners)) {
     try {
-      listener(event);
+      listener(event)
     } catch (_err) {
       // swallow listener errors
     }
@@ -17,12 +17,12 @@ export function emitEvent(event: EventPayload) {
 }
 
 export function subscribe(listener: (e: EventPayload) => void) {
-  listeners.add(listener);
+  listeners.add(listener)
   return () => {
-    listeners.delete(listener);
-  };
+    listeners.delete(listener)
+  }
 }
 
 export function clearAllListeners() {
-  listeners.clear();
+  listeners.clear()
 }

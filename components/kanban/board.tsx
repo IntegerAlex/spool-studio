@@ -1,63 +1,71 @@
-'use client';
+"use client"
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import React from 'react';
-import { Asset, AssetStatus } from '@/types/index';
-import { Card } from '@/components/ui/card';
-import Link from 'next/link';
-import { cn } from '@/lib/utils';
-import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
-import { StatusBadge } from '@/components/assets/status-badge';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import Lenis from 'lenis';
+import { AnimatePresence, motion } from "framer-motion"
+import Lenis from "lenis"
 import {
-  GripVertical,
-  ChevronDown,
-  ChevronUp,
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
   Clock,
-  MessageSquare,
-  MoreHorizontal,
   Copy,
   Eye,
-} from 'lucide-react';
+  GripVertical,
+  MessageSquare,
+  MoreHorizontal,
+} from "lucide-react"
+import Link from "next/link"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { StatusBadge } from "@/components/assets/status-badge"
+import { getAssetIcon, getAssetPreviewType } from "@/lib/asset-display"
 import {
   getKanbanWorkflowColumnId,
   getKanbanWorkflowColumnIndex,
   getKanbanWorkflowStatusForColumn,
   isKanbanHiddenStatus,
-  kanbanWorkflowColumns,
   type KanbanWorkflowColumnId,
-} from '@/lib/kanban-workflow';
+  kanbanWorkflowColumns,
+} from "@/lib/kanban-workflow"
+import { cn } from "@/lib/utils"
+import type { Asset, AssetStatus } from "@/types/index"
 
 interface KanbanBoardProps {
-  assets: Asset[];
-  onStatusChange?: (assetId: string, newStatus: AssetStatus) => void;
+  assets: Asset[]
+  onStatusChange?: (assetId: string, newStatus: AssetStatus) => void
 }
 
 function isOverdue(asset: Asset): boolean {
   if (
-    asset.status === 'uploading' ||
-    asset.status === 'uploaded' ||
-    asset.status === 'processing' ||
-    asset.status === 'approved' ||
-    asset.status === 'published' ||
-    asset.status === 'archived' ||
-    asset.status === 'failed' ||
-    asset.status === 'scheduled'
-  ) return false;
-  const daysSinceCreation = Math.floor((Date.now() - asset.createdAt.getTime()) / (1000 * 60 * 60 * 24));
-  return daysSinceCreation > 7;
+    asset.status === "uploading" ||
+    asset.status === "uploaded" ||
+    asset.status === "processing" ||
+    asset.status === "approved" ||
+    asset.status === "published" ||
+    asset.status === "archived" ||
+    asset.status === "failed" ||
+    asset.status === "scheduled"
+  )
+    return false
+  const daysSinceCreation = Math.floor(
+    (Date.now() - asset.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+  )
+  return daysSinceCreation > 7
 }
 
-function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQuickApprove?: () => void; isDragging?: boolean }) {
-  const [showActions, setShowActions] = useState(false);
-  const revisionCount = asset.revisions.length;
-  const commentCount = asset.comments.length;
-  const overdue = isOverdue(asset);
-  const AssetIcon = getAssetIcon(asset);
-  const previewType = getAssetPreviewType(asset);
+function KanbanCard({
+  asset,
+  onQuickApprove,
+  isDragging,
+}: {
+  asset: Asset
+  onQuickApprove?: () => void
+  isDragging?: boolean
+}) {
+  const [showActions, setShowActions] = useState(false)
+  const revisionCount = asset.revisions.length
+  const commentCount = asset.comments.length
+  const overdue = isOverdue(asset)
+  const AssetIcon = getAssetIcon(asset)
+  const previewType = getAssetPreviewType(asset)
 
   return (
     <motion.div
@@ -68,20 +76,22 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
         scale: isDragging ? 1.03 : 1,
         y: 0,
         boxShadow: isDragging
-          ? '0 20px 40px rgba(0,0,0,0.4), 0 0 0 2px rgba(16,185,129,0.3)'
-          : '0 0 0 0px rgba(0,0,0,0)',
+          ? "0 20px 40px rgba(0,0,0,0.4), 0 0 0 2px rgba(16,185,129,0.3)"
+          : "0 0 0 0px rgba(0,0,0,0)",
       }}
       exit={{ opacity: 0, scale: 0.95, y: -10, transition: { duration: 0.2 } }}
       transition={{
-        layout: { type: 'spring', stiffness: 350, damping: 30 },
+        layout: { type: "spring", stiffness: 350, damping: 30 },
         opacity: { duration: 0.2 },
-        scale: { type: 'spring', stiffness: 400, damping: 25 },
+        scale: { type: "spring", stiffness: 400, damping: 25 },
       }}
-      whileHover={!isDragging ? { y: -2, transition: { duration: 0.15 } } : undefined}
+      whileHover={
+        !isDragging ? { y: -2, transition: { duration: 0.15 } } : undefined
+      }
       className={cn(
-        'group relative mb-2 overflow-hidden kanban-card shadow-none',
-        overdue && 'border-[rgba(239,68,68,0.4)]',
-        isDragging && 'z-50'
+        "group relative mb-2 overflow-hidden kanban-card shadow-none",
+        overdue && "border-[rgba(239,68,68,0.4)]",
+        isDragging && "z-50",
       )}
     >
       <div className="flex items-start gap-2">
@@ -91,9 +101,13 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
 
         <Link href={`/dashboard/assets/${asset.id}`} className="min-w-0 flex-1">
           <div className="mb-2 overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)]">
-            {previewType === 'image' && asset.thumbnailUrl ? (
+            {previewType === "image" && asset.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={asset.thumbnailUrl} alt={asset.title} className="h-14 w-full object-cover" />
+              <img
+                src={asset.thumbnailUrl}
+                alt={asset.title}
+                className="h-14 w-full object-cover"
+              />
             ) : (
               <div className="flex h-14 items-center gap-2 px-3 text-[11px] text-[var(--color-text-secondary)]">
                 <AssetIcon className="h-4 w-4 text-[var(--color-text-faint)]" />
@@ -106,10 +120,16 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
               <h4 className="truncate kanban-card-title">{asset.title}</h4>
               <div className="mt-1 flex items-center gap-1 kanban-card-meta">
                 <AssetIcon className="h-3.5 w-3.5 text-[var(--color-text-faint)]" />
-                <span className="truncate capitalize">{asset.fileExtension ?? asset.mimeType?.split('/').pop() ?? asset.type}</span>
+                <span className="truncate capitalize">
+                  {asset.fileExtension ??
+                    asset.mimeType?.split("/").pop() ??
+                    asset.type}
+                </span>
               </div>
             </div>
-            {overdue && <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#ca8a04]" />}
+            {overdue && (
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#ca8a04]" />
+            )}
           </div>
         </Link>
 
@@ -152,8 +172,11 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
               <Eye className="h-3 w-3" />
               View
             </button>
-            {asset.status === 'revision_requested' && (
-              <button onClick={onQuickApprove} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-[#16a34a] hover:bg-[rgba(22,163,74,0.1)]">
+            {asset.status === "revision_requested" && (
+              <button
+                onClick={onQuickApprove}
+                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-[#16a34a] hover:bg-[rgba(22,163,74,0.1)]"
+              >
                 <CheckCircle2 className="h-3 w-3" />
                 Approve
               </button>
@@ -166,22 +189,25 @@ function KanbanCard({ asset, onQuickApprove, isDragging }: { asset: Asset; onQui
         )}
       </AnimatePresence>
     </motion.div>
-  );
+  )
 }
 
 function areEqual(prev: any, next: any) {
-  const a = prev.asset;
-  const b = next.asset;
-  if (a.id !== b.id) return false;
-  if (a.title !== b.title) return false;
-  if (a.status !== b.status) return false;
-  if (a.thumbnailUrl !== b.thumbnailUrl) return false;
-  if ((a.revisions?.length ?? 0) !== (b.revisions?.length ?? 0)) return false;
-  if ((a.comments?.length ?? 0) !== (b.comments?.length ?? 0)) return false;
-  return prev.isDragging === next.isDragging && prev.onQuickApprove === next.onQuickApprove;
+  const a = prev.asset
+  const b = next.asset
+  if (a.id !== b.id) return false
+  if (a.title !== b.title) return false
+  if (a.status !== b.status) return false
+  if (a.thumbnailUrl !== b.thumbnailUrl) return false
+  if ((a.revisions?.length ?? 0) !== (b.revisions?.length ?? 0)) return false
+  if ((a.comments?.length ?? 0) !== (b.comments?.length ?? 0)) return false
+  return (
+    prev.isDragging === next.isDragging &&
+    prev.onQuickApprove === next.onQuickApprove
+  )
 }
 
-const MemoizedKanbanCard = React.memo(KanbanCard, areEqual);
+const MemoizedKanbanCard = React.memo(KanbanCard, areEqual)
 
 function KanbanColumn({
   status,
@@ -193,36 +219,39 @@ function KanbanColumn({
   onDrop,
   onStatusChange,
 }: {
-  status: typeof kanbanWorkflowColumns[number];
-  assets: Asset[];
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-  draggedItem: { assetId: string; fromStatus: AssetStatus } | null;
-  onDragStart: (assetId: string, status: AssetStatus) => void;
-  onDrop: (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => void;
-  onStatusChange?: (assetId: string, newStatus: AssetStatus) => void;
+  status: (typeof kanbanWorkflowColumns)[number]
+  assets: Asset[]
+  isCollapsed: boolean
+  onToggleCollapse: () => void
+  draggedItem: { assetId: string; fromStatus: AssetStatus } | null
+  onDragStart: (assetId: string, status: AssetStatus) => void
+  onDrop: (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => void
+  onStatusChange?: (assetId: string, newStatus: AssetStatus) => void
 }) {
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false)
 
-  let dotColor = '#52525b';
-  if (status.id === 'draft') dotColor = '#525252';
-  else if (status.id === 'revision') dotColor = '#ca8a04';
-  else if (status.id === 'approved') dotColor = '#16a34a';
-  else if (status.id === 'published') dotColor = '#3b82f6';
+  let dotColor = "#52525b"
+  if (status.id === "draft") dotColor = "#525252"
+  else if (status.id === "revision") dotColor = "#ca8a04"
+  else if (status.id === "approved") dotColor = "#16a34a"
+  else if (status.id === "published") dotColor = "#3b82f6"
 
   return (
     <div className="kanban-column-container">
       <div className="kanban-column-header">
         <div className="flex items-center gap-2">
-          <span className="h-[6px] w-[6px] shrink-0 rounded-full" style={{ backgroundColor: dotColor }} />
+          <span
+            className="h-[6px] w-[6px] shrink-0 rounded-full"
+            style={{ backgroundColor: dotColor }}
+          />
           <button
             onClick={onToggleCollapse}
             className="rounded p-0.5 transition-colors hover:bg-[rgba(255,255,255,0.04)]"
-            aria-label={isCollapsed ? 'Expand column' : 'Collapse column'}
+            aria-label={isCollapsed ? "Expand column" : "Collapse column"}
           >
             <motion.div
               animate={{ rotate: isCollapsed ? 180 : 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
               <ChevronDown className="h-4 w-4 text-[var(--color-text-muted)]" />
             </motion.div>
@@ -233,7 +262,7 @@ function KanbanColumn({
           key={columnAssets.length}
           initial={{ scale: 1.3 }}
           animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
           className="kanban-column-counter"
         >
           {columnAssets.length}
@@ -242,17 +271,21 @@ function KanbanColumn({
 
       <motion.div
         onDragOver={(e) => {
-          e.preventDefault();
-          setIsDragOver(true);
+          e.preventDefault()
+          setIsDragOver(true)
         }}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={(e) => {
-          setIsDragOver(false);
-          onDrop(e, status.id);
+          setIsDragOver(false)
+          onDrop(e, status.id)
         }}
         animate={{
-          backgroundColor: isDragOver ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0)',
-          borderColor: isDragOver ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.06)',
+          backgroundColor: isDragOver
+            ? "rgba(255,255,255,0.03)"
+            : "rgba(255,255,255,0)",
+          borderColor: isDragOver
+            ? "rgba(16,185,129,0.3)"
+            : "rgba(255,255,255,0.06)",
         }}
         transition={{ duration: 0.15 }}
         className="kanban-column-body border border-transparent rounded-lg"
@@ -262,9 +295,9 @@ function KanbanColumn({
             <motion.div
               key="collapsed"
               initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
+              animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="flex items-center justify-center py-8 text-[12px] text-[var(--color-text-muted)]"
             >
               {columnAssets.length} items
@@ -277,12 +310,20 @@ function KanbanColumn({
               exit={{ opacity: 0 }}
               className="flex flex-col items-center justify-center py-[32px] px-[16px] text-center"
             >
-              <svg className="w-[28px] h-[28px] text-[var(--color-text-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg
+                className="w-[28px] h-[28px] text-[var(--color-text-faint)]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              >
                 <rect x="5" y="5" width="14" height="3" rx="0.5" />
                 <rect x="5" y="10" width="14" height="3" rx="0.5" />
                 <rect x="5" y="15" width="14" height="3" rx="0.5" />
               </svg>
-              <p className="text-[12px] text-[var(--color-text-faint)] mt-2">No assets</p>
+              <p className="text-[12px] text-[var(--color-text-faint)] mt-2">
+                No assets
+              </p>
             </motion.div>
           ) : (
             columnAssets.map((asset) => (
@@ -296,8 +337,8 @@ function KanbanColumn({
                   asset={asset}
                   isDragging={draggedItem?.assetId === asset.id}
                   onQuickApprove={
-                    onStatusChange && asset.status === 'revision_requested'
-                      ? () => onStatusChange(asset.id, 'approved')
+                    onStatusChange && asset.status === "revision_requested"
+                      ? () => onStatusChange(asset.id, "approved")
                       : undefined
                   }
                 />
@@ -307,96 +348,107 @@ function KanbanColumn({
         </AnimatePresence>
       </motion.div>
     </div>
-  );
+  )
 }
 
 export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
-  const [collapsedColumns, setCollapsedColumns] = useState<Set<KanbanWorkflowColumnId>>(new Set());
-  const [draggedItem, setDraggedItem] = useState<{ assetId: string; fromStatus: AssetStatus } | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const lenisRef = useRef<Lenis | null>(null);
+  const [collapsedColumns, setCollapsedColumns] = useState<
+    Set<KanbanWorkflowColumnId>
+  >(new Set())
+  const [draggedItem, setDraggedItem] = useState<{
+    assetId: string
+    fromStatus: AssetStatus
+  } | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const lenisRef = useRef<Lenis | null>(null)
 
   useEffect(() => {
-    if (!scrollRef.current) return;
+    if (!scrollRef.current) return
 
     const lenis = new Lenis({
       wrapper: scrollRef.current,
       content: scrollRef.current.firstElementChild as HTMLElement,
       duration: 1.2,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      easing: (t) => Math.min(1, 1.001 - 2 ** (-10 * t)),
       touchMultiplier: 2,
       infinite: false,
-    });
+    })
 
-    lenisRef.current = lenis;
+    lenisRef.current = lenis
 
     function raf(time: number) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
+      lenis.raf(time)
+      requestAnimationFrame(raf)
     }
-    requestAnimationFrame(raf);
+    requestAnimationFrame(raf)
 
     return () => {
-      lenis.destroy();
-    };
-  }, []);
+      lenis.destroy()
+    }
+  }, [])
 
-  const toggleColumnCollapse = useCallback((statusId: KanbanWorkflowColumnId) => {
-    setCollapsedColumns((prev) => {
-      const next = new Set(prev);
-      if (next.has(statusId)) {
-        next.delete(statusId);
-      } else {
-        next.add(statusId);
-      }
-      return next;
-    });
-  }, []);
+  const toggleColumnCollapse = useCallback(
+    (statusId: KanbanWorkflowColumnId) => {
+      setCollapsedColumns((prev) => {
+        const next = new Set(prev)
+        if (next.has(statusId)) {
+          next.delete(statusId)
+        } else {
+          next.add(statusId)
+        }
+        return next
+      })
+    },
+    [],
+  )
 
   const handleDragStart = (assetId: string, status: AssetStatus) => {
-    setDraggedItem({ assetId, fromStatus: status });
-  };
+    setDraggedItem({ assetId, fromStatus: status })
+  }
 
-  const handleDrop = (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => {
-    e.preventDefault();
-    const targetStatus = getKanbanWorkflowStatusForColumn(toColumnId);
+  const handleDrop = (
+    e: React.DragEvent,
+    toColumnId: KanbanWorkflowColumnId,
+  ) => {
+    e.preventDefault()
+    const targetStatus = getKanbanWorkflowStatusForColumn(toColumnId)
 
     if (!draggedItem || draggedItem.fromStatus === targetStatus) {
-      setDraggedItem(null);
-      return;
+      setDraggedItem(null)
+      return
     }
 
-    const fromColumnId = getKanbanWorkflowColumnId(draggedItem.fromStatus);
-    const fromIndex = getKanbanWorkflowColumnIndex(fromColumnId);
-    const toIndex = getKanbanWorkflowColumnIndex(toColumnId);
+    const fromColumnId = getKanbanWorkflowColumnId(draggedItem.fromStatus)
+    const fromIndex = getKanbanWorkflowColumnIndex(fromColumnId)
+    const toIndex = getKanbanWorkflowColumnIndex(toColumnId)
 
     if (Math.abs(fromIndex - toIndex) > 1) {
-      setDraggedItem(null);
-      return;
+      setDraggedItem(null)
+      return
     }
 
-    const assetId = draggedItem.assetId;
-    setDraggedItem(null);
-    onStatusChange?.(assetId, getKanbanWorkflowStatusForColumn(toColumnId));
-  };
+    const assetId = draggedItem.assetId
+    setDraggedItem(null)
+    onStatusChange?.(assetId, getKanbanWorkflowStatusForColumn(toColumnId))
+  }
 
   const assetsByStatus = useMemo(() => {
-    const map = new Map<KanbanWorkflowColumnId, Asset[]>();
-    kanbanWorkflowColumns.forEach((column) => map.set(column.id, []));
+    const map = new Map<KanbanWorkflowColumnId, Asset[]>()
+    kanbanWorkflowColumns.forEach((column) => map.set(column.id, []))
 
     for (const asset of assets) {
       if (isKanbanHiddenStatus(asset.status)) {
-        continue;
+        continue
       }
-      const columnId = getKanbanWorkflowColumnId(asset.status);
-      const bucket = map.get(columnId);
+      const columnId = getKanbanWorkflowColumnId(asset.status)
+      const bucket = map.get(columnId)
       if (bucket) {
-        bucket.push(asset);
+        bucket.push(asset)
       }
     }
 
-    return map;
-  }, [assets]);
+    return map
+  }, [assets])
 
   return (
     <div ref={scrollRef} className="kanban-board-wrapper overflow-x-auto">
@@ -420,5 +472,5 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
         Swipe to see more columns
       </div>
     </div>
-  );
+  )
 }

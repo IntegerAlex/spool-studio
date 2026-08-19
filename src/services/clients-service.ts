@@ -1,81 +1,84 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import type { Client } from '@/types/index';
+import { getCurrentUser } from "@/lib/auth"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import {
+  listAssetSummaries,
+  listAssetsByClientId,
+} from "@/repositories/assets-repository"
 import {
   deleteClient as deleteClientRow,
   getClientById,
   insertClient,
   listClients,
   updateClient as updateClientRow,
-} from '@/repositories/clients-repository';
-import { listAssetSummaries, listAssetsByClientId } from '@/repositories/assets-repository';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import { getCurrentUser } from '@/lib/auth';
-import { getOrCreateCurrentUserProfile } from '@/services/users-service';
-import { logAuditEvent } from '@/services/audit-log-service';
+} from "@/repositories/clients-repository"
+import { logAuditEvent } from "@/services/audit-log-service"
+import { getOrCreateCurrentUserProfile } from "@/services/users-service"
+import type { Client } from "@/types/index"
 
 export interface ClientInput {
-  name: string;
-  slug: string;
-  instagramHandle?: string;
-  brandColor?: string;
-  monthlyReelsTarget?: number;
-  monthlyPostsTarget?: number;
-  monthlyGoal?: number;
-  weeklyGoal?: number;
-  weeklyPosterGoal?: number;
-  weeklyReelGoal?: number;
-  contractStartDate?: string;
-  contractEndDate?: string;
+  name: string
+  slug: string
+  instagramHandle?: string
+  brandColor?: string
+  monthlyReelsTarget?: number
+  monthlyPostsTarget?: number
+  monthlyGoal?: number
+  weeklyGoal?: number
+  weeklyPosterGoal?: number
+  weeklyReelGoal?: number
+  contractStartDate?: string
+  contractEndDate?: string
 }
 
 function normalizeInstagramHandle(handle?: string | null): string {
   if (!handle) {
-    return '';
+    return ""
   }
-  return handle.startsWith('@') ? handle : `@${handle}`;
+  return handle.startsWith("@") ? handle : `@${handle}`
 }
 
 function normalizeSlug(slug: string): string {
-  return slug.trim().toLowerCase();
+  return slug.trim().toLowerCase()
 }
 
 function getMonthStart(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+  return new Date(date.getFullYear(), date.getMonth(), 1)
 }
 
 function getWeekStart(date: Date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = d.getDay();
-  const diff = (day + 6) % 7;
-  d.setDate(d.getDate() - diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const day = d.getDay()
+  const diff = (day + 6) % 7
+  d.setDate(d.getDate() - diff)
+  d.setHours(0, 0, 0, 0)
+  return d
 }
 
 interface ClientMetrics {
-  completedReels: number;
-  completedPosters: number;
-  pendingApprovals: number;
-  pendingRevisions: number;
-  completedDeliverables: number;
-  weeklyCompleted: number;
-  weeklyCompletedReels: number;
-  weeklyCompletedPosters: number;
-  assignedTeamMembers: Set<string>;
+  completedReels: number
+  completedPosters: number
+  pendingApprovals: number
+  pendingRevisions: number
+  completedDeliverables: number
+  weeklyCompleted: number
+  weeklyCompletedReels: number
+  weeklyCompletedPosters: number
+  assignedTeamMembers: Set<string>
 }
 
 function buildClientMetricsMap(
   assetSummaries: Awaited<ReturnType<typeof listAssetSummaries>>,
   monthStart: Date,
   weekStart: Date,
-  now: Date
+  now: Date,
 ): Map<string, ClientMetrics> {
-  const map = new Map<string, ClientMetrics>();
+  const map = new Map<string, ClientMetrics>()
   for (const asset of assetSummaries) {
-    const cid = asset.client_id;
-    if (!cid) continue;
+    const cid = asset.client_id
+    if (!cid) continue
 
-    let metrics = map.get(cid);
+    let metrics = map.get(cid)
     if (!metrics) {
       metrics = {
         completedReels: 0,
@@ -87,63 +90,72 @@ function buildClientMetricsMap(
         weeklyCompletedReels: 0,
         weeklyCompletedPosters: 0,
         assignedTeamMembers: new Set<string>(),
-      };
-      map.set(cid, metrics);
+      }
+      map.set(cid, metrics)
     }
 
-    const isCompletedStatus = ['uploaded', 'ready_for_review', 'revision_requested', 'approved', 'published', 'scheduled'].includes(asset.status || '');
+    const isCompletedStatus = [
+      "uploaded",
+      "ready_for_review",
+      "revision_requested",
+      "approved",
+      "published",
+      "scheduled",
+    ].includes(asset.status || "")
 
-    const lastActivityDate = asset.uploaded_at || asset.approved_at || asset.created_at;
+    const lastActivityDate =
+      asset.uploaded_at || asset.approved_at || asset.created_at
 
     if (lastActivityDate && isCompletedStatus) {
-      const completed = new Date(lastActivityDate);
+      const completed = new Date(lastActivityDate)
       if (completed >= weekStart && completed <= now) {
-        metrics.weeklyCompleted++;
-        if (asset.type === 'reel') {
-          metrics.weeklyCompletedReels++;
-        } else if (asset.type === 'poster') {
-          metrics.weeklyCompletedPosters++;
+        metrics.weeklyCompleted++
+        if (asset.type === "reel") {
+          metrics.weeklyCompletedReels++
+        } else if (asset.type === "poster") {
+          metrics.weeklyCompletedPosters++
         }
       }
     }
 
     if (asset.assigned_to) {
-      metrics.assignedTeamMembers.add(asset.assigned_to);
+      metrics.assignedTeamMembers.add(asset.assigned_to)
     }
 
-    const isCurrentMonth = lastActivityDate && new Date(lastActivityDate) >= monthStart;
+    const isCurrentMonth =
+      lastActivityDate && new Date(lastActivityDate) >= monthStart
     if (isCompletedStatus && isCurrentMonth) {
-      metrics.completedDeliverables++;
-      if (asset.type === 'reel') {
-        metrics.completedReels++;
-      } else if (asset.type === 'poster') {
-        metrics.completedPosters++;
+      metrics.completedDeliverables++
+      if (asset.type === "reel") {
+        metrics.completedReels++
+      } else if (asset.type === "poster") {
+        metrics.completedPosters++
       }
     }
 
-    if (asset.status === 'draft' || asset.status === 'ready_for_review') {
-      metrics.pendingApprovals++;
-    } else if (asset.status === 'revision_requested') {
-      metrics.pendingRevisions++;
+    if (asset.status === "draft" || asset.status === "ready_for_review") {
+      metrics.pendingApprovals++
+    } else if (asset.status === "revision_requested") {
+      metrics.pendingRevisions++
     }
   }
-  return map;
+  return map
 }
 
 function mapClient(
   client: Awaited<ReturnType<typeof getClientById>>,
   assetSummaries: Awaited<ReturnType<typeof listAssetSummaries>>,
-  metricsMap?: Map<string, ClientMetrics>
+  metricsMap?: Map<string, ClientMetrics>,
 ): Client | null {
   if (!client) {
-    return null;
+    return null
   }
 
-  const now = new Date();
-  const monthStart = getMonthStart(now);
-  const weekStart = getWeekStart(now);
+  const now = new Date()
+  const monthStart = getMonthStart(now)
+  const weekStart = getWeekStart(now)
 
-  let metrics: ClientMetrics;
+  let metrics: ClientMetrics
 
   if (metricsMap) {
     metrics = metricsMap.get(client.id) ?? {
@@ -156,56 +168,100 @@ function mapClient(
       weeklyCompletedReels: 0,
       weeklyCompletedPosters: 0,
       assignedTeamMembers: new Set<string>(),
-    };
+    }
   } else {
-    const clientAssets = assetSummaries.filter((asset) => asset.client_id === client.id);
+    const clientAssets = assetSummaries.filter(
+      (asset) => asset.client_id === client.id,
+    )
     const assignedTeam = new Set<string>(
-      clientAssets.map((asset) => asset.assigned_to).filter((v): v is string => Boolean(v))
-    );
+      clientAssets
+        .map((asset) => asset.assigned_to)
+        .filter((v): v is string => Boolean(v)),
+    )
     const completedDeliv = clientAssets.filter((asset) => {
-      const isCompletedStatus = ['uploaded', 'ready_for_review', 'revision_requested', 'approved', 'published', 'scheduled'].includes(asset.status || '');
-      if (!isCompletedStatus || !asset.created_at) return false;
-      return new Date(asset.created_at) >= monthStart;
-    });
+      const isCompletedStatus = [
+        "uploaded",
+        "ready_for_review",
+        "revision_requested",
+        "approved",
+        "published",
+        "scheduled",
+      ].includes(asset.status || "")
+      if (!isCompletedStatus || !asset.created_at) return false
+      return new Date(asset.created_at) >= monthStart
+    })
 
     metrics = {
-      completedReels: completedDeliv.filter((asset) => asset.type === 'reel').length,
-      completedPosters: completedDeliv.filter((asset) => asset.type === 'poster').length,
-      pendingApprovals: clientAssets.filter((asset) => asset.status === 'draft' || asset.status === 'ready_for_review').length,
-      pendingRevisions: clientAssets.filter((asset) => asset.status === 'revision_requested').length,
+      completedReels: completedDeliv.filter((asset) => asset.type === "reel")
+        .length,
+      completedPosters: completedDeliv.filter(
+        (asset) => asset.type === "poster",
+      ).length,
+      pendingApprovals: clientAssets.filter(
+        (asset) =>
+          asset.status === "draft" || asset.status === "ready_for_review",
+      ).length,
+      pendingRevisions: clientAssets.filter(
+        (asset) => asset.status === "revision_requested",
+      ).length,
       completedDeliverables: completedDeliv.length,
       weeklyCompleted: clientAssets.filter((asset) => {
-        const isCompletedStatus = ['uploaded', 'ready_for_review', 'revision_requested', 'approved', 'published', 'scheduled'].includes(asset.status || '');
-        if (!isCompletedStatus || !asset.created_at) return false;
-        const created = new Date(asset.created_at);
-        return created >= weekStart && created <= now;
+        const isCompletedStatus = [
+          "uploaded",
+          "ready_for_review",
+          "revision_requested",
+          "approved",
+          "published",
+          "scheduled",
+        ].includes(asset.status || "")
+        if (!isCompletedStatus || !asset.created_at) return false
+        const created = new Date(asset.created_at)
+        return created >= weekStart && created <= now
       }).length,
       weeklyCompletedReels: clientAssets.filter((asset) => {
-        const isCompletedStatus = ['uploaded', 'ready_for_review', 'revision_requested', 'approved', 'published', 'scheduled'].includes(asset.status || '');
-        if (asset.type !== 'reel' || !isCompletedStatus || !asset.created_at) return false;
-        const created = new Date(asset.created_at);
-        return created >= weekStart && created <= now;
+        const isCompletedStatus = [
+          "uploaded",
+          "ready_for_review",
+          "revision_requested",
+          "approved",
+          "published",
+          "scheduled",
+        ].includes(asset.status || "")
+        if (asset.type !== "reel" || !isCompletedStatus || !asset.created_at)
+          return false
+        const created = new Date(asset.created_at)
+        return created >= weekStart && created <= now
       }).length,
       weeklyCompletedPosters: clientAssets.filter((asset) => {
-        const isCompletedStatus = ['uploaded', 'ready_for_review', 'revision_requested', 'approved', 'published', 'scheduled'].includes(asset.status || '');
-        if (asset.type !== 'poster' || !isCompletedStatus || !asset.created_at) return false;
-        const created = new Date(asset.created_at);
-        return created >= weekStart && created <= now;
+        const isCompletedStatus = [
+          "uploaded",
+          "ready_for_review",
+          "revision_requested",
+          "approved",
+          "published",
+          "scheduled",
+        ].includes(asset.status || "")
+        if (asset.type !== "poster" || !isCompletedStatus || !asset.created_at)
+          return false
+        const created = new Date(asset.created_at)
+        return created >= weekStart && created <= now
       }).length,
       assignedTeamMembers: assignedTeam,
-    };
+    }
   }
 
-  const monthlyDeliverables = client.monthly_goal ?? ((client.monthly_reels_target ?? 0) + (client.monthly_posts_target ?? 0));
+  const monthlyDeliverables =
+    client.monthly_goal ??
+    (client.monthly_reels_target ?? 0) + (client.monthly_posts_target ?? 0)
 
-  const weeklyPosterGoal = client.weekly_poster_goal ?? 0;
-  const weeklyReelGoal = client.weekly_reel_goal ?? 0;
-  let weeklyGoal = weeklyPosterGoal + weeklyReelGoal;
+  const weeklyPosterGoal = client.weekly_poster_goal ?? 0
+  const weeklyReelGoal = client.weekly_reel_goal ?? 0
+  let weeklyGoal = weeklyPosterGoal + weeklyReelGoal
   if (weeklyGoal === 0 && (client.weekly_goal ?? 0) > 0) {
-    weeklyGoal = client.weekly_goal ?? 0;
+    weeklyGoal = client.weekly_goal ?? 0
   }
 
-  const weeklyRemaining = Math.max(0, weeklyGoal - metrics.weeklyCompleted);
+  const weeklyRemaining = Math.max(0, weeklyGoal - metrics.weeklyCompleted)
 
   return {
     id: client.id,
@@ -231,66 +287,98 @@ function mapClient(
     weeklyReelGoal,
     weeklyCompletedReels: metrics.weeklyCompletedReels,
     weeklyCompletedPosters: metrics.weeklyCompletedPosters,
-    contractStartDate: client.contract_start_date ? new Date(client.contract_start_date) : undefined,
-    contractEndDate: client.contract_end_date ? new Date(client.contract_end_date) : undefined,
-  };
-}
-
-export async function getClients(preFetchedAssetSummaries?: any[]): Promise<Client[]> {
-  try {
-    const [clients, assetSummaries] = await Promise.all([
-      listClients(),
-      preFetchedAssetSummaries ? Promise.resolve(preFetchedAssetSummaries) : listAssetSummaries(),
-    ]);
-
-    const now = new Date();
-    const metricsMap = buildClientMetricsMap(assetSummaries, getMonthStart(now), getWeekStart(now), now);
-
-    const mappedClients = clients
-      .map((client) => {
-        const mapped = mapClient(client, assetSummaries, metricsMap);
-        if (!mapped) return null;
-        mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0));
-        return mapped;
-      })
-      .filter((client): client is Client => Boolean(client));
-
-    return mappedClients;
-  } catch (error) {
-    logProductionRuntimeError('clients-loader', error);
-    return [];
+    contractStartDate: client.contract_start_date
+      ? new Date(client.contract_start_date)
+      : undefined,
+    contractEndDate: client.contract_end_date
+      ? new Date(client.contract_end_date)
+      : undefined,
   }
 }
 
-export async function getClientDetail(clientId: string): Promise<Client | null> {
+export async function getClients(
+  preFetchedAssetSummaries?: any[],
+): Promise<Client[]> {
   try {
-    const [client, assetSummaries] = await Promise.all([getClientById(clientId), listAssetSummaries()]);
+    const [clients, assetSummaries] = await Promise.all([
+      listClients(),
+      preFetchedAssetSummaries
+        ? Promise.resolve(preFetchedAssetSummaries)
+        : listAssetSummaries(),
+    ])
 
-    const now = new Date();
-    const metricsMap = buildClientMetricsMap(assetSummaries, getMonthStart(now), getWeekStart(now), now);
-    const mapped = mapClient(client, assetSummaries, metricsMap);
-    if (!mapped) return null;
+    const now = new Date()
+    const metricsMap = buildClientMetricsMap(
+      assetSummaries,
+      getMonthStart(now),
+      getWeekStart(now),
+      now,
+    )
 
-    mapped.weeklyRemaining = Math.max(0, (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0));
+    const mappedClients = clients
+      .map((client) => {
+        const mapped = mapClient(client, assetSummaries, metricsMap)
+        if (!mapped) return null
+        mapped.weeklyRemaining = Math.max(
+          0,
+          (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0),
+        )
+        return mapped
+      })
+      .filter((client): client is Client => Boolean(client))
 
-    return mapped;
+    return mappedClients
   } catch (error) {
-    logProductionRuntimeError('client-detail-loader', error, { clientId });
-    return null;
+    logProductionRuntimeError("clients-loader", error)
+    return []
+  }
+}
+
+export async function getClientDetail(
+  clientId: string,
+): Promise<Client | null> {
+  try {
+    const [client, assetSummaries] = await Promise.all([
+      getClientById(clientId),
+      listAssetSummaries(),
+    ])
+
+    const now = new Date()
+    const metricsMap = buildClientMetricsMap(
+      assetSummaries,
+      getMonthStart(now),
+      getWeekStart(now),
+      now,
+    )
+    const mapped = mapClient(client, assetSummaries, metricsMap)
+    if (!mapped) return null
+
+    mapped.weeklyRemaining = Math.max(
+      0,
+      (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0),
+    )
+
+    return mapped
+  } catch (error) {
+    logProductionRuntimeError("client-detail-loader", error, { clientId })
+    return null
   }
 }
 
 export async function createClient(input: ClientInput): Promise<Client> {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser()
   if (!user) {
-    throw new Error('Unauthorized');
+    throw new Error("Unauthorized")
   }
 
-  await getOrCreateCurrentUserProfile();
-  const supabase = await createServerSupabaseClient();
+  await getOrCreateCurrentUserProfile()
+  const supabase = await createServerSupabaseClient()
 
-  const calculatedWeeklyGoal = (input.weeklyPosterGoal ?? 0) + (input.weeklyReelGoal ?? 0);
-  const monthlyGoal = input.monthlyGoal ?? ((input.monthlyReelsTarget ?? 0) + (input.monthlyPostsTarget ?? 0));
+  const calculatedWeeklyGoal =
+    (input.weeklyPosterGoal ?? 0) + (input.weeklyReelGoal ?? 0)
+  const monthlyGoal =
+    input.monthlyGoal ??
+    (input.monthlyReelsTarget ?? 0) + (input.monthlyPostsTarget ?? 0)
 
   const insertData = {
     name: input.name,
@@ -306,117 +394,139 @@ export async function createClient(input: ClientInput): Promise<Client> {
     created_by: user.id,
     contract_start_date: input.contractStartDate ?? null,
     contract_end_date: input.contractEndDate ?? null,
-  };
+  }
 
-  const record = await insertClient(
-    insertData,
-    supabase
-  );
+  const record = await insertClient(insertData, supabase)
 
-  let updatedRecord = record;
+  const updatedRecord = record
 
-  const assetSummaries = await listAssetSummaries(supabase);
-  const mapped = mapClient(updatedRecord, assetSummaries);
+  const assetSummaries = await listAssetSummaries(supabase)
+  const mapped = mapClient(updatedRecord, assetSummaries)
 
   if (!mapped) {
-    throw new Error('Failed to map client');
+    throw new Error("Failed to map client")
   }
 
   try {
     await logAuditEvent({
-      action: 'client_created',
-      entityType: 'client',
+      action: "client_created",
+      entityType: "client",
       entityId: mapped.id,
       entityName: mapped.name,
       metadata: { name: mapped.name, slug: input.slug },
-    });
+    })
   } catch (_error) {
     // Audit logging should not block creation.
   }
 
-  return mapped;
+  return mapped
 }
 
 export async function updateClient(
   clientId: string,
-  input: Partial<ClientInput>
+  input: Partial<ClientInput>,
 ): Promise<Client> {
-  const updates: Record<string, unknown> = {};
-  if (input.name !== undefined) updates.name = input.name;
-  if (input.slug !== undefined) updates.slug = normalizeSlug(input.slug);
-  if (input.instagramHandle !== undefined) updates.instagram_handle = input.instagramHandle;
-  if (input.brandColor !== undefined) updates.brand_color = input.brandColor;
+  const updates: Record<string, unknown> = {}
+  if (input.name !== undefined) updates.name = input.name
+  if (input.slug !== undefined) updates.slug = normalizeSlug(input.slug)
+  if (input.instagramHandle !== undefined)
+    updates.instagram_handle = input.instagramHandle
+  if (input.brandColor !== undefined) updates.brand_color = input.brandColor
   if (input.monthlyReelsTarget !== undefined) {
-    updates.monthly_reels_target = input.monthlyReelsTarget;
+    updates.monthly_reels_target = input.monthlyReelsTarget
   }
   if (input.monthlyPostsTarget !== undefined) {
-    updates.monthly_posts_target = input.monthlyPostsTarget;
+    updates.monthly_posts_target = input.monthlyPostsTarget
   }
-  if (input.weeklyGoal !== undefined) updates.weekly_goal = input.weeklyGoal;
-  if (input.weeklyPosterGoal !== undefined) updates.weekly_poster_goal = input.weeklyPosterGoal;
-  if (input.weeklyReelGoal !== undefined) updates.weekly_reel_goal = input.weeklyReelGoal;
-  if (input.contractStartDate !== undefined) updates.contract_start_date = input.contractStartDate;
-  if (input.contractEndDate !== undefined) updates.contract_end_date = input.contractEndDate;
+  if (input.weeklyGoal !== undefined) updates.weekly_goal = input.weeklyGoal
+  if (input.weeklyPosterGoal !== undefined)
+    updates.weekly_poster_goal = input.weeklyPosterGoal
+  if (input.weeklyReelGoal !== undefined)
+    updates.weekly_reel_goal = input.weeklyReelGoal
+  if (input.contractStartDate !== undefined)
+    updates.contract_start_date = input.contractStartDate
+  if (input.contractEndDate !== undefined)
+    updates.contract_end_date = input.contractEndDate
 
-  if (input.monthlyReelsTarget !== undefined || input.monthlyPostsTarget !== undefined || input.monthlyGoal !== undefined) {
-    const currentClient = await getClientById(clientId);
+  if (
+    input.monthlyReelsTarget !== undefined ||
+    input.monthlyPostsTarget !== undefined ||
+    input.monthlyGoal !== undefined
+  ) {
+    const currentClient = await getClientById(clientId)
     if (currentClient) {
-      const mReels = input.monthlyReelsTarget !== undefined ? input.monthlyReelsTarget : (currentClient.monthly_reels_target ?? 0);
-      const mPosts = input.monthlyPostsTarget !== undefined ? input.monthlyPostsTarget : (currentClient.monthly_posts_target ?? 0);
-      updates.monthly_goal = input.monthlyGoal !== undefined ? input.monthlyGoal : (mReels + mPosts);
+      const mReels =
+        input.monthlyReelsTarget !== undefined
+          ? input.monthlyReelsTarget
+          : (currentClient.monthly_reels_target ?? 0)
+      const mPosts =
+        input.monthlyPostsTarget !== undefined
+          ? input.monthlyPostsTarget
+          : (currentClient.monthly_posts_target ?? 0)
+      updates.monthly_goal =
+        input.monthlyGoal !== undefined ? input.monthlyGoal : mReels + mPosts
     }
   }
 
-  if (input.weeklyPosterGoal !== undefined || input.weeklyReelGoal !== undefined) {
-    const currentClient = await getClientById(clientId);
+  if (
+    input.weeklyPosterGoal !== undefined ||
+    input.weeklyReelGoal !== undefined
+  ) {
+    const currentClient = await getClientById(clientId)
     if (currentClient) {
-      const pGoal = input.weeklyPosterGoal !== undefined ? input.weeklyPosterGoal : (currentClient.weekly_poster_goal ?? 0);
-      const rGoal = input.weeklyReelGoal !== undefined ? input.weeklyReelGoal : (currentClient.weekly_reel_goal ?? 0);
-      updates.weekly_goal = pGoal + rGoal;
+      const pGoal =
+        input.weeklyPosterGoal !== undefined
+          ? input.weeklyPosterGoal
+          : (currentClient.weekly_poster_goal ?? 0)
+      const rGoal =
+        input.weeklyReelGoal !== undefined
+          ? input.weeklyReelGoal
+          : (currentClient.weekly_reel_goal ?? 0)
+      updates.weekly_goal = pGoal + rGoal
     }
   }
 
   const record = await updateClientRow(
     clientId,
-    updates as Parameters<typeof updateClientRow>[1]
-  );
-  const assetSummaries = await listAssetSummaries();
-  const mapped = mapClient(record, assetSummaries);
+    updates as Parameters<typeof updateClientRow>[1],
+  )
+  const assetSummaries = await listAssetSummaries()
+  const mapped = mapClient(record, assetSummaries)
 
   if (!mapped) {
-    throw new Error('Failed to map client');
+    throw new Error("Failed to map client")
   }
 
   try {
-    const original = await getClientById(clientId);
+    const original = await getClientById(clientId)
     await logAuditEvent({
-      action: original ? 'client_updated' : 'client_created',
-      entityType: 'client',
+      action: original ? "client_updated" : "client_created",
+      entityType: "client",
       entityId: clientId,
-      entityName: input.name ?? mapped.name ?? '',
+      entityName: input.name ?? mapped.name ?? "",
       metadata: { changes: Object.keys(updates) },
-    });
+    })
   } catch (_error) {
     // Audit logging should not block updates.
   }
 
-  return mapped;
+  return mapped
 }
 
 export async function removeClient(clientId: string): Promise<void> {
-  const assets = await listAssetsByClientId(clientId);
+  const assets = await listAssetsByClientId(clientId)
   if (assets && assets.length > 0) {
-    throw new Error('Cannot delete client because it has linked assets.');
+    throw new Error("Cannot delete client because it has linked assets.")
   }
   try {
     await logAuditEvent({
-      action: 'client_deleted',
-      entityType: 'client',
+      action: "client_deleted",
+      entityType: "client",
       entityId: clientId,
-      entityName: '',
-    });
+      entityName: "",
+    })
   } catch (_error) {
     // Audit logging should not block deletion.
   }
-  await deleteClientRow(clientId);
+  await deleteClientRow(clientId)
 }

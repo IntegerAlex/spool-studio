@@ -1,33 +1,16 @@
-'use client';
+"use client"
 
-import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
-import { Breadcrumb } from '@/components/layout/breadcrumb';
-import { AssetCommentsSection } from '@/components/assets/asset-comments-section';
-import { AssetRevisionsSection } from '@/components/assets/asset-revisions-section';
-import { AssetActivitySection } from '@/components/assets/asset-activity-section';
-import { AssetFormDialog } from '@/components/assets/asset-form-dialog';
-import { StatusBadge } from '@/components/assets/status-badge';
-import { assetsApi, clientsApi, usersApi, authApi, clearApiClientCache } from '@/lib/api-client';
-import { Asset, Client, User } from '@/types/index';
-import { mutate } from 'swr';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Copy, FolderOpen, MoreHorizontal, Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
-import { canUploadFromStatus, canUploadRevisionFromStatus, getRevisionEligibilityReason, getUploadEligibilityReason } from '@/lib/asset-workflow';
-import { getAssetIcon, getAssetPreviewType } from '@/lib/asset-display';
-import { AssetPreviewMedia } from '@/components/assets/asset-preview-modal';
-import { toAssetPreviewDescriptor } from '@/lib/asset-preview';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
+import { Copy, MoreHorizontal, Upload } from "lucide-react"
+import { useParams, useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { mutate } from "swr"
+import { AssetActivitySection } from "@/components/assets/asset-activity-section"
+import { AssetCommentsSection } from "@/components/assets/asset-comments-section"
+import { AssetFormDialog } from "@/components/assets/asset-form-dialog"
+import { AssetPreviewMedia } from "@/components/assets/asset-preview-modal"
+import { AssetRevisionsSection } from "@/components/assets/asset-revisions-section"
+import { StatusBadge } from "@/components/assets/status-badge"
+import { Breadcrumb } from "@/components/layout/breadcrumb"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,229 +20,284 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Progress } from "@/components/ui/progress"
+import { useToast } from "@/hooks/use-toast"
+import {
+  assetsApi,
+  authApi,
+  clearApiClientCache,
+  clientsApi,
+  usersApi,
+} from "@/lib/api-client"
+import { getAssetIcon, getAssetPreviewType } from "@/lib/asset-display"
+import { toAssetPreviewDescriptor } from "@/lib/asset-preview"
+import {
+  canUploadFromStatus,
+  canUploadRevisionFromStatus,
+  getRevisionEligibilityReason,
+  getUploadEligibilityReason,
+} from "@/lib/asset-workflow"
+import type { Asset, Client, User } from "@/types/index"
 
 export default function AssetDetailPage() {
-  const params = useParams();
-  const assetId = params.id as string | undefined;
-  const router = useRouter();
-  const { toast } = useToast();
+  const params = useParams()
+  const assetId = params.id as string | undefined
+  const router = useRouter()
+  const { toast } = useToast()
 
-  const [asset, setAsset] = useState<Asset | null>(null);
-  const [client, setClient] = useState<Client | null>(null);
-  const [userMap, setUserMap] = useState<Map<string, User>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showDelete, setShowDelete] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isUploadingRevision, setIsUploadingRevision] = useState(false);
-  const [revisionUploadProgress, setRevisionUploadProgress] = useState(0);
+  const [asset, setAsset] = useState<Asset | null>(null)
+  const [client, setClient] = useState<Client | null>(null)
+  const [userMap, setUserMap] = useState<Map<string, User>>(new Map())
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showDelete, setShowDelete] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingRevision, setIsUploadingRevision] = useState(false)
+  const [revisionUploadProgress, setRevisionUploadProgress] = useState(0)
 
-  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject' | null>(null);
-  const [workflowAction, setWorkflowAction] = useState<'process' | 'move_to_draft' | null>(null);
-  const [revisionRefreshKey, setRevisionRefreshKey] = useState(0);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const revisionInputRef = useRef<HTMLInputElement | null>(null);
+  const [approvalAction, setApprovalAction] = useState<
+    "approve" | "reject" | null
+  >(null)
+  const [workflowAction, setWorkflowAction] = useState<
+    "process" | "move_to_draft" | null
+  >(null)
+  const [revisionRefreshKey, setRevisionRefreshKey] = useState(0)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const revisionInputRef = useRef<HTMLInputElement | null>(null)
 
-  const storageLabel = 'Cloud Storage';
+  const storageLabel = "Cloud Storage"
 
-  const canApproveDraft = asset?.status === 'draft';
-  const canRequestRevision = asset?.status === 'draft';
-  const canApproveRevision = asset?.status === 'revision_requested';
-  const canProcessUpload = asset?.status === 'uploaded';
-  const canMoveToDraft = asset?.status === 'uploaded';
+  const canApproveDraft = asset?.status === "draft"
+  const canRequestRevision = asset?.status === "draft"
+  const canApproveRevision = asset?.status === "revision_requested"
+  const canProcessUpload = asset?.status === "uploaded"
+  const canMoveToDraft = asset?.status === "uploaded"
 
   useEffect(() => {
     const loadData = async () => {
       try {
         if (!assetId) {
-          setError('Asset id is required');
-          setIsLoading(false);
-          return;
+          setError("Asset id is required")
+          setIsLoading(false)
+          return
         }
-        setError(null);
+        setError(null)
         const [assetData, loggedUser] = await Promise.all([
           assetsApi.getSummaryById(assetId),
           authApi.getCurrentUser(),
-        ]);
-        setCurrentUser(loggedUser);
+        ])
+        setCurrentUser(loggedUser)
         if (assetData) {
-          setAsset(assetData);
-          const clientData = await clientsApi.getById(assetData.clientId);
-          setClient(clientData);
+          setAsset(assetData)
+          const clientData = await clientsApi.getById(assetData.clientId)
+          setClient(clientData)
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load asset';
-        setError(message);
+        const message =
+          err instanceof Error ? err.message : "Failed to load asset"
+        setError(message)
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
-    loadData();
-  }, [assetId]);
+    loadData()
+  }, [assetId])
 
   useEffect(() => {
     if (!asset?.assignedTo?.length) {
-      return;
+      return
     }
 
-    const missing = asset.assignedTo.filter((userId) => !userMap.has(userId));
+    const missing = asset.assignedTo.filter((userId) => !userMap.has(userId))
     if (missing.length === 0) {
-      return;
+      return
     }
 
-    let isActive = true;
+    let isActive = true
 
     const loadUsers = async () => {
-      const fetched = await Promise.all(missing.map((userId) => usersApi.getById(userId)));
+      const fetched = await Promise.all(
+        missing.map((userId) => usersApi.getById(userId)),
+      )
       if (!isActive) {
-        return;
+        return
       }
 
       setUserMap((prev) => {
-        const next = new Map(prev);
+        const next = new Map(prev)
         fetched.forEach((user) => {
           if (user) {
-            next.set(user.id, user);
+            next.set(user.id, user)
           }
-        });
-        return next;
-      });
-    };
-
-    void loadUsers();
-
-    return () => {
-      isActive = false;
-    };
-  }, [asset?.assignedTo?.join('|'), userMap.size]);
-
-  function refreshRevisions() {
-    setRevisionRefreshKey((prev) => prev + 1);
-  }
-
-  const handleRevisionSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !asset) return;
-    if (!uploadRevisionEligible) {
-      // respect existing revision eligibility rules
-      toast({ title: 'Revision upload blocked', description: revisionEligibilityReason, variant: 'destructive' });
-      return;
+        })
+        return next
+      })
     }
 
-    setIsUploadingRevision(true);
-    setRevisionUploadProgress(0);
+    void loadUsers()
+
+    return () => {
+      isActive = false
+    }
+  }, [userMap.has, asset?.assignedTo?.length, asset?.assignedTo?.filter])
+
+  function refreshRevisions() {
+    setRevisionRefreshKey((prev) => prev + 1)
+  }
+
+  const handleRevisionSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file || !asset) return
+    if (!uploadRevisionEligible) {
+      // respect existing revision eligibility rules
+      toast({
+        title: "Revision upload blocked",
+        description: revisionEligibilityReason,
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsUploadingRevision(true)
+    setRevisionUploadProgress(0)
     try {
       const result = await assetsApi.uploadFile(asset.id, file, {
         onProgress: ({ percentage }) => {
-          setIsUploadingRevision(true);
-          setRevisionUploadProgress((prev) => Math.max(prev, percentage));
+          setIsUploadingRevision(true)
+          setRevisionUploadProgress((prev) => Math.max(prev, percentage))
         },
-      });
-      setRevisionUploadProgress(100);
-      toast({ title: 'Revision uploaded', description: 'Revision uploaded successfully' });
-      refreshRevisions();
+      })
+      setRevisionUploadProgress(100)
+      toast({
+        title: "Revision uploaded",
+        description: "Revision uploaded successfully",
+      })
+      refreshRevisions()
       // also update local asset state from result if returned
       if (result) {
-        setAsset(result as unknown as Asset);
+        setAsset(result as unknown as Asset)
       }
-      clearApiClientCache();
-      router.refresh();
+      clearApiClientCache()
+      router.refresh()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed';
-      toast({ title: 'Upload failed', description: message, variant: 'destructive' });
-      setRevisionUploadProgress(0);
+      const message = err instanceof Error ? err.message : "Upload failed"
+      toast({
+        title: "Upload failed",
+        description: message,
+        variant: "destructive",
+      })
+      setRevisionUploadProgress(0)
     } finally {
-      setIsUploadingRevision(false);
+      setIsUploadingRevision(false)
       // reset input so same file can be selected again
-      if (revisionInputRef.current) revisionInputRef.current.value = '';
+      if (revisionInputRef.current) revisionInputRef.current.value = ""
     }
-  };
+  }
 
-  const handleApprovalAction = async (action: 'approve' | 'reject') => {
+  const handleApprovalAction = async (action: "approve" | "reject") => {
     if (!asset) {
-      return;
+      return
     }
 
     try {
-      setApprovalAction(action);
+      setApprovalAction(action)
       const response = await fetch(`/api/assets/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assetId: asset.id }),
-      });
-      const payload = await response.json();
+      })
+      const payload = await response.json()
       if (!response.ok) {
-        throw new Error(payload.error ?? 'Request failed');
+        throw new Error(payload.error ?? "Request failed")
       }
 
-      const updated = payload.data as Asset;
-      setAsset(updated);
+      const updated = payload.data as Asset
+      setAsset(updated)
       toast({
-        title: action === 'approve' ? 'Asset approved' : 'Revision requested',
-      });
-      clearApiClientCache();
-      router.refresh();
+        title: action === "approve" ? "Asset approved" : "Revision requested",
+      })
+      clearApiClientCache()
+      router.refresh()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Approval failed';
+      const message = err instanceof Error ? err.message : "Approval failed"
       toast({
-        title: action === 'approve' ? 'Approval failed' : 'Rejection failed',
+        title: action === "approve" ? "Approval failed" : "Rejection failed",
         description: message,
-        variant: 'destructive',
-      });
+        variant: "destructive",
+      })
     } finally {
-      setApprovalAction(null);
+      setApprovalAction(null)
     }
-  };
+  }
 
-  const handleWorkflowStatus = async (nextStatus: Asset['status'], action: 'process' | 'move_to_draft') => {
+  const handleWorkflowStatus = async (
+    nextStatus: Asset["status"],
+    action: "process" | "move_to_draft",
+  ) => {
     if (!asset) {
-      return;
+      return
     }
 
     try {
-      setIsSaving(true);
-      setWorkflowAction(action);
-      const updated = await assetsApi.update(asset.id, { status: nextStatus });
-      setAsset(updated);
-      clearApiClientCache();
-      router.refresh();
+      setIsSaving(true)
+      setWorkflowAction(action)
+      const updated = await assetsApi.update(asset.id, { status: nextStatus })
+      setAsset(updated)
+      clearApiClientCache()
+      router.refresh()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update status';
+      const message =
+        err instanceof Error ? err.message : "Failed to update status"
       toast({
-        title: 'Status update failed',
+        title: "Status update failed",
         description: message,
-        variant: 'destructive',
-      });
+        variant: "destructive",
+      })
     } finally {
-      setIsSaving(false);
-      setWorkflowAction(null);
+      setIsSaving(false)
+      setWorkflowAction(null)
     }
-  };
+  }
 
-  const PreviewIcon = asset ? getAssetIcon(asset) : null;
-  const previewType = asset ? getAssetPreviewType(asset) : null;
-  const assetPreviewItem = asset ? toAssetPreviewDescriptor(asset) : null;
-  const uploadEligible = asset ? canUploadFromStatus(asset.status) : false;
-  const uploadRevisionEligible = asset ? canUploadRevisionFromStatus(asset.status) : false;
-  const revisionEligibilityReason = asset ? getRevisionEligibilityReason(asset.status) : 'Revision uploads are blocked only for archived or published assets.';
+  const PreviewIcon = asset ? getAssetIcon(asset) : null
+  const previewType = asset ? getAssetPreviewType(asset) : null
+  const assetPreviewItem = asset ? toAssetPreviewDescriptor(asset) : null
+  const uploadEligible = asset ? canUploadFromStatus(asset.status) : false
+  const uploadRevisionEligible = asset
+    ? canUploadRevisionFromStatus(asset.status)
+    : false
+  const revisionEligibilityReason = asset
+    ? getRevisionEligibilityReason(asset.status)
+    : "Revision uploads are blocked only for archived or published assets."
 
   if (isLoading) {
     return (
       <div className="space-y-8">
         <Breadcrumb
           items={[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Assets', href: '/dashboard/assets' },
-            { label: 'Loading...' },
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Assets", href: "/dashboard/assets" },
+            { label: "Loading..." },
           ]}
         />
         <div className="text-center py-12">
           <p className="text-muted-foreground">Loading asset...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (error) {
@@ -267,16 +305,16 @@ export default function AssetDetailPage() {
       <div className="space-y-8">
         <Breadcrumb
           items={[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Assets', href: '/dashboard/assets' },
-            { label: 'Error' },
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Assets", href: "/dashboard/assets" },
+            { label: "Error" },
           ]}
         />
         <div className="text-center py-12">
           <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (!asset) {
@@ -284,24 +322,24 @@ export default function AssetDetailPage() {
       <div className="space-y-8">
         <Breadcrumb
           items={[
-            { label: 'Dashboard', href: '/dashboard' },
-            { label: 'Assets', href: '/dashboard/assets' },
-            { label: 'Not found' },
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Assets", href: "/dashboard/assets" },
+            { label: "Not found" },
           ]}
         />
         <div className="text-center py-12">
           <p className="text-muted-foreground">Asset not found</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="space-y-6">
       <Breadcrumb
         items={[
-          { label: 'Dashboard', href: '/dashboard' },
-          { label: 'Assets', href: '/dashboard/assets' },
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Assets", href: "/dashboard/assets" },
           { label: asset.title },
         ]}
       />
@@ -311,10 +349,14 @@ export default function AssetDetailPage() {
           <Card className="overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">Asset detail</p>
-                <h1 className="mt-2 truncate text-[24px] font-semibold tracking-tight text-white sm:text-[28px]">{asset.title}</h1>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">
+                  Asset detail
+                </p>
+                <h1 className="mt-2 truncate text-[24px] font-semibold tracking-tight text-white sm:text-[28px]">
+                  {asset.title}
+                </h1>
                 <p className="mt-2 text-[13px] text-[#a1a1aa]">
-                  {client?.name ?? 'Unknown client'} · {asset.type}
+                  {client?.name ?? "Unknown client"} · {asset.type}
                 </p>
               </div>
 
@@ -326,9 +368,12 @@ export default function AssetDetailPage() {
                     mode="edit"
                     asset={asset}
                     onSaved={(updated) => {
-                      setAsset(updated);
-                      mutate('/api/assets');
-                      clientsApi.getById(updated.clientId).then(setClient).catch(() => undefined);
+                      setAsset(updated)
+                      mutate("/api/assets")
+                      clientsApi
+                        .getById(updated.clientId)
+                        .then(setClient)
+                        .catch(() => undefined)
                     }}
                     trigger={
                       <Button className="h-10 w-full bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto">
@@ -338,8 +383,6 @@ export default function AssetDetailPage() {
                     }
                   />
                 )}
-
-
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -351,14 +394,20 @@ export default function AssetDetailPage() {
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white">
+                  <DropdownMenuContent
+                    align="end"
+                    className="border-[rgba(255,255,255,0.08)] bg-[#161616] text-white"
+                  >
                     <AssetFormDialog
                       mode="edit"
                       asset={asset}
                       onSaved={(updated) => {
-                        setAsset(updated);
-                        mutate('/api/assets');
-                        clientsApi.getById(updated.clientId).then(setClient).catch(() => undefined);
+                        setAsset(updated)
+                        mutate("/api/assets")
+                        clientsApi
+                          .getById(updated.clientId)
+                          .then(setClient)
+                          .catch(() => undefined)
                       }}
                       trigger={
                         <DropdownMenuItem
@@ -377,14 +426,14 @@ export default function AssetDetailPage() {
                     <DropdownMenuItem className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white">
                       Share
                     </DropdownMenuItem>
-                    {(currentUser?.role === 'admin' || true) && (
+                    {(currentUser?.role === "admin" || true) && (
                       <>
                         <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
                         <DropdownMenuItem
                           className="cursor-pointer text-red-300 focus:bg-red-500/10 focus:text-red-200"
                           onSelect={(event) => {
-                            event.preventDefault();
-                            setShowDelete(true);
+                            event.preventDefault()
+                            setShowDelete(true)
                           }}
                         >
                           Delete
@@ -396,27 +445,45 @@ export default function AssetDetailPage() {
               </div>
             </div>
 
-              <div className="mt-5 space-y-4">
-                {assetPreviewItem ? (
-                  <AssetPreviewMedia item={assetPreviewItem} compact className="aspect-video min-h-0 w-full" />
-                ) : (
-                  <div className="flex h-[260px] items-center justify-center overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f]">
-                    <div className="flex flex-col items-center justify-center gap-3 px-6 text-center">
-                      {PreviewIcon ? <PreviewIcon className="h-14 w-14 text-[#71717a]" /> : null}
-                      <div>
-                        <p className="text-[13px] text-white">{previewType === 'image' ? 'Image preview unavailable' : 'Media preview unavailable'}</p>
-                        <p className="mt-1 text-[12px] text-[#71717a]">{asset.fileExtension ?? asset.mimeType ?? 'No preview metadata'}</p>
-                      </div>
+            <div className="mt-5 space-y-4">
+              {assetPreviewItem ? (
+                <AssetPreviewMedia
+                  item={assetPreviewItem}
+                  compact
+                  className="aspect-video min-h-0 w-full"
+                />
+              ) : (
+                <div className="flex h-[260px] items-center justify-center overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f]">
+                  <div className="flex flex-col items-center justify-center gap-3 px-6 text-center">
+                    {PreviewIcon ? (
+                      <PreviewIcon className="h-14 w-14 text-[#71717a]" />
+                    ) : null}
+                    <div>
+                      <p className="text-[13px] text-white">
+                        {previewType === "image"
+                          ? "Image preview unavailable"
+                          : "Media preview unavailable"}
+                      </p>
+                      <p className="mt-1 text-[12px] text-[#71717a]">
+                        {asset.fileExtension ??
+                          asset.mimeType ??
+                          "No preview metadata"}
+                      </p>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {asset.driveFileUrl && (
                   <Button
                     asChild
                     className="h-10 w-full bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto"
                   >
-                    <a href={asset.driveFileUrl} target="_blank" rel="noreferrer">
+                    <a
+                      href={asset.driveFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       Open File
                     </a>
                   </Button>
@@ -427,8 +494,10 @@ export default function AssetDetailPage() {
                     variant="outline"
                     className="h-10 w-full border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
                     onClick={() => {
-                      void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
-                      toast({ title: 'Link copied' });
+                      void navigator.clipboard.writeText(
+                        asset.driveFileUrl ?? "",
+                      )
+                      toast({ title: "Link copied" })
                     }}
                   >
                     <Copy className="mr-2 h-4 w-4" />
@@ -438,7 +507,7 @@ export default function AssetDetailPage() {
                 {/* Upload revision hidden input */}
                 <input
                   ref={(el) => {
-                    revisionInputRef.current = el;
+                    revisionInputRef.current = el
                   }}
                   type="file"
                   accept="*/*"
@@ -450,11 +519,22 @@ export default function AssetDetailPage() {
                 <button
                   onClick={() => revisionInputRef.current?.click()}
                   disabled={!uploadRevisionEligible || isUploadingRevision}
-                  title={!uploadRevisionEligible ? revisionEligibilityReason : undefined}
+                  title={
+                    !uploadRevisionEligible
+                      ? revisionEligibilityReason
+                      : undefined
+                  }
                   className="inline-flex h-10 w-full items-center justify-center rounded-md border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)] sm:h-9 sm:w-auto"
                   style={{
-                    opacity: !uploadRevisionEligible ? 0.35 : isUploadingRevision ? 0.7 : undefined,
-                    cursor: !uploadRevisionEligible || isUploadingRevision ? 'not-allowed' : undefined,
+                    opacity: !uploadRevisionEligible
+                      ? 0.35
+                      : isUploadingRevision
+                        ? 0.7
+                        : undefined,
+                    cursor:
+                      !uploadRevisionEligible || isUploadingRevision
+                        ? "not-allowed"
+                        : undefined,
                   }}
                 >
                   {isUploadingRevision ? (
@@ -465,11 +545,11 @@ export default function AssetDetailPage() {
                           width: 12,
                           height: 12,
                           borderWidth: 2,
-                          borderStyle: 'solid',
-                          borderColor: 'rgba(255,255,255,0.14)',
-                          borderTopColor: '#3ecf8e',
-                          borderRadius: '50%',
-                          display: 'inline-block',
+                          borderStyle: "solid",
+                          borderColor: "rgba(255,255,255,0.14)",
+                          borderTopColor: "#3ecf8e",
+                          borderRadius: "50%",
+                          display: "inline-block",
                         }}
                       />
                       <span>Uploading…</span>
@@ -488,7 +568,10 @@ export default function AssetDetailPage() {
                     <span>Uploading revision</span>
                     <span>{revisionUploadProgress}%</span>
                   </div>
-                  <Progress value={revisionUploadProgress} className="h-2 bg-[rgba(255,255,255,0.08)]" />
+                  <Progress
+                    value={revisionUploadProgress}
+                    className="h-2 bg-[rgba(255,255,255,0.08)]"
+                  />
                 </div>
               )}
             </div>
@@ -496,8 +579,12 @@ export default function AssetDetailPage() {
 
           {asset.description && (
             <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5">
-              <h3 className="text-[13px] font-medium text-white">Description</h3>
-              <p className="mt-3 text-[13px] leading-6 text-[#d4d4d8]">{asset.description}</p>
+              <h3 className="text-[13px] font-medium text-white">
+                Description
+              </h3>
+              <p className="mt-3 text-[13px] leading-6 text-[#d4d4d8]">
+                {asset.description}
+              </p>
             </Card>
           )}
 
@@ -506,11 +593,15 @@ export default function AssetDetailPage() {
 
         <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.24)]">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">Asset metadata</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">
+              Asset metadata
+            </p>
             <div className="mt-4 grid grid-cols-1 gap-3 text-[12px] sm:grid-cols-2">
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
                 <p className="text-[#71717a]">Client</p>
-                <p className="mt-1 font-medium text-white">{client?.name ?? 'Unknown client'}</p>
+                <p className="mt-1 font-medium text-white">
+                  {client?.name ?? "Unknown client"}
+                </p>
               </div>
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
                 <p className="text-[#71717a]">Storage</p>
@@ -518,18 +609,25 @@ export default function AssetDetailPage() {
               </div>
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
                 <p className="text-[#71717a]">File</p>
-                <p className="mt-1 font-medium text-white">{asset.fileExtension ?? asset.mimeType ?? 'Unknown'}</p>
+                <p className="mt-1 font-medium text-white">
+                  {asset.fileExtension ?? asset.mimeType ?? "Unknown"}
+                </p>
               </div>
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
                 <p className="text-[#71717a]">Preview</p>
-                <p className="mt-1 font-medium text-white capitalize">{previewType}</p>
+                <p className="mt-1 font-medium text-white capitalize">
+                  {previewType}
+                </p>
               </div>
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3 sm:col-span-2">
                 <p className="text-[#71717a]">Assigned To</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {asset.assignedTo.length > 0 ? (
                     asset.assignedTo.map((userId) => (
-                      <span key={userId} className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[12px] text-[#e4e4e7]">
+                      <span
+                        key={userId}
+                        className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[12px] text-[#e4e4e7]"
+                      >
                         {userMap.get(userId)?.name ?? userId}
                       </span>
                     ))
@@ -541,7 +639,9 @@ export default function AssetDetailPage() {
             </div>
 
             <div className="mt-4 rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3 text-[12px] text-[#a1a1aa]">
-              {asset.driveFileUrl ? 'Open the source file or copy the share link from the actions menu.' : 'This asset does not have a file URL linked yet.'}
+              {asset.driveFileUrl
+                ? "Open the source file or copy the share link from the actions menu."
+                : "This asset does not have a file URL linked yet."}
             </div>
           </Card>
 
@@ -556,8 +656,12 @@ export default function AssetDetailPage() {
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">Workflow actions</p>
-                <p className="mt-2 text-[13px] text-[#d4d4d8]">Move the asset through the pipeline.</p>
+                <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">
+                  Workflow actions
+                </p>
+                <p className="mt-2 text-[13px] text-[#d4d4d8]">
+                  Move the asset through the pipeline.
+                </p>
               </div>
               <StatusBadge status={asset.status} />
             </div>
@@ -567,10 +671,12 @@ export default function AssetDetailPage() {
                   className="h-9 w-full justify-between border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                   variant="default"
                   disabled={isSaving}
-                  aria-busy={workflowAction === 'process'}
-                  onClick={() => handleWorkflowStatus('processing', 'process')}
+                  aria-busy={workflowAction === "process"}
+                  onClick={() => handleWorkflowStatus("processing", "process")}
                 >
-                  <span>{workflowAction === 'process' ? 'Processing…' : 'Process'}</span>
+                  <span>
+                    {workflowAction === "process" ? "Processing…" : "Process"}
+                  </span>
                   <span className="text-[#71717a]">→</span>
                 </Button>
               )}
@@ -580,10 +686,14 @@ export default function AssetDetailPage() {
                   className="h-9 w-full justify-between border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                   variant="outline"
                   disabled={isSaving}
-                  aria-busy={workflowAction === 'move_to_draft'}
-                  onClick={() => handleWorkflowStatus('draft', 'move_to_draft')}
+                  aria-busy={workflowAction === "move_to_draft"}
+                  onClick={() => handleWorkflowStatus("draft", "move_to_draft")}
                 >
-                  <span>{workflowAction === 'move_to_draft' ? 'Moving…' : 'Move to Draft'}</span>
+                  <span>
+                    {workflowAction === "move_to_draft"
+                      ? "Moving…"
+                      : "Move to Draft"}
+                  </span>
                   <span className="text-[#71717a]">→</span>
                 </Button>
               )}
@@ -593,10 +703,12 @@ export default function AssetDetailPage() {
                   className="h-9 w-full justify-between border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[13px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399]"
                   variant="outline"
                   disabled={approvalAction !== null}
-                  aria-busy={approvalAction === 'approve'}
-                  onClick={() => handleApprovalAction('approve')}
+                  aria-busy={approvalAction === "approve"}
+                  onClick={() => handleApprovalAction("approve")}
                 >
-                  <span>{approvalAction === 'approve' ? 'Approving…' : 'Approve'}</span>
+                  <span>
+                    {approvalAction === "approve" ? "Approving…" : "Approve"}
+                  </span>
                   <span className="text-[#71717a]">→</span>
                 </Button>
               )}
@@ -606,10 +718,14 @@ export default function AssetDetailPage() {
                   className="h-9 w-full justify-between border border-[rgba(239,68,68,0.2)] bg-transparent px-3 text-[13px] text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)] hover:text-[#fca5a5]"
                   variant="outline"
                   disabled={approvalAction !== null}
-                  aria-busy={approvalAction === 'reject'}
-                  onClick={() => handleApprovalAction('reject')}
+                  aria-busy={approvalAction === "reject"}
+                  onClick={() => handleApprovalAction("reject")}
                 >
-                  <span>{approvalAction === 'reject' ? 'Requesting…' : 'Request Revision'}</span>
+                  <span>
+                    {approvalAction === "reject"
+                      ? "Requesting…"
+                      : "Request Revision"}
+                  </span>
                   <span className="text-[#71717a]">→</span>
                 </Button>
               )}
@@ -619,32 +735,46 @@ export default function AssetDetailPage() {
                   className="h-9 w-full justify-between border border-[rgba(16,185,129,0.2)] bg-transparent px-3 text-[13px] text-[#34d399] hover:bg-[rgba(16,185,129,0.1)] hover:text-[#34d399]"
                   variant="outline"
                   disabled={approvalAction !== null}
-                  aria-busy={approvalAction === 'approve'}
-                  onClick={() => handleApprovalAction('approve')}
+                  aria-busy={approvalAction === "approve"}
+                  onClick={() => handleApprovalAction("approve")}
                 >
-                  <span>{approvalAction === 'approve' ? 'Approving…' : 'Approve'}</span>
+                  <span>
+                    {approvalAction === "approve" ? "Approving…" : "Approve"}
+                  </span>
                   <span className="text-[#71717a]">→</span>
                 </Button>
               )}
-
             </div>
 
             {!uploadEligible && (
-              <p className="mt-4 text-[12px] text-[#71717a]">{getUploadEligibilityReason(asset.status)}</p>
+              <p className="mt-4 text-[12px] text-[#71717a]">
+                {getUploadEligibilityReason(asset.status)}
+              </p>
             )}
           </Card>
 
           <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5">
-            <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">File storage</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-[#71717a]">
+              File storage
+            </p>
             <p className="mt-2 text-[13px] text-[#d4d4d8]">
-              {asset.driveFileUrl ? 'File is stored in cloud storage and ready for access.' : 'No file has been uploaded yet.'}
+              {asset.driveFileUrl
+                ? "File is stored in cloud storage and ready for access."
+                : "No file has been uploaded yet."}
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {asset.driveFileUrl ? (
                 <>
-                  <Button asChild className="h-9 bg-[var(--primary)] px-3 text-[13px] text-white hover:bg-[#4f46e5]">
-                    <a href={asset.driveFileUrl} target="_blank" rel="noreferrer">
+                  <Button
+                    asChild
+                    className="h-9 bg-[var(--primary)] px-3 text-[13px] text-white hover:bg-[#4f46e5]"
+                  >
+                    <a
+                      href={asset.driveFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       Open File
                     </a>
                   </Button>
@@ -652,8 +782,10 @@ export default function AssetDetailPage() {
                     variant="outline"
                     className="h-9 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[13px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                     onClick={() => {
-                      void navigator.clipboard.writeText(asset.driveFileUrl ?? '');
-                      toast({ title: 'Link copied' });
+                      void navigator.clipboard.writeText(
+                        asset.driveFileUrl ?? "",
+                      )
+                      toast({ title: "Link copied" })
                     }}
                   >
                     <Copy className="mr-2 h-4 w-4" />
@@ -661,7 +793,9 @@ export default function AssetDetailPage() {
                   </Button>
                 </>
               ) : (
-                <p className="text-[12px] text-[#71717a]">Upload a file to see storage details.</p>
+                <p className="text-[12px] text-[#71717a]">
+                  Upload a file to see storage details.
+                </p>
               )}
             </div>
           </Card>
@@ -681,19 +815,22 @@ export default function AssetDetailPage() {
             <AlertDialogAction
               onClick={async () => {
                 try {
-                  await assetsApi.delete(asset.id);
-                  toast({ title: 'Asset deleted' });
-                  mutate('/api/assets');
-                  clearApiClientCache();
-                  router.refresh();
-                  router.push('/dashboard/assets');
+                  await assetsApi.delete(asset.id)
+                  toast({ title: "Asset deleted" })
+                  mutate("/api/assets")
+                  clearApiClientCache()
+                  router.refresh()
+                  router.push("/dashboard/assets")
                 } catch (err) {
-                  const message = err instanceof Error ? err.message : 'Failed to delete asset';
+                  const message =
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to delete asset"
                   toast({
-                    title: 'Delete failed',
+                    title: "Delete failed",
                     description: message,
-                    variant: 'destructive',
-                  });
+                    variant: "destructive",
+                  })
                 }
               }}
             >
@@ -703,5 +840,5 @@ export default function AssetDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
+  )
 }

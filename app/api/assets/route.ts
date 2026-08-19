@@ -1,55 +1,65 @@
-import { NextResponse } from 'next/server';
-import { createAsset, getAssets, getAssetsByClientId, getAssetsByStatuses } from '@/services/assets-service';
-import { assetStatusValues } from '@/lib/asset-workflow';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import type { AssetStatus } from '@/types/index';
+import { NextResponse } from "next/server"
+import { assetStatusValues } from "@/lib/asset-workflow"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  createAsset,
+  getAssets,
+  getAssetsByClientId,
+  getAssetsByStatuses,
+} from "@/services/assets-service"
+import type { AssetStatus } from "@/types/index"
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const clientId = searchParams.get('clientId');
-    const statusesParam = searchParams.get('statuses');
+    const { searchParams } = new URL(request.url)
+    const clientId = searchParams.get("clientId")
+    const statusesParam = searchParams.get("statuses")
 
-    let assets;
+    let assets
     if (statusesParam) {
-      const statuses = statusesParam.split(',').filter(
-        (s): s is AssetStatus => assetStatusValues.includes(s as AssetStatus)
-      );
-      assets = await getAssetsByStatuses(statuses);
+      const statuses = statusesParam
+        .split(",")
+        .filter((s): s is AssetStatus =>
+          assetStatusValues.includes(s as AssetStatus),
+        )
+      assets = await getAssetsByStatuses(statuses)
     } else if (clientId) {
-      assets = await getAssetsByClientId(clientId);
+      assets = await getAssetsByClientId(clientId)
     } else {
-      assets = await getAssets();
+      assets = await getAssets()
     }
-    const response = NextResponse.json({ data: assets });
-    response.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
-    return response;
+    const response = NextResponse.json({ data: assets })
+    response.headers.set(
+      "Cache-Control",
+      "public, max-age=30, stale-while-revalidate=60",
+    )
+    return response
   } catch (error) {
-    logProductionRuntimeError('api-assets-get', error);
-    return NextResponse.json({ data: [] });
+    logProductionRuntimeError("api-assets-get", error)
+    return NextResponse.json({ data: [] })
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    console.info('[api/assets] create payload', body);
+    const body = await request.json()
+    console.info("[api/assets] create payload", body)
     if (!body?.clientId || !body?.title || !body?.type) {
-      const error = 'Client, title, and type are required';
-      console.warn('[api/assets] validation error', { error, body });
-      return NextResponse.json({ success: false, error }, { status: 400 });
+      const error = "Client, title, and type are required"
+      console.warn("[api/assets] validation error", { error, body })
+      return NextResponse.json({ success: false, error }, { status: 400 })
     }
-    const allowedTypes = ['reel', 'poster'];
-    const allowedStatuses = [...assetStatusValues];
+    const allowedTypes = ["reel", "poster"]
+    const allowedStatuses = [...assetStatusValues]
     if (!allowedTypes.includes(body.type)) {
-      const error = `Invalid asset type: ${body.type}`;
-      console.warn('[api/assets] enum mismatch', { error, type: body.type });
-      return NextResponse.json({ success: false, error }, { status: 400 });
+      const error = `Invalid asset type: ${body.type}`
+      console.warn("[api/assets] enum mismatch", { error, type: body.type })
+      return NextResponse.json({ success: false, error }, { status: 400 })
     }
     if (body.status && !allowedStatuses.includes(body.status)) {
-      const error = `Invalid status: ${body.status}`;
-      console.warn('[api/assets] enum mismatch', { error, status: body.status });
-      return NextResponse.json({ success: false, error }, { status: 400 });
+      const error = `Invalid status: ${body.status}`
+      console.warn("[api/assets] enum mismatch", { error, status: body.status })
+      return NextResponse.json({ success: false, error }, { status: 400 })
     }
 
     const payload = {
@@ -67,8 +77,8 @@ export async function POST(request: Request) {
       publishedAt: body.publishedAt ?? null,
       approvedAt: body.approvedAt ?? null,
       approvedBy: body.approvedBy ?? null,
-    };
-    console.info('[api/assets] parsed payload', payload);
+    }
+    console.info("[api/assets] parsed payload", payload)
     const asset = await createAsset({
       clientId: payload.clientId,
       title: payload.title,
@@ -84,12 +94,16 @@ export async function POST(request: Request) {
       publishedAt: payload.publishedAt,
       approvedAt: payload.approvedAt,
       approvedBy: payload.approvedBy,
-    });
-    console.info('[api/assets] insert result', asset);
-    return NextResponse.json({ success: true, data: asset }, { status: 201 });
+    })
+    console.info("[api/assets] insert result", asset)
+    return NextResponse.json({ success: true, data: asset }, { status: 201 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to create asset';
-    logProductionRuntimeError('api-assets-post', error);
-    return NextResponse.json({ success: false, error: message }, { status: 400 });
+    const message =
+      error instanceof Error ? error.message : "Failed to create asset"
+    logProductionRuntimeError("api-assets-post", error)
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 400 },
+    )
   }
 }

@@ -1,69 +1,103 @@
-import { NextResponse } from 'next/server';
-import { getPool } from '@/lib/db';
-import { requireUser } from '@/lib/auth';
-import { logProductionRuntimeError } from '@/lib/runtime-diagnostics';
-import { UploadQueueStatus } from '@/types/index';
+import { NextResponse } from "next/server"
+import { requireUser } from "@/lib/auth"
+import { getPool } from "@/lib/db"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import type { UploadQueueStatus } from "@/types/index"
 
 export async function GET() {
   try {
-    const user = await requireUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await requireUser()
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const pool = getPool();
+    const pool = getPool()
     const { rows } = await pool.query(
       `SELECT q.id, q.asset_id, q.scheduled_date, q.platform, q.status, q.caption, q.hashtags, q.created_at
        FROM upload_queue q
-       JOIN assets a ON a.id = q.asset_id
-       WHERE a.client_id IN (SELECT id FROM clients WHERE id IN (SELECT client_id FROM client_users WHERE user_id = $1) OR created_by = $1)
+       JOIN content_assets a ON a.id = q.asset_id
+       WHERE a.created_by = $1
        ORDER BY q.scheduled_date ASC`,
-      [user.id]
-    );
+      [user.id],
+    )
 
-    return NextResponse.json(rows.map((r) => ({
-      id: r.id,
-      assetId: r.asset_id,
-      scheduledDate: r.scheduled_date,
-      platform: r.platform,
-      status: r.status as UploadQueueStatus,
-      caption: r.caption,
-      hashtags: r.hashtags,
-      createdAt: r.created_at,
-    })));
+    return NextResponse.json({
+      data: rows.map((r) => ({
+        id: r.id,
+        assetId: r.asset_id,
+        scheduledDate: r.scheduled_date,
+        platform: r.platform,
+        status: r.status as UploadQueueStatus,
+        caption: r.caption,
+        hashtags: r.hashtags,
+        createdAt: r.created_at,
+      })),
+    })
   } catch (error) {
-    logProductionRuntimeError('api-queue-get', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logProductionRuntimeError("api-queue-get", error)
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    )
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const user = await requireUser()
+    if (!user)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { assetId, scheduledDate, platform, caption, hashtags } = await request.json();
+    const { assetId, scheduledDate, platform, caption, hashtags, recurrence } =
+      await request.json()
 
     if (!assetId || !scheduledDate || !platform) {
-      return NextResponse.json({ error: 'assetId, scheduledDate, and platform are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "assetId, scheduledDate, and platform are required" },
+        { status: 400 },
+      )
     }
 
-    const pool = getPool();
-    const id = crypto.randomUUID();
+    const pool = getPool()
+    const id = crypto.randomUUID()
     await pool.query(
-      `INSERT INTO upload_queue (id, asset_id, scheduled_date, platform, status, caption, hashtags, created_at)
-       VALUES ($1, $2, $3, $4, 'scheduled', $5, $6, NOW())`,
-      [id, assetId, scheduledDate, platform, caption || null, hashtags ? JSON.stringify(hashtags) : null]
-    );
+      `INSERT INTO upload_queue (id, asset_id, scheduled_date, platform, status, caption, hashtags, created_at, recurrence)
+       VALUES ($1, $2, $3, $4, 'scheduled', $5, $6, NOW(), $7)`,
+      [
+        id,
+        assetId,
+        scheduledDate,
+        platform,
+        caption || null,
+        hashtags ? JSON.stringify(hashtags) : null,
+        recurrence ? JSON.stringify(recurrence) : null,
+      ],
+    )
 
-    const { rows } = await pool.query('SELECT * FROM upload_queue WHERE id = $1', [id]);
-    const r = rows[0];
+    const { rows } = await pool.query(
+      "SELECT * FROM upload_queue WHERE id = $1",
+      [id],
+    )
+    const r = rows[0]
 
-    return NextResponse.json({
-      id: r.id, assetId: r.asset_id, scheduledDate: r.scheduled_date,
-      platform: r.platform, status: r.status, caption: r.caption,
-      hashtags: r.hashtags,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        data: {
+          id: r.id,
+          assetId: r.asset_id,
+          scheduledDate: r.scheduled_date,
+          platform: r.platform,
+          status: r.status,
+          caption: r.caption,
+          hashtags: r.hashtags,
+        },
+      },
+      { status: 201 },
+    )
   } catch (error) {
-    logProductionRuntimeError('api-queue-create', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logProductionRuntimeError("api-queue-create", error)
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    )
   }
 }

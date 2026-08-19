@@ -1,11 +1,14 @@
-import { hash, compare } from 'bcryptjs';
+import { compare, hash } from "bcryptjs"
 
-const SALT_ROUNDS = 12;
+const SALT_ROUNDS = 12
 
 export async function hashPassword(password: string): Promise<string> {
-  return hash(password, SALT_ROUNDS);
+  return hash(password, SALT_ROUNDS)
 }
 
-export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  return compare(password, hashedPassword);
+export async function verifyPassword(
+  password: string,
+  hashedPassword: string,
+): Promise<boolean> {
+  return compare(password, hashedPassword)
 }

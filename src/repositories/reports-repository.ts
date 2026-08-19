@@ -1,10 +1,10 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import type { Database } from '@/types/database';
+import { createServerSupabaseClient } from "@/lib/supabase/server"
+import type { Database } from "@/types/database"
 
-export type DbAsset = Database['public']['Tables']['content_assets']['Row'];
+export type DbAsset = Database["public"]["Tables"]["content_assets"]["Row"]
 
 async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient());
+  return client ?? (await createServerSupabaseClient())
 }
 
 /**
@@ -18,35 +18,35 @@ export async function listClientAssetsForReport(
   clientId: string,
   startDate: Date,
   endDate: Date,
-  client?: any
+  client?: any,
 ): Promise<DbAsset[]> {
-  const supabase = await getClient(client);
+  const supabase = await getClient(client)
 
   const { data, error } = await supabase
-    .from('content_assets')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('status', 'published');
+    .from("content_assets")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("status", "published")
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message)
   }
 
-  const assets = data ?? [];
+  const assets = data ?? []
 
   return assets.filter((asset: any) => {
-    let resolvedDate: Date;
+    let resolvedDate: Date
 
     if (asset.published_at) {
-      resolvedDate = new Date(asset.published_at);
+      resolvedDate = new Date(asset.published_at)
     } else if (asset.publish_date) {
       // If publish_time exists, combine them to prevent timezone shift issues, otherwise use date
-      const timePart = asset.publish_time ?? '00:00:00';
-      resolvedDate = new Date(`${asset.publish_date}T${timePart}`);
+      const timePart = asset.publish_time ?? "00:00:00"
+      resolvedDate = new Date(`${asset.publish_date}T${timePart}`)
     } else {
-      resolvedDate = new Date(asset.created_at);
+      resolvedDate = new Date(asset.created_at)
     }
 
-    return resolvedDate >= startDate && resolvedDate <= endDate;
-  });
+    return resolvedDate >= startDate && resolvedDate <= endDate
+  })
 }
