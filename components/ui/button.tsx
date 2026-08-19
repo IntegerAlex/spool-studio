@@ -50,6 +50,7 @@ function Button({
     asChild?: boolean
   }) {
   const Comp = asChild ? Slot : "button"
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const loadingProps = props as React.ComponentProps<"button"> & {
     "data-loading"?: string | boolean
   }

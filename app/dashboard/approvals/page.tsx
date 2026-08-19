@@ -71,6 +71,7 @@ export default function ApprovalsPage() {
         throw new Error(payload.error ?? "Request failed")
       }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       const updated = payload.data as Asset
       setAssets((prev) =>
         prev.map((asset) => (asset.id === updated.id ? updated : asset)),

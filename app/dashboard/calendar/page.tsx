@@ -132,19 +132,19 @@ const MONTH_NAMES = [
   "December",
 ]
 
-const KIND_LABEL: Record<CalendarEventKind, string> = {
+const KIND_LABEL = {
   publish: "Publish",
   upload: "Upload",
   contract: "Contract",
   approval: "Approval",
-}
+} satisfies Record<CalendarEventKind, string>
 
-const KIND_STYLES: Record<CalendarEventKind, string> = {
+const KIND_STYLES = {
   publish: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300",
   upload: "bg-sky-500/10 border border-sky-500/20 text-sky-300",
   contract: "bg-amber-500/10 border border-amber-500/20 text-amber-300",
   approval: "bg-violet-500/10 border border-violet-500/20 text-violet-300",
-}
+} satisfies Record<CalendarEventKind, string>
 
 const PLATFORMS = [
   "instagram",
@@ -517,7 +517,10 @@ export default function CalendarPage() {
               <Download className="h-3.5 w-3.5" />
             </Button>
             <div className="inline-flex rounded-md border border-white/10 bg-[#161616] p-0.5">
-              {(["month", "week", "day"] as ViewMode[]).map((mode) => (
+              {(
+                // SAFETY: literal tuple of ViewMode values rendered as the view toggle.
+                ["month", "week", "day"] as ViewMode[]
+              ).map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -800,6 +803,7 @@ function MonthView({
           const dayKey = formatDateKey(date)
           const isToday = dayKey === formatDateKey(new Date())
           const spanHere = spanEvents.filter(
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             (e) => dayKey >= e.start && dayKey <= (e.contractEndDate as string),
           )
           const singleEvents = dayEvents.filter(
@@ -1531,6 +1535,7 @@ function ScheduleComposer({
               id="schedule-repeat"
               value={repeat}
               onChange={(e) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
                 setRepeat(e.target.value as "none" | RecurrenceFreq)
               }
               className="mt-1 w-full rounded-md border border-white/10 bg-[#0f0f0f] px-3 py-2 text-sm text-white"

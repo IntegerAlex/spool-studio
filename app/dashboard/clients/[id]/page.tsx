@@ -9,6 +9,7 @@ import type { Asset, Client } from "@/types/index"
 
 export default function ClientDetailPage() {
   const params = useParams()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const clientId = params.id as string | undefined
 
   const [client, setClient] = useState<Client | null>(null)

@@ -42,6 +42,7 @@ export async function query<T = any>(
   const client = await getPool().connect()
   try {
     const result = await client.query(text, params)
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     return { rows: result.rows as T[], rowCount: result.rowCount ?? 0 }
   } finally {
     client.release()

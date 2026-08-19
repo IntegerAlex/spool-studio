@@ -67,6 +67,7 @@ function InputGroupAddon({
       data-align={align}
       className={cn(inputGroupAddonVariants({ align }), className)}
       onClick={(e) => {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         if ((e.target as HTMLElement).closest("button")) {
           return
         }

@@ -64,6 +64,7 @@ function formatDisplayDate(
 ): string {
   if (!dateValue) return "—"
   const dateObj =
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
     typeof dateValue === "string" ? new Date(dateValue) : dateValue
   if (Number.isNaN(dateObj.getTime())) return "—"
   return dateObj.toLocaleDateString("en-GB", {
@@ -267,7 +268,10 @@ export function ClientReport({
             type="single"
             value={reportMode}
             onValueChange={(val) => {
-              if (val) setReportMode(val as "monthly" | "custom")
+              if (val) {
+                // SAFETY: ToggleGroup only emits the two known mode literals.
+                setReportMode(val as "monthly" | "custom")
+              }
             }}
             className="justify-start"
           >

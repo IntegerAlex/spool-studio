@@ -138,7 +138,7 @@ export default function QueuePage() {
 
         try {
           await assetsApi.uploadFile(targetAssetId, file)
-          const [assetsData] = await Promise.all([assetsApi.getAll()])
+          const assetsData = await assetsApi.getAll()
           setAssets(new Map(assetsData.map((a) => [a.id, a])))
         } catch (err) {
           const message = err instanceof Error ? err.message : "Upload failed"

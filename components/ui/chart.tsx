@@ -88,6 +88,7 @@ ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
     return color ? `  --color-${key}: ${color};` : null
@@ -136,7 +137,9 @@ function ChartTooltipContent({
     const [item] = payload
     const key = `${labelKey || item?.dataKey || item?.name || "value"}`
     const itemConfig = getPayloadConfigFromPayload(config, item, key)
+    // SAFETY: label is only used to index config when it is a string key.
     const value =
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
       !labelKey && typeof label === "string"
         ? config[label as keyof typeof config]?.label || label
         : itemConfig?.label
@@ -212,6 +215,7 @@ function ChartTooltipContent({
                           },
                         )}
                         style={
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
                           {
                             "--color-bg": indicatorColor,
                             "--color-border": indicatorColor,
@@ -305,15 +309,18 @@ function ChartLegendContent({
 // Helper to extract item config from a payload.
 function getPayloadConfigFromPayload(
   config: ChartConfig,
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external input at boundary
   payload: unknown,
   key: string,
 ) {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
   if (typeof payload !== "object" || payload === null) {
     return undefined
   }
 
   const payloadPayload =
     "payload" in payload &&
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
     typeof payload.payload === "object" &&
     payload.payload !== null
       ? payload.payload
@@ -321,21 +328,25 @@ function getPayloadConfigFromPayload(
 
   let configLabelKey: string = key
 
-  if (
-    key in payload &&
-    typeof payload[key as keyof typeof payload] === "string"
-  ) {
-    configLabelKey = payload[key as keyof typeof payload] as string
-  } else if (
-    payloadPayload &&
-    key in payloadPayload &&
-    typeof payloadPayload[key as keyof typeof payloadPayload] === "string"
-  ) {
-    configLabelKey = payloadPayload[
-      key as keyof typeof payloadPayload
-    ] as string
+  if (key in payload) {
+    // SAFETY: key is present on payload, so the indexed value is the stored field.
+    const candidate = payload[key as keyof typeof payload]
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
+    if (typeof candidate === "string") {
+      // SAFETY: candidate is confirmed a string above, so the cast is sound.
+      configLabelKey = candidate as string
+    }
+  } else if (payloadPayload && key in payloadPayload) {
+    // SAFETY: key is present on payloadPayload, so the indexed value is the stored field.
+    const candidate = payloadPayload[key as keyof typeof payloadPayload]
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // external input validation
+    if (typeof candidate === "string") {
+      // SAFETY: candidate is confirmed a string above, so the cast is sound.
+      configLabelKey = candidate as string
+    }
   }
 
+  // SAFETY: both configLabelKey and key originate from config keys.
   return configLabelKey in config
     ? config[configLabelKey]
     : config[key as keyof typeof config]

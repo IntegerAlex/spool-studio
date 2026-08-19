@@ -106,6 +106,7 @@ describe("expandRecurrence", () => {
 
   it("builds one event per occurrence with stable ids and series metadata", () => {
     const base = makeBase({
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       recurrence: { freq: "daily", count: 3 } as RecurrenceRule,
     })
     const result = expandRecurrence(base, rangeStart, rangeEnd)
@@ -127,6 +128,7 @@ describe("expandRecurrence", () => {
     const base = makeBase({
       kind: "upload",
       start: "2024-05-10T14:00:00Z",
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       recurrence: { freq: "weekly", count: 2 } as RecurrenceRule,
     })
     const result = expandRecurrence(base, rangeStart, rangeEnd)

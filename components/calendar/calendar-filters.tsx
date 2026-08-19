@@ -34,12 +34,12 @@ const ALL_KINDS: CalendarEventKind[] = [
   "approval",
 ]
 
-const KIND_LABEL: Record<CalendarEventKind, string> = {
+const KIND_LABEL = {
   publish: "Publishes",
   upload: "Uploads",
   contract: "Contracts",
   approval: "Approvals",
-}
+} satisfies Record<CalendarEventKind, string>
 
 export function CalendarFilters({
   clients,

@@ -92,7 +92,7 @@ email notifications go through Mailgun.
 | Animation       | Framer Motion                                                       |
 | Dates           | date-fns, react-day-picker                                          |
 | PDF             | `@react-pdf/renderer`                                               |
-| Lint / Format   | [Biome](https://biomejs.dev) v2                                     |
+| Lint / Format   | [Biome](https://biomejs.dev) v2 + `oxlint` anti-slop plugin (Node 24 required) |
 | Tests           | Vitest (unit/integration), Playwright (end-to-end)                  |
 | Analytics       | `@vercel/analytics`                                                 |
 
@@ -140,7 +140,7 @@ spool-studio/
 
 ### Prerequisites
 
-- **Node.js** ≥ 20.9 (Next.js 16 requirement)
+- **Node.js** ≥ 20.9 (Next.js 16 requirement) — but for `lint:oxlint` you must use **Node 24.x** exactly (`nvm use 24`). The oxlint anti-slop plugin's TypeScript rules depend on `allowImportingTsExtensions`, which only works on Node 24. Do NOT upgrade or downgrade this version; breaking the plugin will break the entire CI typecheck gate.
 - A **PostgreSQL** database (a free [Neon](https://neon.tech) instance works well)
 - (Optional) **Cloudflare R2** or any S3-compatible bucket for media storage
 - (Optional) **Mailgun** account for email notifications
@@ -230,6 +230,7 @@ Open <http://localhost:3000>.
 | `npm run build`       | Create a production build.                           |
 | `npm run start`       | Serve the production build.                          |
 | `npm run lint`        | Lint and format-check with Biome.                    |
+| `npm run lint:oxlint` | Run oxlint anti-slop plugin (requires Node 24).      |
 | `npm run format`      | Auto-format the codebase with Biome.                 |
 | `npm run typecheck`   | Run `tsc --noEmit`.                                  |
 | `npm run test`        | Run the unit/integration suite (Vitest).             |
@@ -255,10 +256,11 @@ Open <http://localhost:3000>.
   npm run test:e2e
   ```
 
-- **Quality gates** — Biome (lint + format) and `tsc` typechecking:
+- **Quality gates** — Biome (lint + format), `tsc` typechecking, and oxlint anti-slop:
 
   ```bash
   npm run lint
+  npx oxlint
   npm run typecheck
   ```
 
@@ -329,10 +331,12 @@ Contributions are welcome! This project uses **Biome** for linting/formatting an
 
 1. Fork the repository and create a feature branch.
 2. Install dependencies and set up your `.env` (see [Getting Started](#getting-started)).
-3. Make your changes, keeping tests and types green:
+3. Make your changes, keeping tests and types green. For linting, run `nvm use 24` first because `oxlint` anti-slop requires Node 24:
 
    ```bash
+   nvm use 24
    npm run lint
+   npx oxlint
    npm run typecheck
    npm run test
    ```

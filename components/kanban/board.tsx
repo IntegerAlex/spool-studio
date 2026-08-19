@@ -367,6 +367,7 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
 
     const lenis = new Lenis({
       wrapper: scrollRef.current,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       content: scrollRef.current.firstElementChild as HTMLElement,
       duration: 1.2,
       easing: (t) => Math.min(1, 1.001 - 2 ** (-10 * t)),

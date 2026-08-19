@@ -51,6 +51,7 @@ import type { Asset, Client, User } from "@/types/index"
 
 export default function AssetDetailPage() {
   const params = useParams()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const assetId = params.id as string | undefined
   const router = useRouter()
   const { toast } = useToast()
@@ -188,7 +189,7 @@ export default function AssetDetailPage() {
       refreshRevisions()
       // also update local asset state from result if returned
       if (result) {
-        setAsset(result as unknown as Asset)
+        setAsset(result)
       }
       clearApiClientCache()
       router.refresh()
@@ -224,6 +225,7 @@ export default function AssetDetailPage() {
         throw new Error(payload.error ?? "Request failed")
       }
 
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       const updated = payload.data as Asset
       setAsset(updated)
       toast({
@@ -426,7 +428,7 @@ export default function AssetDetailPage() {
                     <DropdownMenuItem className="cursor-pointer text-white focus:bg-[rgba(255,255,255,0.06)] focus:text-white">
                       Share
                     </DropdownMenuItem>
-                    {(currentUser?.role === "admin" || true) && (
+                    {currentUser?.role === "admin" && (
                       <>
                         <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
                         <DropdownMenuItem

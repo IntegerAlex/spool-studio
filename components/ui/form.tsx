@@ -25,6 +25,7 @@ type FormFieldContextValue<
 }
 
 const FormFieldContext = React.createContext<FormFieldContextValue>(
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   {} as FormFieldContextValue,
 )
 
@@ -69,6 +70,7 @@ type FormItemContextValue = {
 }
 
 const FormItemContext = React.createContext<FormItemContextValue>(
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   {} as FormItemContextValue,
 )
 

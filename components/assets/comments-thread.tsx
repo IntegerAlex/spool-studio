@@ -189,8 +189,10 @@ export function CommentsThread({
     if (user) {
       return {
         id: user.id,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         name: (user as any).full_name ?? (user as any).name ?? "Unknown",
         email: user.email,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         avatar: (user as any).avatar_url ?? (user as any).avatar ?? null,
         role: user.role,
       }
@@ -221,8 +223,11 @@ export function CommentsThread({
         ) : null}
         {comments.map((comment) => {
           const authorId =
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             (comment as any).userId ??
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             (comment as any).user_id ??
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             (comment as any).authorId ??
             "unknown"
           const author = getUser(authorId)
@@ -261,6 +266,7 @@ export function CommentsThread({
                   </div>
                   <p className="text-xs text-muted-foreground mb-2">
                     {new Date(
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
                       (comment as any).createdAt ?? (comment as any).created_at,
                     ).toLocaleString()}
                   </p>

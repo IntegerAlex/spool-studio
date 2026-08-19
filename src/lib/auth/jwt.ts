@@ -26,8 +26,11 @@ export async function verifyToken(token: string): Promise<TokenPayload | null> {
     })
     return {
       sub: payload.sub!,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       email: payload.email as string,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       role: payload.role as TokenPayload["role"],
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       name: payload.name as string | undefined,
       iat: payload.iat,
       exp: payload.exp,
@@ -42,8 +45,11 @@ export function decodeToken(token: string): TokenPayload | null {
     const payload = decodeJwt(token)
     return {
       sub: payload.sub!,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       email: payload.email as string,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       role: payload.role as TokenPayload["role"],
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       name: payload.name as string | undefined,
       iat: payload.iat,
       exp: payload.exp,

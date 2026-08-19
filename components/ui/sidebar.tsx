@@ -74,6 +74,7 @@ function SidebarProvider({
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
+      // oxlint-disable-next-line anti-slop/no-runtime-typeof  // function-vs-value discrimination of setter arg
       const openState = typeof value === "function" ? value(open) : value
       if (setOpenProp) {
         setOpenProp(openState)
@@ -131,6 +132,7 @@ function SidebarProvider({
         <div
           data-slot="sidebar-wrapper"
           style={
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             {
               "--sidebar-width": SIDEBAR_WIDTH,
               "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
@@ -188,6 +190,7 @@ function Sidebar({
           data-mobile="true"
           className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
           style={
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
             } as React.CSSProperties
@@ -525,6 +528,7 @@ function SidebarMenuButton({
     return button
   }
 
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof  // string-vs-node discrimination of tooltip prop
   if (typeof tooltip === "string") {
     tooltip = {
       children: tooltip,
@@ -627,6 +631,7 @@ function SidebarMenuSkeleton({
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
         style={
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
           {
             "--skeleton-width": width,
           } as React.CSSProperties

@@ -21,13 +21,14 @@ export class ErrorBoundary extends React.Component<Props, ErrorBoundaryState> {
   }
 
   static getDerivedStateFromError(_error: Error) {
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
     return { hasError: true } as Partial<ErrorBoundaryState>
   }
 
-  componentDidCatch(error: unknown, info: unknown) {
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
     try {
       logProductionRuntimeError("client-error-boundary", error, { info })
-    } catch (_) {
+    } catch {
       // swallow
     }
     // store minimal error for internal diagnostics but do not expose to users

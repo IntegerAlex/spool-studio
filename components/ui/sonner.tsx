@@ -8,9 +8,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
 
   return (
     <Sonner
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       style={
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
         {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",

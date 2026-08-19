@@ -11,7 +11,7 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const labels: Record<AssetStatus, string> = {
+  const labels = {
     draft: "Draft",
     uploading: "Uploading",
     uploaded: "Uploaded",
@@ -24,9 +24,9 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
     ready_for_review: "Draft",
     revision_requested: "Revision",
     scheduled: "Scheduled",
-  }
+  } satisfies Record<AssetStatus, string>
 
-  const styles: Record<AssetStatus, string> = {
+  const styles = {
     draft: "status-badge-draft",
     uploading:
       "border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.15)] text-emerald-400",

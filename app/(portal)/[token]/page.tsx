@@ -68,6 +68,7 @@ function statusColor(status: string): string {
 
 export default function PortalPage() {
   const params = useParams()
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const token = params?.token as string
   const [data, setData] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(true)

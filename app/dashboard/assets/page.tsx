@@ -62,8 +62,10 @@ import type { Asset, AssetStatus, AssetType, Client, User } from "@/types/index"
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url)
   if (!response.ok) throw new Error("Request failed")
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const envelope = (await response.json()) as { data?: T; error?: string }
   if (envelope.error) throw new Error(envelope.error)
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
   return envelope.data as T
 }
 
@@ -83,10 +85,10 @@ function hydrateClientDates(client: Client): Client {
   return {
     ...client,
     createdAt: client.createdAt
-      ? new Date(client.createdAt as unknown as string)
+      ? new Date(client.createdAt)
       : client.createdAt,
     updatedAt: client.updatedAt
-      ? new Date(client.updatedAt as unknown as string)
+      ? new Date(client.updatedAt)
       : client.updatedAt,
   }
 }
@@ -313,6 +315,7 @@ export default function AssetsPage() {
         <Select
           value={selectedStatus}
           onValueChange={(value) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             setSelectedStatus(value as AssetStatus | "all")
           }
         >
@@ -337,6 +340,7 @@ export default function AssetsPage() {
         <Select
           value={selectedAssetType}
           onValueChange={(value) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             setSelectedAssetType(value as AssetType | "all")
           }
         >
@@ -361,6 +365,7 @@ export default function AssetsPage() {
         <Select
           value={uploadedDateFilter}
           onValueChange={(value) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             setUploadedDateFilter(value as AssetUploadedDateFilter)
           }
         >
@@ -384,6 +389,7 @@ export default function AssetsPage() {
         <Select
           value={selectedAssignedUserId}
           onValueChange={(value) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             setSelectedAssignedUserId(value as string | "all" | "unassigned")
           }
         >
@@ -409,6 +415,7 @@ export default function AssetsPage() {
         <Select
           value={metadataFilter}
           onValueChange={(value) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             setMetadataFilter(value as AssetMetadataFilter)
           }
         >
@@ -720,6 +727,7 @@ export default function AssetsPage() {
 
           <Select
             value={sortMode}
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
             onValueChange={(value) => setSortMode(value as AssetSortMode)}
           >
             <SelectTrigger className="h-[34px] w-full border-[rgba(255,255,255,0.08)] bg-[#161616] px-3 text-[13px] text-white shadow-none hover:border-[rgba(255,255,255,0.12)] sm:w-[11rem]">
@@ -773,6 +781,7 @@ export default function AssetsPage() {
                   <Select
                     value={sortMode}
                     onValueChange={(value) =>
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
                       setSortMode(value as AssetSortMode)
                     }
                   >

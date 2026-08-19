@@ -83,7 +83,7 @@ function AssetCardImpl({ asset }: AssetCardProps) {
   const openAsset = () => {
     try {
       window.location.href = detailUrl
-    } catch (_) {
+    } catch {
       // ignore open errors
     }
   }
@@ -91,7 +91,7 @@ function AssetCardImpl({ asset }: AssetCardProps) {
   const previewAsset = () => {
     try {
       window.open(detailUrl, "_blank", "noopener,noreferrer")
-    } catch (_) {
+    } catch {
       // ignore open errors
     }
   }
@@ -141,7 +141,7 @@ function AssetCardImpl({ asset }: AssetCardProps) {
       document.body.appendChild(link)
       link.click()
       link.remove()
-    } catch (_) {
+    } catch {
       // ignore download errors
     }
   }
@@ -301,17 +301,15 @@ function AssetCardImpl({ asset }: AssetCardProps) {
                 >
                   Copy Link
                 </DropdownMenuItem>
-                {true && (
-                  <>
-                    <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="cursor-pointer text-red-300 focus:bg-red-500/10 focus:text-red-200"
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </>
-                )}
+                <>
+                  <DropdownMenuSeparator className="bg-[rgba(255,255,255,0.08)]" />
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="cursor-pointer text-red-300 focus:bg-red-500/10 focus:text-red-200"
+                  >
+                    Delete
+                  </DropdownMenuItem>
+                </>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

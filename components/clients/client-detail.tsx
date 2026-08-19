@@ -351,6 +351,7 @@ function ReferenceEditorDialog({
                   onValueChange={(value) =>
                     setForm((prev) => ({
                       ...prev,
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
                       type: value as ClientReferenceType,
                     }))
                   }
@@ -660,7 +661,7 @@ export function ClientDetail({
             }
           />
 
-          {(currentUser?.role === "admin" || true) && (
+          {currentUser?.role === "admin" && (
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(true)}

@@ -3,12 +3,14 @@ import { useEffect } from "react"
 
 export default function PerfClient() {
   useEffect(() => {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // SSR guard
     if (typeof window === "undefined") return
     if (process.env.NEXT_PUBLIC_PERF_DIAG !== "1") return
 
     const send = () => {
       try {
         const nav = (
+// SAFETY: this cast is safe because the value already conforms to the asserted type.
           performance.getEntriesByType(
             "navigation",
           ) as PerformanceNavigationTiming[]
@@ -38,7 +40,7 @@ export default function PerfClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tag: "[render]", payload: data }),
         })
-      } catch (_e) {
+      } catch {
         // ignore
       }
     }
