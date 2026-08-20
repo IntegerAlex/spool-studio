@@ -22,6 +22,13 @@
       "when": 1787164275925,
       "tag": "0002_numerous_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787184000000,
+      "tag": "0003_add_clients_weekly_counts",
+      "breakpoints": true
     }
   ]
 }

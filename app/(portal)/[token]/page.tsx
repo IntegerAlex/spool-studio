@@ -1,18 +1,11 @@
 "use client"
 
-import { CheckCircle, Eye, Image as ImageIcon, XCircle } from "lucide-react"
-import { useParams } from "next/navigation"
+import { AlertCircle, CheckCircle, Eye, Image as ImageIcon } from "lucide-react"
+import { useParams, useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 interface PortalAsset {
   id: string
@@ -70,10 +63,10 @@ export default function PortalPage() {
   const params = useParams()
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
   const token = params?.token as string
+  const router = useRouter()
   const [data, setData] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selectedAsset, setSelectedAsset] = useState<PortalAsset | null>(null)
   const [decisionLoading, setDecisionLoading] = useState(false)
 
   const fetchPortalData = useCallback(async () => {
@@ -127,8 +120,6 @@ export default function PortalPage() {
           ),
         }
       })
-
-      setSelectedAsset(null)
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to submit decision")
     } finally {
@@ -147,7 +138,7 @@ export default function PortalPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
-        <XCircle className="h-10 w-10 text-destructive" />
+        <AlertCircle className="h-10 w-10 text-destructive" />
         <p className="text-sm text-muted-foreground">{error}</p>
       </div>
     )
@@ -178,7 +169,7 @@ export default function PortalPage() {
             <Card
               key={asset.id}
               className="overflow-hidden border-border bg-card cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => setSelectedAsset(asset)}
+              onClick={() => router.push(`/portal/${token}/assets/${asset.id}`)}
             >
               <div className="aspect-video bg-muted flex items-center justify-center">
                 {asset.thumbnail_url ? (
@@ -214,7 +205,7 @@ export default function PortalPage() {
                     className="flex-1 h-8 text-xs"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setSelectedAsset(asset)
+                      router.push(`/portal/${token}/assets/${asset.id}`)
                     }}
                   >
                     <Eye className="mr-1 h-3 w-3" />
@@ -224,6 +215,7 @@ export default function PortalPage() {
                     <Button
                       size="sm"
                       className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700 text-white"
+                      disabled={decisionLoading}
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDecision(asset.id, "approved")
@@ -239,84 +231,6 @@ export default function PortalPage() {
           ))}
         </div>
       )}
-
-      <Dialog
-        open={!!selectedAsset}
-        onOpenChange={() => setSelectedAsset(null)}
-      >
-        <DialogContent className="max-w-2xl bg-card border-border">
-          {selectedAsset && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-foreground">
-                  {selectedAsset.title}
-                </DialogTitle>
-              </DialogHeader>
-
-              <div className="aspect-video bg-muted rounded-lg overflow-hidden flex items-center justify-center">
-                {selectedAsset.drive_file_url || selectedAsset.thumbnail_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={
-                      selectedAsset.drive_file_url ||
-                      selectedAsset.thumbnail_url!
-                    }
-                    alt={selectedAsset.title}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <ImageIcon className="h-16 w-16 text-muted-foreground/50" />
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Badge
-                  variant="secondary"
-                  className={statusColor(selectedAsset.status)}
-                >
-                  {statusLabel(selectedAsset.status)}
-                </Badge>
-                <span className="capitalize">{selectedAsset.type}</span>
-              </div>
-
-              <DialogFooter className="flex-row gap-2 sm:gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setSelectedAsset(null)}
-                >
-                  Close
-                </Button>
-                {selectedAsset.status !== "approved" && (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="flex-1 border-yellow-500 text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400"
-                      disabled={decisionLoading}
-                      onClick={() =>
-                        handleDecision(selectedAsset.id, "revision_requested")
-                      }
-                    >
-                      <XCircle className="mr-1 h-4 w-4" />
-                      Request Revision
-                    </Button>
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                      disabled={decisionLoading}
-                      onClick={() =>
-                        handleDecision(selectedAsset.id, "approved")
-                      }
-                    >
-                      <CheckCircle className="mr-1 h-4 w-4" />
-                      Approve
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

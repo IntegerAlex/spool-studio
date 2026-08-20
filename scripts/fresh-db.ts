@@ -1,14 +1,17 @@
-import { readdirSync, readFileSync } from "node:fs"
-import { join } from "node:path"
+import { execSync } from "node:child_process"
+import { loadEnvConfig } from "@next/env"
 import { getPool } from "../src/lib/db"
+
+loadEnvConfig(process.cwd())
 
 async function freshDB() {
   const pool = getPool()
   const client = await pool.connect()
 
   try {
-    // Drop everything
-    console.log("Dropping all objects in public schema...")
+    // Drop everything in the public schema, including the drizzle journal schema,
+    // so the subsequent `drizzle-kit migrate` rebuilds the database from scratch.
+    console.log("Dropping all objects in public + drizzle schemas...")
     await client.query(`
       DO $$ DECLARE
         r RECORD;
@@ -29,54 +32,23 @@ async function freshDB() {
         LOOP
           EXECUTE format('DROP FUNCTION IF EXISTS %I(%s) CASCADE', r.proname, r.args);
         END LOOP;
-        DROP TABLE IF EXISTS _migrations CASCADE;
       END $$;
     `)
+    await client.query("DROP SCHEMA IF EXISTS drizzle CASCADE")
     console.log("All objects dropped.")
-
-    // Run all SQL migrations from scripts/ in order
-    const migrationsDir = join(process.cwd(), "scripts")
-    const files = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort()
-
-    for (const file of files) {
-      const sql = readFileSync(join(migrationsDir, file), "utf-8")
-      console.log(`  apply ${file}...`)
-      await client.query(sql)
-      console.log(`  done  ${file}`)
-    }
-
-    // Verify
-    const tables = await client.query(
-      "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename",
-    )
-    console.log(
-      "\nTables created:",
-      tables.rows.map((r) => r.tablename).join(", "),
-    )
-
-    const types = await client.query(
-      "SELECT typname FROM pg_type t JOIN pg_namespace n ON t.typnamespace = n.oid WHERE n.nspname = 'public' AND t.typtype = 'e' ORDER BY typname",
-    )
-    console.log("Enums created:", types.rows.map((r) => r.typname).join(", "))
-
-    const cols = await client.query(
-      "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'users' ORDER BY ordinal_position",
-    )
-    console.log(
-      "\nusers columns:",
-      cols.rows.map((r) => `${r.column_name}(${r.data_type})`).join(", "),
-    )
-
-    console.log("\nFresh database ready.")
   } finally {
     client.release()
     await pool.end()
   }
+
+  // Rebuild from the canonical drizzle-kit migrations (drizzle/migrations/*).
+  console.log("Rebuilding from Drizzle migrations...")
+  execSync("npx drizzle-kit migrate", { stdio: "inherit" })
+  console.log("\nFresh database ready.")
 }
 
 freshDB().catch((err) => {
-  console.error("Failed:", err.message)
+  // SAFETY: execSync/rejected promise surfaces Error instances; .message is set.
+  console.error("Failed:", (err as Error).message)
   process.exit(1)
 })

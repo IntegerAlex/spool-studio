@@ -64,9 +64,11 @@ email notifications go through Mailgun.
 - **Approval pipeline** — structured approve / reject / revision-requested flow
   with activity logs.
 - **Client management** — profiles, targets, references, and branded reports (PDF).
-- **Upload queue** — track uploads through processing and into the asset library.
+- **Upload queue** — track uploads through processing and into the asset library,
+  with per-item download, schedule editing, retry, and cancel.
 - **Client portal** — share a tokenized, read-only view of a client's assets and
-  allow approvals without a login.
+  allow approvals without a login. Each asset has a detail view with preview,
+  comment thread, and revision history.
 - **Notifications & real-time** — in-app notifications and Server-Sent Events
   (SSE) for live updates.
 - **Authentication** — email/password with JWT sessions, password reset, and
@@ -82,7 +84,7 @@ email notifications go through Mailgun.
 | Framework       | [Next.js 16](https://nextjs.org) (App Router, Turbopack)            |
 | UI              | React 19, [Radix UI](https://www.radix-ui.com), Tailwind CSS v4     |
 | Language        | TypeScript 5.7                                                      |
-| Database        | PostgreSQL (Neon), `pg` driver, custom SQL migration runner         |
+| Database        | PostgreSQL (Neon), Drizzle ORM (`drizzle-orm`) over the `pg` driver |
 | Auth            | JWT (HS512 via `jose`), `bcryptjs` password hashing                 |
 | Storage         | S3-compatible (Cloudflare R2) via `@aws-sdk/client-s3`              |
 | Email           | Mailgun (`mailgun.js`)                                              |
@@ -105,7 +107,9 @@ spool-studio/
 ├── app/                        # Next.js App Router
 │   ├── (auth)/                 # Login & password recovery
 │   ├── (portal)/               # Public, token-based client sharing
+│   │   └── [token]/            # Asset list + per-asset detail (comments/revisions)
 │   ├── api/                    # Route handlers (REST + SSE)
+│   │   └── portal/[token]/     # Token validation, asset detail, approvals
 │   ├── dashboard/              # Authenticated app
 │   │   ├── calendar/           # Month / week / day planning
 │   │   ├── kanban/             # Production board
@@ -178,6 +182,8 @@ cp .env.example .env
 | `MAILGUN_DOMAIN`           | ⚠️\*\*   | Verified Mailgun sending domain.                         |
 | `MAILGUN_FROM`             | ⚠️\*\*   | From address, e.g. `Spool Studio <noreply@example.com>`.          |
 | `MAIL_NOTIFICATION_TO`     | ⚠️\*\*   | Default recipient for internal notifications.             |
+| `NEXT_PUBLIC_R2_ENDPOINT`  | ⚠️\*     | Public mirror of `R2_ENDPOINT` (powers the integrations status card). |
+| `NEXT_PUBLIC_MAILGUN_DOMAIN` | ⚠️\*\* | Public mirror of `MAILGUN_DOMAIN` (powers the integrations status card). |
 | `NEXT_PUBLIC_APP_URL`      | ✅       | Public app URL (used in emails/links).                   |
 | `NODE_ENV`                 | ✅       | `development` or `production`.                           |
 
@@ -189,17 +195,22 @@ cp .env.example .env
 
 ### Database Setup
 
-Migrations are plain SQL files tracked in a `_migrations` table. Apply them with
-the included runner (uses a TypeScript-aware Node runtime, e.g. `tsx` or
-`node --experimental-strip-types` on Node ≥ 22):
+Migrations are managed by [Drizzle Kit](https://orm.drizzle.team/kit-docs/overview)
+and live in `drizzle/migrations`. Apply them with:
 
 ```bash
-# Apply all pending migrations
-npx tsx scripts/migrate.ts
+# Apply all pending migrations (creates the journal on a fresh database)
+pnpm db:migrate
+
+# If the schema already exists from another path, seed the journal first
+pnpm db:init
 
 # (Optional) Seed demo data — workspace, clients, users, and sample assets
 npx tsx scripts/seed.ts
 ```
+
+`scripts/migrate.ts` is a thin wrapper that delegates to `drizzle-kit migrate`,
+and `scripts/fresh-db.ts` drops everything and rebuilds from the migrations.
 
 To wipe everything and start fresh (drops all tables):
 
@@ -236,7 +247,9 @@ Open <http://localhost:3000>.
 | `npm run test`        | Run the unit/integration suite (Vitest).             |
 | `npm run test:watch`  | Run Vitest in watch mode.                            |
 | `npm run test:e2e`    | Run end-to-end tests (Playwright).                   |
-| `npx tsx scripts/migrate.ts` | Apply database migrations.                    |
+| `pnpm db:migrate`     | Apply Drizzle migrations (`drizzle-kit migrate`).    |
+| `pnpm db:init`       | Seed the Drizzle migration journal (existing DB).    |
+| `npx tsx scripts/migrate.ts` | Apply database migrations (delegates to `drizzle-kit migrate`). |
 | `npx tsx scripts/seed.ts`    | Seed demo data.                              |
 
 ---
@@ -301,7 +314,7 @@ The API is organized by domain under `app/api`:
 | Kanban        | `kanban/board`                                                              |
 | Queue         | `queue`, `queue/[id]`                                                       |
 | Uploads       | `uploads/r2-session`, `uploads/google-session`                              |
-| Portal        | `portal/token`, `portal/[token]`, `portal/[token]/assets/[id]/approve`      |
+| Portal        | `portal/token`, `portal/[token]`, `portal/[token]/assets/[id]`, `portal/[token]/assets/[id]/approve`      |
 | Notifications | `notifications`, `notifications/[id]`, `notifications/mark-all-read`, `settings/notifications` |
 | Push          | `push/subscribe`, `push/send`, `push/unsubscribe`                           |
 | Real-time     | `events/stream` (SSE), `perf`                                               |
