@@ -1,24 +1,24 @@
 "use client"
 
-import {
-  BarChart3,
-  Calendar,
-  CheckSquare,
-  ClipboardList,
-  Image as ImageIcon,
-  LogOut,
-  Settings,
-  Upload,
-  Users,
-} from "lucide-react"
+import { BarChart3, Calendar, CheckSquare, ClipboardList, Image as ImageIcon, LayoutList, LogOut, Settings, Upload, Users } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useMemo } from "react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import type { AuthUser } from "@/lib/auth"
-import { cn } from "@/lib/utils"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarRail,
+} from "@/components/ui/sidebar"
 
 const navigationSections = [
   {
@@ -33,6 +33,11 @@ const navigationSections = [
         label: "Clients",
         href: "/dashboard/clients",
         icon: Users,
+      },
+      {
+        label: "Planner",
+        href: "/dashboard/planner",
+        icon: LayoutList,
       },
       {
         label: "Assets",
@@ -83,17 +88,11 @@ const navigationSections = [
   },
 ]
 
-interface SidebarProps {
-  variant?: "desktop" | "drawer"
-  onNavigate?: () => void
+interface SidebarLayoutProps {
   user?: AuthUser | null
 }
 
-export function Sidebar({
-  variant = "desktop",
-  onNavigate,
-  user = null,
-}: SidebarProps) {
+export function SidebarLayout({ user = null }: SidebarLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -128,148 +127,87 @@ export function Sidebar({
     router.refresh()
   }
 
-  const baseAsideClassName = cn(
-    "flex h-full min-w-0 flex-col overflow-hidden",
-    variant === "desktop"
-      ? "hidden lg:fixed lg:left-0 lg:top-0 lg:flex lg:h-screen lg:w-[240px]"
-      : "w-full",
-  )
-
   return (
-    <aside
-      className={baseAsideClassName}
-      style={{
-        backgroundColor: "#0f0f0f",
-        borderRight: "1px solid var(--color-border)",
-        padding: "0",
-        height: "100vh",
-      }}
-    >
-      <div
-        className="flex items-center justify-center px-4"
-        style={{
-          height: "96px",
-          borderBottom: "1px solid var(--color-border)",
-          backgroundColor: "#0f0f0f",
-        }}
-      >
-        <Link
-          href="/dashboard"
-          prefetch={true}
-          className="flex min-w-0 items-center justify-center h-full w-full"
-        >
-          <div className="relative flex items-center justify-center h-full w-full">
-            <Image
-              src="/asset_flow.png"
-              alt="Asset Flow"
-              width={260}
-              height={78}
-              priority
-              className="h-[76px] w-auto shrink-0 object-contain"
-            />
-          </div>
-        </Link>
-      </div>
+    <Sidebar collapsible="icon" className="bg-[#0f0f0f]">
+      <SidebarHeader className="border-b border-[rgba(255,255,255,0.06)] px-4 py-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <Image
+                src="/asset_flow.png"
+                alt="Asset Flow"
+                width={260}
+                height={78}
+                priority
+                className="h-10 w-auto shrink-0 object-contain group-data-[collapsible=icon]:h-7"
+              />
+            </Link>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
 
-      <nav className="flex-1 overflow-y-auto px-[14px] py-4 min-w-0 space-y-4">
+      <SidebarContent className="px-2 py-1">
         {navigationSections.map((section) => (
-          <div key={section.title} className="space-y-1">
-            <h4 className="px-3 text-[10px] font-semibold tracking-wider text-[var(--color-text-faint)] uppercase opacity-75">
+          <SidebarGroup key={section.title} className="py-1">
+            <SidebarGroupLabel className="px-3 text-[10px] uppercase tracking-wider text-[var(--color-text-faint)]">
               {section.title}
-            </h4>
-            <div className="space-y-0.5">
+            </SidebarGroupLabel>
+            <SidebarMenu className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = item.icon
                 const isActive = pathname === item.href
 
                 return (
-                  <Link key={item.href} href={item.href} prefetch={true}>
-                    <div
-                      className={cn("nav-item", isActive && "active")}
-                      onClick={onNavigate}
+                  <SidebarMenuItem key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-[13px] transition-colors hover:bg-[var(--color-bg-hover)] ${
+                        isActive
+                          ? "bg-[var(--color-bg-active)] font-semibold text-[var(--color-text-primary)]"
+                          : "text-[var(--color-text-muted)]"
+                      }`}
                     >
-                      <Icon className="nav-icon shrink-0" />
-                      <span className="min-w-0 truncate leading-none">
-                        {item.label}
-                      </span>
-                    </div>
-                  </Link>
+                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-[var(--color-text-primary)]" : "opacity-70"}`} />
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                    </Link>
+                  </SidebarMenuItem>
                 )
               })}
-            </div>
-          </div>
+            </SidebarMenu>
+          </SidebarGroup>
         ))}
-      </nav>
+      </SidebarContent>
 
-      <div
-        className="space-y-4 min-w-0"
-        style={{
-          borderTop: "1px solid var(--color-border)",
-          padding: "16px 14px",
-          paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
-          marginTop: "auto",
-          backgroundColor: "rgba(255, 255, 255, 0.01)",
-        }}
-      >
-        <div className="flex items-center gap-[12px] px-1.5">
-          <Avatar
-            className="border"
-            style={{
-              height: "40px",
-              width: "40px",
-              backgroundColor: "var(--color-bg-overlay)",
-              color: "var(--color-text-secondary)",
-              border: "1px solid var(--color-border)",
-            }}
-          >
-            <AvatarFallback
-              style={{
-                backgroundColor: "transparent",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "var(--color-text-secondary)",
-              }}
+      <SidebarFooter className="border-t border-[rgba(255,255,255,0.06)] px-3 py-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <div className="flex items-center gap-3 px-2 py-1">
+              <Avatar className="h-9 w-9 shrink-0 border border-[rgba(255,255,255,0.08)]">
+                <AvatarImage src={user?.avatarUrl ?? undefined} alt={displayName} />
+                <AvatarFallback className="bg-[var(--color-bg-overlay)] text-[12px] font-semibold text-[var(--color-text-secondary)]">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+                <p className="truncate text-[13px] font-semibold text-[var(--color-text-primary)]">{displayName}</p>
+                <p className="truncate text-[11px] text-[var(--color-text-faint)]">{userRole}</p>
+              </div>
+            </div>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              className="w-full justify-center gap-2 border border-[var(--color-border)] text-[12px] text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
             >
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col min-w-0">
-            <span
-              className="truncate"
-              style={{
-                fontSize: "13.5px",
-                color: "var(--color-text-primary)",
-                fontWeight: 600,
-                lineHeight: 1.2,
-              }}
-            >
-              {displayName}
-            </span>
-            <span
-              className="truncate"
-              style={{
-                fontSize: "11px",
-                color: "var(--color-text-faint)",
-                fontWeight: 400,
-                marginTop: "2px",
-              }}
-            >
-              {userRole}
-            </span>
-          </div>
-        </div>
-        <Button
-          onClick={async () => {
-            onNavigate?.()
-            await handleLogout()
-          }}
-          variant="ghost"
-          className="signout-btn min-h-[44px] sm:min-h-0"
-        >
-          <LogOut className="h-[14px] w-[14px]" />
-          <span>Sign Out</span>
-        </Button>
-      </div>
-    </aside>
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
+            </Button>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+
+      <SidebarRail />
+    </Sidebar>
   )
 }

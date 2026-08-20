@@ -49,6 +49,8 @@ export const contentAssets = pgTable("content_assets", {
     .defaultNow()
     .notNull(),
   recurrence: jsonb("recurrence"),
+  cycle_id: uuid("cycle_id"),
+  asset_number: integer("asset_number"),
 })
 
 export type ContentAsset = typeof contentAssets.$inferSelect

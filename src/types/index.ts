@@ -119,6 +119,52 @@ export interface Asset {
   latestRevision?: AssetRevision
   revisionCount?: number
   comments: AssetComment[]
+  cycleId?: string | null
+  assetNumber?: number | null
+}
+
+export type CycleStatus = "upcoming" | "active" | "completed" | "cancelled"
+
+export interface ServiceCycle {
+  id: string
+  clientId: string
+  startDate: string
+  endDate: string
+  reelsTarget: number
+  postersTarget: number
+  status: CycleStatus
+  createdBy?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface ContentPlanRow {
+  id: string
+  cycleId: string
+  clientId: string
+  weekNumber: number
+  weekStart: string
+  weekEnd: string
+  plannedReels: number
+  plannedPosters: number
+  actualReels?: number
+  actualPosters?: number
+}
+
+export interface ServiceCycleWithPlan extends ServiceCycle {
+  plans: ContentPlanRow[]
+  totalReelsPlanned: number
+  totalPostersPlanned: number
+  totalReelsPublished: number
+  totalPostersPublished: number
+}
+
+export interface CreateCycleInput {
+  clientId: string
+  startDate: string
+  endDate: string
+  reelsTarget: number
+  postersTarget: number
 }
 
 export interface AssetComment {

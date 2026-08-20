@@ -1,5 +1,5 @@
+import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
-import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import { Suspense } from "react"
 import { Toaster } from "@/components/ui/toaster"
@@ -32,6 +32,12 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({

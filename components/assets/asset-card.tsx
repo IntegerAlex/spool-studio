@@ -26,13 +26,23 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import { assetsApi, clearApiClientCache } from "@/lib/api-client"
-import { getAssetIcon, getAssetPreviewType } from "@/lib/asset-display"
+import { formatRelativeTime, getAssetIcon, getAssetPreviewType } from "@/lib/asset-display"
 import { canUploadFromStatus } from "@/lib/asset-workflow"
 import { cn } from "@/lib/utils"
 import type { Asset } from "@/types/index"
 
 interface AssetCardProps {
   asset: Asset
+  onThumbnailClick?: () => void
+  usersById?: Map<string, { name: string }>
+}
+
+function getDisplayName(name: string): string {
+  if (name.includes("@")) {
+    const local = name.split("@")[0]
+    return local.charAt(0).toUpperCase() + local.slice(1)
+  }
+  return name.split(" ")[0]
 }
 
 function _getDimensionLabel(asset: Asset): string | null {
@@ -67,13 +77,17 @@ function getExtensionLabel(asset: Asset): string {
   ).toUpperCase()
 }
 
-function AssetCardImpl({ asset }: AssetCardProps) {
+function AssetCardImpl({ asset, onThumbnailClick, usersById }: AssetCardProps) {
   const router = useRouter()
   const previewType = getAssetPreviewType(asset)
   const AssetIcon = getAssetIcon(asset)
   const durationLabel = getDurationLabel(asset)
   const detailUrl = `/dashboard/assets/${asset.id}`
   const uploadEligible = canUploadFromStatus(asset.status)
+  const rawUploaderName = asset.uploadedBy
+    ? usersById?.get(asset.uploadedBy)?.name
+    : null
+  const uploaderName = rawUploaderName ? getDisplayName(rawUploaderName) : null
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -154,7 +168,16 @@ function AssetCardImpl({ asset }: AssetCardProps) {
           "hover:border-[rgba(255,255,255,0.18)] hover:bg-[#1a1a1a] focus-within:border-[rgba(255,255,255,0.18)] focus-within:bg-[#1a1a1a]",
         )}
       >
-        <div className="relative overflow-hidden bg-[#0f0f0f]">
+        <div
+          className="relative overflow-hidden bg-[#0f0f0f]"
+          onClick={(e) => {
+            if (onThumbnailClick) {
+              e.preventDefault()
+              e.stopPropagation()
+              onThumbnailClick()
+            }
+          }}
+        >
           <div className="aspect-[16/9] w-full">
             {previewType === "image" && asset.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -249,6 +272,17 @@ function AssetCardImpl({ asset }: AssetCardProps) {
             <p className="truncate text-[13px] font-medium leading-5 text-white">
               {asset.title}
             </p>
+            {(uploaderName || asset.uploadedAt) && (
+              <p className="mt-1 truncate text-[11px] leading-4 text-[#71717a]">
+                {uploaderName && <span>{uploaderName}</span>}
+                {uploaderName && asset.uploadedAt && (
+                  <span className="mx-1">·</span>
+                )}
+                {asset.uploadedAt && (
+                  <span>{formatRelativeTime(asset.uploadedAt)}</span>
+                )}
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="inline-flex h-[18px] items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-2 text-[10px] uppercase tracking-wide text-[#a1a1aa]">
                 {getExtensionLabel(asset)}

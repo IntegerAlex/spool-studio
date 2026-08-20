@@ -1,25 +1,13 @@
 "use client"
 
-import { Bell, Menu } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
+import { Bell } from "lucide-react"
 import { usePathname } from "next/navigation"
 import type { ReactNode } from "react"
-import { useEffect, useMemo, useState } from "react"
-import { Header } from "@/components/layout/header"
-import { Sidebar } from "@/components/layout/sidebar"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useEffect, useState } from "react"
+import { SidebarLayout } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
+import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
 import type { AuthUser } from "@/lib/auth"
-import { cn } from "@/lib/utils"
 
 interface DashboardShellProps {
   title: string
@@ -29,6 +17,7 @@ interface DashboardShellProps {
 function getRouteTitle(pathname: string, fallback: string): string {
   if (pathname === "/dashboard" || pathname === "/dashboard/")
     return "Dashboard"
+  if (pathname.startsWith("/dashboard/planner")) return "Planner"
   if (pathname.startsWith("/dashboard/assets/")) return "Asset Details"
   if (pathname.startsWith("/dashboard/assets")) return "Assets"
   if (pathname.startsWith("/dashboard/clients")) return "Clients"
@@ -40,22 +29,23 @@ function getRouteTitle(pathname: string, fallback: string): string {
   return fallback
 }
 
-export function DashboardShell({ title, children }: DashboardShellProps) {
+export function DashboardShell({ title,children }: DashboardShellProps) {
   const pathname = usePathname()
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [user, setUser] = useState<AuthUser | null>(null)
 
   useEffect(() => {
-    const isActive = true
+    let isActive = true
 
     const loadUser = async () => {
       try {
         const res = await fetch("/api/auth/me")
-        if (res.ok && isActive) {
-          const data = await res.json()
-          setUser(data.user ?? data ?? null)
-        } else if (isActive) {
-          setUser(null)
+        if (isActive) {
+          if (res.ok) {
+            const data = await res.json()
+            setUser(data.user ?? data ?? null)
+          } else {
+            setUser(null)
+          }
         }
       } catch {
         if (isActive) setUser(null)
@@ -63,106 +53,38 @@ export function DashboardShell({ title, children }: DashboardShellProps) {
     }
 
     void loadUser()
-  }, [])
 
-  const displayName = user?.name || user?.email || "User"
-  const avatarUrl = user?.avatarUrl
-  const initials = useMemo(() => {
-    return (
-      displayName
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part: string) => part[0]?.toUpperCase())
-        .join("")
-        .slice(0, 2) || "CO"
-    )
-  }, [displayName])
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   const routeTitle = getRouteTitle(pathname, title)
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[var(--background)] text-foreground">
-      <Sidebar user={user} />
-
-      <div className="flex min-h-screen w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-[var(--surface-main)] lg:ml-[240px] lg:w-[calc(100%-240px)]">
-        <div className="sticky top-0 z-50 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 lg:hidden pt-[env(safe-area-inset-top)] h-[calc(3.5rem+env(safe-area-inset-top))]">
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <div className="relative flex items-center h-full w-full ml-1">
-              <Image
-                src="/asset_flow.png"
-                alt="Asset Flow"
-                width={180}
-                height={54}
-                priority
-                className="h-[36px] w-auto shrink-0 object-contain"
-              />
-            </div>
-            <span className="sr-only">Asset Flow</span>
-          </Link>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
-            >
-              <Bell className="h-[18px] w-[18px]" />
-            </Button>
-
-            <Avatar className="size-8 border border-[rgba(255,255,255,0.08)] bg-[var(--surface-elevated)]">
-              <AvatarImage src={avatarUrl ?? undefined} alt={displayName} />
-              <AvatarFallback className="bg-[var(--surface-elevated)] text-[12px] font-semibold text-white">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-
-            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-              <SheetTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
-                >
-                  <Menu className="h-[18px] w-[18px]" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="left"
-                className="w-[88vw] max-w-sm border-r border-[rgba(255,255,255,0.08)] bg-[var(--sidebar)] p-0 text-white"
-              >
-                <SheetHeader className="border-b border-[rgba(255,255,255,0.06)] px-4 py-4">
-                  <SheetTitle className="text-left text-[15px] text-white">
-                    Dashboard navigation
-                  </SheetTitle>
-                  <SheetDescription className="text-left text-[#a1a1aa]">
-                    Jump between sections and manage your workspace.
-                  </SheetDescription>
-                </SheetHeader>
-                <div className="h-[calc(100%-5rem)] overflow-y-auto">
-                  <Sidebar
-                    variant="drawer"
-                    onNavigate={() => setMobileNavOpen(false)}
-                    user={user}
-                  />
-                </div>
-              </SheetContent>
-            </Sheet>
+    <SidebarProvider>
+      <SidebarLayout user={user} />
+      <SidebarInset>
+        <header className="sticky top-0 z-50 flex h-14 items-center gap-4 border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 md:px-6">
+          <SidebarTrigger className="-ml-1 text-[#71717a] hover:text-white" />
+          <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+            {routeTitle}
           </div>
-        </div>
-
-        <Header title={routeTitle} className="hidden lg:flex" user={user} />
-
-        <main
-          className={cn(
-            "flex-1 w-full max-w-full min-w-0 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:pt-20",
-          )}
-        >
-          <div className="mx-auto w-full max-w-[1900px] lg:w-[90%] min-w-0">
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 text-[#71717a] hover:bg-[rgba(255,255,255,0.05)] hover:text-white"
+          >
+            <Bell className="h-5 w-5" />
+          </Button>
+        </header>
+        <main className="flex-1 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 md:px-6">
+          <div className="mx-auto w-full max-w-[1900px] min-w-0">
             {children}
           </div>
         </main>
-      </div>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

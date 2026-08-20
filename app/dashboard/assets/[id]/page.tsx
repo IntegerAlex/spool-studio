@@ -30,7 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Progress } from "@/components/ui/progress"
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import {
   assetsApi,
@@ -566,9 +566,9 @@ export default function AssetDetailPage() {
               </div>
               {isUploadingRevision && (
                 <div className="mt-3 w-full max-w-sm space-y-2">
-                  <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[#71717a]">
-                    <span>Uploading revision</span>
-                    <span>{revisionUploadProgress}%</span>
+                  <div className="flex items-center justify-between">
+                    <ProgressLabel>Uploading revision</ProgressLabel>
+                    <ProgressValue>{revisionUploadProgress}%</ProgressValue>
                   </div>
                   <Progress
                     value={revisionUploadProgress}

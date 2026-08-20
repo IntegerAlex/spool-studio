@@ -11,6 +11,16 @@ import {
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import useSWR, { mutate } from "swr"
+import { PreviewShell } from "@/components/preview"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination"
 import { AssetCard } from "@/components/assets/asset-card"
 import { AssetFormDialog } from "@/components/assets/asset-form-dialog"
 import { StatusBadge } from "@/components/assets/status-badge"
@@ -199,6 +209,10 @@ export default function AssetsPage() {
   const [sortMode, setSortMode] = useState<AssetSortMode>(defaultSortMode)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const PAGE_SIZE = 20
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -264,6 +278,42 @@ export default function AssetsPage() {
     () => getDiscoveryEmptyState(discoveryFilters, visibleAssets.length),
     [discoveryFilters, visibleAssets.length],
   )
+
+  const totalPages = Math.max(1, Math.ceil(visibleAssets.length / PAGE_SIZE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedAssets = useMemo(
+    () =>
+      visibleAssets.slice(
+        (safeCurrentPage - 1) * PAGE_SIZE,
+        safeCurrentPage * PAGE_SIZE,
+      ),
+    [visibleAssets, safeCurrentPage, PAGE_SIZE],
+  )
+
+  const pageItems = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1)
+    }
+
+    const pages: Array<number | "ellipsis"> = []
+    const first = 1
+    const last = totalPages
+    const current = safeCurrentPage
+    const neighbors = [current - 1, current, current + 1].filter(
+      (value) => value > first && value < last,
+    )
+
+    pages.push(first)
+    if (neighbors[0] > first + 1) {
+      pages.push("ellipsis")
+    }
+    pages.push(...neighbors)
+    if (neighbors[neighbors.length - 1] < last - 1) {
+      pages.push("ellipsis")
+    }
+    pages.push(last)
+    return pages
+  }, [totalPages, safeCurrentPage])
 
   useEffect(() => {
     console.info("[assets][discovery]", {
@@ -507,7 +557,14 @@ export default function AssetsPage() {
         className="table-row-item"
       >
         <div className="flex flex-1 items-center gap-3 min-w-0">
-          <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]">
+          <div
+            className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setPreviewAsset(asset)
+            }}
+          >
             {asset.thumbnailUrl && previewType === "image" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -863,8 +920,13 @@ export default function AssetsPage() {
       {visibleAssets.length > 0 ? (
         viewMode === "grid" ? (
           <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 xl:grid-cols-4">
-            {visibleAssets.map((asset) => (
-              <AssetCard key={asset.id} asset={asset} />
+            {paginatedAssets.map((asset) => (
+              <AssetCard
+                key={asset.id}
+                asset={asset}
+                usersById={usersById}
+                onThumbnailClick={() => setPreviewAsset(asset)}
+              />
             ))}
           </div>
         ) : (
@@ -927,6 +989,66 @@ export default function AssetsPage() {
           </p>
         </div>
       )}
+
+      {totalPages > 1 && (
+        <div className="flex justify-center pt-2">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
+                  className={
+                    safeCurrentPage === 1
+                      ? "pointer-events-none opacity-40"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+
+              {pageItems.map((item, idx) =>
+                item === "ellipsis" ? (
+                  <PaginationItem key={`ellipsis-${idx}`}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={item}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(item)}
+                      isActive={item === safeCurrentPage}
+                      className="cursor-pointer"
+                    >
+                      {item}
+                    </PaginationLink>
+                  </PaginationItem>
+                ),
+              )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() =>
+                    setCurrentPage((page) => Math.min(totalPages, page + 1))
+                  }
+                  className={
+                    safeCurrentPage === totalPages
+                      ? "pointer-events-none opacity-40"
+                      : "cursor-pointer"
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
+
+      <PreviewShell
+        asset={previewAsset}
+        open={previewAsset !== null}
+        onOpenChange={(open) => {
+          if (!open) setPreviewAsset(null)
+        }}
+      />
     </div>
   )
 }

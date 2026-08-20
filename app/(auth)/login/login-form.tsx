@@ -1,11 +1,10 @@
 "use client"
 
-import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 
 export function LoginForm() {
   const router = useRouter()
@@ -41,80 +40,87 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium text-foreground">
-          Email Address
-        </label>
-        <Input
-          id="email"
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-2.5 px-8 pb-1 rounded-[25px] transition-all duration-300 hover:scale-[1.02]"
+      style={{ backgroundColor: "#171717" }}
+    >
+      <div className="flex justify-center my-6">
+        <Image
+          src="/asset_flow.png"
+          alt="Asset Flow"
+          width={200}
+          height={60}
+          priority
+          className="h-12 w-auto"
+        />
+      </div>
+
+      <div
+        className="flex items-center gap-2.5 rounded-[25px] px-3 py-2.5"
+        style={{ boxShadow: "inset 2px 5px 10px rgb(5, 5, 5)", backgroundColor: "#171717" }}
+      >
+        <Mail className="h-5 w-5 shrink-0 text-[#a1a1aa]" />
+        <input
           type="email"
-          placeholder="you@agency.com"
+          placeholder="Email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
-          className="bg-background text-foreground"
+          className="w-full bg-transparent border-none outline-none text-[#d3d3d3] placeholder:text-[#71717a]"
           required
         />
       </div>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label
-            htmlFor="password"
-            className="text-sm font-medium text-foreground"
-          >
-            Password
-          </label>
-          <Link
-            href="/forgot-password"
-            className="text-sm text-primary hover:underline"
-          >
-            Forgot?
-          </Link>
-        </div>
-        <div className="relative">
-          <Input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            className="bg-background text-foreground pr-10"
-            required
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
-          </button>
-        </div>
+      <div
+        className="flex items-center gap-2.5 rounded-[25px] px-3 py-2.5"
+        style={{ boxShadow: "inset 2px 5px 10px rgb(5, 5, 5)", backgroundColor: "#171717" }}
+      >
+        <Lock className="h-5 w-5 shrink-0 text-[#a1a1aa]" />
+        <input
+          type={showPassword ? "text" : "password"}
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={isLoading}
+          className="w-full bg-transparent border-none outline-none text-[#d3d3d3] placeholder:text-[#71717a]"
+          required
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="shrink-0 text-[#71717a] hover:text-[#a1a1aa] transition-colors"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-sm text-red-400 text-center">{error}</p>}
 
-      <Button
-        type="submit"
-        disabled={isLoading}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Signing in...
-          </>
-        ) : (
-          "Sign In"
-        )}
-      </Button>
+      {isLoading && (
+        <div className="flex justify-center py-1">
+          <Loader2 className="h-5 w-5 animate-spin text-[#818cf8]" />
+        </div>
+      )}
+
+      <div className="flex justify-center gap-2 mt-6">
+        <Link
+          href="/forgot-password"
+          type="button"
+          className="px-4 py-2 rounded-md text-sm text-[#a1a1aa] transition-colors hover:bg-[#252525] hover:text-white"
+        >
+          Forgot Password
+        </Link>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="px-9 py-2 rounded-md text-sm text-white transition-colors hover:bg-[#252525] disabled:opacity-50"
+          style={{ backgroundColor: "#252525" }}
+        >
+          Sign In
+        </button>
+      </div>
     </form>
   )
 }

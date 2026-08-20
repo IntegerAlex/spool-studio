@@ -132,10 +132,10 @@ export async function generateReport(
     }
 
     return {
-      id: asset.id,
+      id: asset.asset_id,
       title: asset.title,
-      type: asset.type,
-      status: asset.status,
+      type: asset.type as "reel" | "poster",
+      status: "published",
       uploadedAt: asset.uploaded_at
         ? new Date(asset.uploaded_at).toISOString()
         : null,

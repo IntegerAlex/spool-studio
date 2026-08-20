@@ -45,8 +45,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     console.info("[api/assets] create payload", body)
-    if (!body?.clientId || !body?.title || !body?.type) {
-      const error = "Client, title, and type are required"
+    if (!body?.clientId || !body?.type) {
+      const error = "Client and type are required"
       console.warn("[api/assets] validation error", { error, body })
       return NextResponse.json({ success: false, error }, { status: 400 })
     }
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     console.info("[api/assets] parsed payload", payload)
     const asset = await createAsset({
       clientId: payload.clientId,
-      title: payload.title,
+      title: payload.title || "",
       type: payload.type,
       status: payload.status,
       driveFileUrl: payload.driveFileUrl,

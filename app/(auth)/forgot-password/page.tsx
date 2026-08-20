@@ -1,11 +1,10 @@
 "use client"
 
-import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, CheckCircle, Loader2, Mail } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { HexagonBackground } from "@/components/animate-ui/components/backgrounds/hexagon"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -39,84 +38,95 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-background p-4">
+      <HexagonBackground className="absolute inset-0" hexagonSize={75} hexagonMargin={3} />
+      <div className="relative z-10 w-full max-w-md">
         <Link
           href="/login"
-          className="inline-flex items-center text-sm text-primary hover:underline"
+          className="inline-flex items-center text-sm text-[#a1a1aa] hover:text-white transition-colors mb-6"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to login
         </Link>
 
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Reset Password</h1>
-          <p className="text-muted-foreground">
-            Enter your email to receive reset instructions
-          </p>
-        </div>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-2.5 px-8 pb-1 rounded-[25px] transition-all duration-300 hover:scale-[1.02]"
+          style={{ backgroundColor: "#171717" }}
+        >
+          <div className="flex justify-center my-6">
+            <Image
+              src="/asset_flow.png"
+              alt="Asset Flow"
+              width={200}
+              height={60}
+              priority
+              className="h-12 w-auto"
+            />
+          </div>
 
-        <Card className="p-8 space-y-6 border border-border">
           {!submitted ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="text-sm font-medium text-foreground"
-                >
-                  Email Address
-                </label>
-                <Input
-                  id="email"
+            <>
+              <div
+                className="flex items-center gap-2.5 rounded-[25px] px-3 py-2.5"
+                style={{ boxShadow: "inset 2px 5px 10px rgb(5, 5, 5)", backgroundColor: "#171717" }}
+              >
+                <Mail className="h-5 w-5 shrink-0 text-[#a1a1aa]" />
+                <input
                   type="email"
-                  placeholder="you@agency.com"
+                  placeholder="Email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading}
-                  className="bg-background text-foreground"
+                  className="w-full bg-transparent border-none outline-none text-[#d3d3d3] placeholder:text-[#71717a]"
                   required
                 />
               </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <p className="text-sm text-red-400 text-center">{error}</p>
+              )}
 
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  "Send Reset Link"
-                )}
-              </Button>
-            </form>
+              {isLoading && (
+                <div className="flex justify-center py-1">
+                  <Loader2 className="h-5 w-5 animate-spin text-[#818cf8]" />
+                </div>
+              )}
+
+              <div className="flex justify-center mt-6">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-9 py-2 rounded-md text-sm text-white transition-colors hover:bg-[#252525] disabled:opacity-50"
+                  style={{ backgroundColor: "#252525" }}
+                >
+                  Send Reset Link
+                </button>
+              </div>
+            </>
           ) : (
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-4 py-4">
               <div className="flex justify-center">
-                <CheckCircle className="w-12 h-12 text-primary" />
+                <CheckCircle className="w-12 h-12 text-[#818cf8]" />
               </div>
               <div className="space-y-2">
-                <h2 className="font-semibold text-foreground">
-                  Check your email
-                </h2>
-                <p className="text-sm text-muted-foreground">
+                <h2 className="font-semibold text-white">Check your email</h2>
+                <p className="text-sm text-[#a1a1aa]">
                   We&apos;ve sent password reset instructions to {email}
                 </p>
               </div>
-              <Button
-                asChild
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                <Link href="/login">Back to login</Link>
-              </Button>
+              <div className="flex justify-center mt-4">
+                <Link
+                  href="/login"
+                  className="px-9 py-2 rounded-md text-sm text-white transition-colors hover:bg-[#252525]"
+                  style={{ backgroundColor: "#252525" }}
+                >
+                  Back to login
+                </Link>
+              </div>
             </div>
           )}
-        </Card>
+        </form>
       </div>
     </div>
   )

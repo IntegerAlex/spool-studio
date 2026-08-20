@@ -29,6 +29,13 @@
       "when": 1787184000000,
       "tag": "0003_add_clients_weekly_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787190000000,
+      "tag": "0004_content_planning",
+      "breakpoints": true
     }
   ]
 }

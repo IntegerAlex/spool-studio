@@ -53,6 +53,7 @@ import {
   clearApiClientCache,
   clientReferencesApi,
   clientsApi,
+  cyclesApi,
   usersApi,
 } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
@@ -61,9 +62,15 @@ import type {
   Client,
   ClientReference,
   ClientReferenceType,
+  ServiceCycle,
+  ServiceCycleWithPlan,
+  CreateCycleInput,
   User,
 } from "@/types/index"
 import { ClientReport } from "./client-report"
+import { CycleCard } from "@/components/cycles/cycle-card"
+import { CycleFormDialog } from "@/components/cycles/cycle-form-dialog"
+import { ContentPlanCard } from "@/components/cycles/content-plan-card"
 
 interface ClientDetailProps {
   client: Client
@@ -421,6 +428,69 @@ export function ClientDetail({
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const router = useRouter()
   const { toast } = useToast()
+
+  const [cycles, setCycles] = useState<ServiceCycleWithPlan[]>([])
+  const [isCycleFormOpen, setIsCycleFormOpen] = useState(false)
+  const [editingCycle, setEditingCycle] = useState<ServiceCycle | null>(null)
+  const [cycleFormPrefill, setCycleFormPrefill] = useState<
+    Partial<ServiceCycle> | undefined
+  >(undefined)
+
+  useEffect(() => {
+    let isActive = true
+    cyclesApi
+      .list(client.id)
+      .then((data) => {
+        if (isActive) setCycles(data)
+      })
+      .catch(() => {
+        if (isActive) setCycles([])
+      })
+    return () => {
+      isActive = false
+    }
+  }, [client.id])
+
+  const handleCycleFormSubmit = async (input: CreateCycleInput) => {
+    if (editingCycle) {
+      await cyclesApi.update(editingCycle.id, input)
+      setEditingCycle(null)
+    } else if (cycleFormPrefill?.id) {
+      await cyclesApi.renew(cycleFormPrefill.id, input)
+    } else {
+      await cyclesApi.create(input)
+    }
+    const updated = await cyclesApi.list(client.id)
+    setCycles(updated)
+  }
+
+  const handleCompleteCycle = async (cycleId: string) => {
+    await cyclesApi.complete(cycleId)
+    const updated = await cyclesApi.list(client.id)
+    setCycles(updated)
+    toast({ title: "Cycle completed" })
+  }
+
+  const handleCancelCycle = async (cycleId: string) => {
+    await cyclesApi.cancel(cycleId)
+    const updated = await cyclesApi.list(client.id)
+    setCycles(updated)
+    toast({ title: "Cycle cancelled" })
+  }
+
+  const handleRenewCycle = (cycle: ServiceCycle) => {
+    setCycleFormPrefill(cycle)
+    setEditingCycle(null)
+    setIsCycleFormOpen(true)
+  }
+
+  const handleEditCycle = (cycle: ServiceCycle) => {
+    setEditingCycle(cycle)
+    setCycleFormPrefill(cycle)
+    setIsCycleFormOpen(true)
+  }
+
+  const activeCycle = cycles.find((c) => c.status === "active") ?? null
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -1191,6 +1261,51 @@ export function ClientDetail({
               </div>
             </Card>
           )}
+
+          <Card className="rounded-[10px] border-0 bg-[#161616] p-5 shadow-none">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[13px] font-medium text-white">
+                Service Cycles
+              </h2>
+              <Button
+                size="sm"
+                className="h-7 bg-[var(--primary)] text-[11px] text-white hover:bg-[#4f46e5]"
+                onClick={() => {
+                  setCycleFormPrefill(undefined)
+                  setIsCycleFormOpen(true)
+                }}
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                New Cycle
+              </Button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {cycles.length === 0 ? (
+                <div className="rounded-md border border-dashed border-[rgba(255,255,255,0.08)] py-6 text-center text-[12px] text-[#71717a]">
+                  No service cycles yet. Create one to generate a content plan.
+                </div>
+              ) : (
+                cycles.map((cycle) => (
+                  <CycleCard
+                    key={cycle.id}
+                    cycle={cycle}
+                    isActive={cycle.status === "active"}
+                    onComplete={handleCompleteCycle}
+                    onCancel={handleCancelCycle}
+                    onRenew={handleRenewCycle}
+                    onEdit={handleEditCycle}
+                  />
+                ))
+              )}
+            </div>
+          </Card>
+
+          {activeCycle && (
+            <ContentPlanCard
+              plans={activeCycle.plans}
+              className="rounded-[10px] border-0"
+            />
+          )}
         </>
       )}
 
@@ -1297,6 +1412,20 @@ export function ClientDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CycleFormDialog
+        open={isCycleFormOpen}
+        onOpenChange={(open) => {
+          setIsCycleFormOpen(open)
+          if (!open) {
+            setEditingCycle(null)
+          }
+        }}
+        clientId={client.id}
+        prefill={cycleFormPrefill}
+        isEditing={!!editingCycle}
+        onSubmit={handleCycleFormSubmit}
+      />
     </div>
   )
 }

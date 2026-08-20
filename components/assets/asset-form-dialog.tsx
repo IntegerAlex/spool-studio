@@ -57,7 +57,7 @@ const UNASSIGNED_VALUE = "__unassigned__"
 
 const formSchema = z
   .object({
-    title: z.string().min(2, "Title is required"),
+    title: z.string().optional(),
     clientId: z.string().min(1, "Client is required"),
     type: z.enum(["reel", "poster"]),
     status: z.enum(assetStatuses).optional(),
@@ -253,7 +253,7 @@ export function AssetFormDialog({
     try {
       const payload = {
         clientId: values.clientId,
-        title: values.title,
+        title: values.title ?? "",
         type: values.type,
         status: mode === "create" ? "draft" : values.status,
         assignedTo: values.assignedTo ? values.assignedTo : null,
@@ -363,10 +363,25 @@ export function AssetFormDialog({
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Title</FormLabel>
+                  <FormLabel>
+                    {mode === "create" ? "Title (optional)" : "Title"}
+                  </FormLabel>
                   <FormControl>
-                    <Input placeholder="Asset title" {...field} />
+                    <Input
+                      placeholder={
+                        mode === "create"
+                          ? "Leave empty to auto-generate"
+                          : "Asset title"
+                      }
+                      {...field}
+                    />
                   </FormControl>
+                  {mode === "create" && (
+                    <p className="text-[11px] text-[#71717a]">
+                      Leave empty to auto-generate (e.g., FS_Jul_R01). Requires
+                      an active service cycle.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

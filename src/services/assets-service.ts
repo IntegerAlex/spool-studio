@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { assetRevisions } from "@/db/schema"
 import { deleteFile, uploadFile } from "@/integrations/r2/r2-service"
@@ -31,6 +31,14 @@ import { getUserById } from "@/repositories/users-repository"
 import { logAssetActivity } from "@/services/activity-service"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getOrCreateCurrentUserProfile } from "@/services/users-service"
+import {
+  getActiveCycleForClientService,
+} from "@/services/service-cycles-service"
+import {
+  getNextAssetNumber,
+  generateAssetTitle,
+  extractClientShortForm,
+} from "@/services/numbering-service"
 import type { AssetStatus, AssetType, Json } from "@/types"
 import type { Asset, AssetRevision } from "@/types/index"
 
@@ -50,6 +58,8 @@ export interface AssetInput {
   approvedAt?: string | null
   approvedBy?: string | null
   recurrence?: Json | null
+  cycleId?: string | null
+  assetNumber?: number | null
 }
 
 type ScheduledAtParts = {
@@ -390,9 +400,36 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
 
   const scheduledFields = splitScheduledAt(input.scheduledAt)
 
+  // Auto-numbering: if title is empty, derive it from the active service cycle.
+  let finalTitle = input.title
+  let finalCycleId = input.cycleId ?? null
+  let finalAssetNumber = input.assetNumber ?? null
+
+  if (!finalTitle || finalTitle.trim() === "") {
+    const activeCycle = await getActiveCycleForClientService(input.clientId)
+    if (!activeCycle) {
+      throw new Error(
+        "No active service cycle found. Please contact the administrator to create one.",
+      )
+    }
+
+    const assetNumber = await getNextAssetNumber(activeCycle.id, input.type)
+    const clientRecord = await getClientById(input.clientId)
+    const shortForm = extractClientShortForm(clientRecord?.name ?? "XX")
+
+    finalTitle = generateAssetTitle(
+      shortForm,
+      activeCycle.startDate,
+      input.type,
+      assetNumber,
+    )
+    finalCycleId = activeCycle.id
+    finalAssetNumber = assetNumber
+  }
+
   const record = await insertAsset({
     client_id: input.clientId,
-    title: input.title,
+    title: finalTitle,
     type: input.type,
     status: input.status ?? "draft",
     drive_file_url: input.driveFileUrl ?? null,
@@ -406,6 +443,8 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     published_at: input.publishedAt ?? null,
     approved_at: input.approvedAt ?? null,
     approved_by: input.approvedBy ?? null,
+    cycle_id: finalCycleId,
+    asset_number: finalAssetNumber,
   })
 
   const storedRecord = record
@@ -1149,11 +1188,30 @@ export async function updateAsset(
     updates.published_at = input.publishedAt ?? new Date().toISOString()
   }
 
-  const record = await updateAssetRow(
-    assetId,
-    // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    updates as Parameters<typeof updateAssetRow>[1],
-  )
+  let record: Awaited<ReturnType<typeof getAssetById>>
+  if (updates.status === "published") {
+    // Atomic publication: apply all updates and create the immutable
+    // publication record in a single transaction via the SQL function.
+    const publishedAt = updates.published_at as string
+    await db.execute(sql`
+      select public.publish_asset_with_record(
+        ${assetId}::uuid,
+        ${JSON.stringify(updates)}::jsonb,
+        ${publishedAt}::timestamptz
+      )
+    `)
+    const refreshed = await getAssetById(assetId)
+    if (!refreshed) {
+      throw new Error("Asset not found after publication")
+    }
+    record = refreshed
+  } else {
+    record = await updateAssetRow(
+      assetId,
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
+      updates as Parameters<typeof updateAssetRow>[1],
+    )
+  }
 
   const mapped = mapAsset(record)
   if (!mapped) {

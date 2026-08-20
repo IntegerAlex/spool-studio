@@ -16,6 +16,7 @@ export interface ActivityInput {
   assetId: string
   action: string
   metadata?: Record<string, Json>
+  userId?: string
 }
 
 // oxlint-disable-next-line anti-slop/no-unknown-parameters  // external input at boundary (JSON serializer)
@@ -93,16 +94,23 @@ export async function getAssetActivityWithUsers(
 export async function logAssetActivity(
   input: ActivityInput,
 ): Promise<AssetActivityLog> {
-  const user = await getCurrentUser()
-  if (!user) {
-    throw new Error("Unauthorized")
-  }
+  let resolvedUserId: string
 
-  await getOrCreateCurrentUserProfile()
+  if (input.userId) {
+    resolvedUserId = input.userId
+  } else {
+    const user = await getCurrentUser()
+    if (!user) {
+      throw new Error("Unauthorized")
+    }
+
+    await getOrCreateCurrentUserProfile()
+    resolvedUserId = user.id
+  }
 
   const record = await insertActivity({
     asset_id: input.assetId,
-    user_id: user.id,
+    user_id: resolvedUserId,
     action: input.action,
     metadata: toJson(input.metadata ?? {}),
   })
