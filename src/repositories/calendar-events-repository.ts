@@ -40,7 +40,7 @@ function calendarQuery(
   FROM content_assets a
   LEFT JOIN clients c ON c.id = a.client_id
   WHERE a.created_by = ${userId}
-    AND a.status = ANY(${includeDrafts ? sql`ARRAY['approved','published','scheduled','draft','in_design']` : sql`ARRAY['approved','published','scheduled']`}::text[])
+    AND a.status IN (${sql.raw(includeDrafts ? "'approved','published','scheduled','draft','in_design'" : "'approved','published','scheduled'")})
     AND (
       (a.publish_date IS NOT NULL AND a.publish_date BETWEEN (${rangeStart}::date - interval '2 days') AND (${rangeEnd}::date + interval '2 days'))
       OR (a.scheduled_at IS NOT NULL AND a.scheduled_at BETWEEN ${windowStart}::timestamptz AND ${windowEnd}::timestamptz)
