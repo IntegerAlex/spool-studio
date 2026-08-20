@@ -1,5 +1,3 @@
-import type { Database, Json } from "./database"
-
 export type {
   CalendarEvent,
   CalendarEventKind,
@@ -8,15 +6,46 @@ export type {
   RecurrenceRule,
 } from "./calendar"
 
-export type { Json } from "./database"
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
-export type UserRole = Database["public"]["Enums"]["user_role"]
-export type AssetType = Database["public"]["Enums"]["asset_type"]
-export type AssetStatus = Database["public"]["Enums"]["asset_status"]
-export type CommentType = Database["public"]["Enums"]["comment_type"]
-export type RevisionStatus = Database["public"]["Enums"]["revision_status"]
+export type UserRole = "admin" | "designer" | "approver" | "uploader"
+export type AssetType = "reel" | "poster"
+export type AssetStatus =
+  | "draft"
+  | "uploading"
+  | "uploaded"
+  | "processing"
+  | "approved"
+  | "published"
+  | "failed"
+  | "archived"
+  | "in_design"
+  | "ready_for_review"
+  | "revision_requested"
+  | "scheduled"
+export type CommentType =
+  | "comment"
+  | "revision"
+  | "approval_note"
+  | "internal_note"
+export type RevisionStatus = "open" | "resolved"
 export type ClientReferenceType =
-  Database["public"]["Enums"]["client_reference_type"]
+  | "instagram"
+  | "website"
+  | "youtube"
+  | "pinterest"
+  | "drive_folder"
+  | "competitor"
+  | "branding"
+  | "reel_reference"
+  | "ad_reference"
+  | "other"
 
 export interface User {
   id: string
@@ -141,11 +170,6 @@ export interface ClientReference {
   createdAt: Date
   updatedAt: Date
 }
-
-export type UserInsert = Database["public"]["Tables"]["users"]["Insert"]
-export type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"]
-export type AssetInsert =
-  Database["public"]["Tables"]["content_assets"]["Insert"]
 
 export interface KanbanClientOption {
   id: string
