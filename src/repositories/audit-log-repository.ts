@@ -95,24 +95,14 @@ export async function listAuditLogs(
   options: AuditLogListOptions = {},
 ): Promise<{ data: DbAuditLog[]; total: number }> {
   const where = buildWhere(options)
-
-  const countRows = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(auditLogs)
-    .where(where)
-  const total = countRows[0]?.count ?? 0
-
   const limit = Math.min(options.limit ?? 50, 200)
   const offset = options.offset ?? 0
 
-  const rows = await db
-    .select()
-    .from(auditLogs)
-    .where(where)
-    .orderBy(desc(auditLogs.created_at))
-    .limit(limit)
-    .offset(offset)
-
+  const [countRows, rows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)::int` }).from(auditLogs).where(where),
+    db.select().from(auditLogs).where(where).orderBy(desc(auditLogs.created_at)).limit(limit).offset(offset),
+  ])
+  const total = countRows[0]?.count ?? 0
   return { data: rows, total }
 }
 
