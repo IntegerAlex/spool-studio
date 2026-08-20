@@ -1,6 +1,15 @@
 import { randomUUID } from "node:crypto"
 import bcrypt from "bcryptjs"
-import { getPool, query } from "../src/lib/db"
+import { getPool } from "../src/lib/db"
+
+async function query(text: string, params?: unknown[]) {
+  const client = await getPool().connect()
+  try {
+    return await client.query(text, params)
+  } finally {
+    client.release()
+  }
+}
 
 async function seed() {
   console.log("Seeding database...\n")

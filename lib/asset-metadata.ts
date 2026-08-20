@@ -1,4 +1,5 @@
-import type { Database } from "@/types/database"
+import type { FlexibleInsert } from "@/db"
+import type { contentAssets } from "@/db/schema"
 
 export type AssetMediaType = "image" | "video" | "other"
 
@@ -16,7 +17,7 @@ export interface AssetMetadataExtractionInput {
 
 export interface AssetMetadataExtractionResult {
   updates: Pick<
-    Database["public"]["Tables"]["content_assets"]["Update"],
+    Partial<FlexibleInsert<typeof contentAssets.$inferInsert>>,
     | "mime_type"
     | "file_size"
     | "file_extension"
@@ -391,11 +392,11 @@ export async function extractVideoMetadata(file: File): Promise<{
   try {
     const buffer = new Uint8Array(await file.arrayBuffer())
     const parsed = {
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       durationSeconds: null as number | null,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       width: null as number | null,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       height: null as number | null,
     }
 

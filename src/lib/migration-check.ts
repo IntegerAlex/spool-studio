@@ -1,4 +1,6 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
+import { sql } from "drizzle-orm"
+import { db } from "@/db"
+import { clients } from "@/db/schema"
 
 let cachedMigrationResult: { ok: boolean; missing?: string[] } | null = null
 
@@ -11,33 +13,37 @@ export async function checkClientGoalsMigration(): Promise<{
   }
 
   try {
-    const supabase = await createServerSupabaseClient()
-    // check columns existence by attempting to select them
-    const { data: _cols, error } = await supabase
-      .from("clients")
-      .select("id, monthly_goal, weekly_goal")
+    await db
+      .select({
+        id: clients.id,
+        monthly_goal: clients.monthly_goal,
+        weekly_goal: clients.weekly_goal,
+      })
+      .from(clients)
       .limit(1)
-      .maybeSingle()
-
-    if (error) {
-      return { ok: false, missing: ["clients table or columns missing"] }
-    }
-
-    // now check function existence via rpc dry-run (get: true)
-    const { error: fnErr } = await supabase.rpc(
-      "clients_weekly_counts",
-      { week_start: new Date().toISOString() },
-      { head: true, get: true },
-    )
-    if (fnErr) {
-      return { ok: false, missing: ["clients_weekly_counts function missing"] }
-    }
-
-    const res = { ok: true }
-    cachedMigrationResult = res
-    return res
-  } catch (err) {
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    return { ok: false, missing: [(err as Error).message] }
+  } catch {
+    return { ok: false, missing: ["clients table or columns missing"] }
   }
+
+  // Check the RPC function exists in the public schema.
+  try {
+    const { rows } = await db.execute(
+      sql`SELECT 1 AS ok FROM pg_proc WHERE proname = ${"clients_weekly_counts"} AND pronamespace = 'public'::regnamespace LIMIT 1`,
+    )
+    if (rows.length === 0) {
+      return {
+        ok: false,
+        missing: ["clients_weekly_counts function missing"],
+      }
+    }
+  } catch {
+    return {
+      ok: false,
+      missing: ["clients_weekly_counts function missing"],
+    }
+  }
+
+  const res = { ok: true }
+  cachedMigrationResult = res
+  return res
 }
