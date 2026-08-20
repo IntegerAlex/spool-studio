@@ -1,6 +1,8 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { uploadQueue } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function PATCH(
@@ -15,48 +17,41 @@ export async function PATCH(
     const { id } = await params
     const updates = await request.json()
 
-    const pool = getPool()
-    const sets: string[] = []
-    const vals: any[] = []
-    let idx = 1
+    const set: Partial<typeof uploadQueue.$inferInsert> = {}
 
     if (updates.status !== undefined) {
-      sets.push(`status = $${idx++}`)
-      vals.push(updates.status)
+      set.status = updates.status
     }
     if (updates.scheduledDate !== undefined) {
-      sets.push(`scheduled_date = $${idx++}`)
-      vals.push(updates.scheduledDate)
+      set.scheduled_date = updates.scheduledDate
     }
     if (updates.caption !== undefined) {
-      sets.push(`caption = $${idx++}`)
-      vals.push(updates.caption)
+      set.caption = updates.caption
     }
     if (updates.hashtags !== undefined) {
-      sets.push(`hashtags = $${idx++}`)
-      vals.push(JSON.stringify(updates.hashtags))
+      // SAFETY: hashtags arrive from a parsed JSON payload; runtime shape matches the DB column.
+      set.hashtags = updates.hashtags as never
     }
     if (updates.platform !== undefined) {
-      sets.push(`platform = $${idx++}`)
-      vals.push(updates.platform)
+      set.platform = updates.platform
     }
     if (updates.recurrence !== undefined) {
-      sets.push(`recurrence = $${idx++}`)
-      vals.push(updates.recurrence ? JSON.stringify(updates.recurrence) : null)
+      // SAFETY: recurrence arrives from a parsed JSON payload; runtime shape matches the DB column.
+      set.recurrence = (updates.recurrence ? updates.recurrence : null) as never
     }
 
-    if (sets.length === 0) {
+    if (Object.keys(set).length === 0) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 },
       )
     }
 
-    vals.push(id)
-    const { rows } = await pool.query(
-      `UPDATE upload_queue SET ${sets.join(", ")} WHERE id = $${idx} RETURNING *`,
-      vals,
-    )
+    const rows = await db
+      .update(uploadQueue)
+      .set(set)
+      .where(eq(uploadQueue.id, id))
+      .returning()
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -90,8 +85,7 @@ export async function DELETE() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const pool = getPool()
-    await pool.query("DELETE FROM upload_queue WHERE status = 'completed'")
+    await db.delete(uploadQueue).where(eq(uploadQueue.status, "completed"))
     return NextResponse.json({ success: true })
   } catch (error) {
     logProductionRuntimeError("api-queue-delete", error)

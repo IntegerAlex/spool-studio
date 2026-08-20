@@ -1,6 +1,8 @@
+import { and, eq, isNull, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { notifications } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function PATCH(
@@ -13,11 +15,25 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const pool = getPool()
-    const { rows } = await pool.query(
-      "UPDATE notifications SET read = true WHERE id = $1 AND (user_id = $2 OR user_id IS NULL) RETURNING id, user_id, type, title, message, related_asset_id, read, created_at",
-      [id, user.id],
-    )
+    const rows = await db
+      .update(notifications)
+      .set({ read: true })
+      .where(
+        and(
+          eq(notifications.id, id),
+          or(eq(notifications.user_id, user.id), isNull(notifications.user_id)),
+        ),
+      )
+      .returning({
+        id: notifications.id,
+        user_id: notifications.user_id,
+        type: notifications.type,
+        title: notifications.title,
+        message: notifications.message,
+        related_asset_id: notifications.related_asset_id,
+        read: notifications.read,
+        created_at: notifications.created_at,
+      })
 
     if (rows.length === 0) {
       return NextResponse.json(
@@ -56,13 +72,17 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const pool = getPool()
-    const { rowCount } = await pool.query(
-      "DELETE FROM notifications WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)",
-      [id, user.id],
-    )
+    const deleted = await db
+      .delete(notifications)
+      .where(
+        and(
+          eq(notifications.id, id),
+          or(eq(notifications.user_id, user.id), isNull(notifications.user_id)),
+        ),
+      )
+      .returning({ id: notifications.id })
 
-    if (rowCount === 0) {
+    if (deleted.length === 0) {
       return NextResponse.json(
         { error: "Notification not found" },
         { status: 404 },

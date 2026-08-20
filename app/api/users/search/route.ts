@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { asc, ilike, or } from "drizzle-orm"
 import { requireUser } from "@/lib/auth"
+import { db } from "@/db"
+import { users } from "@/db/schema"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function GET(request: Request) {
   try {
@@ -16,35 +18,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: [] })
     }
 
-    const supabase = await createServerSupabaseClient()
     const searchTerm = `%${q.trim().toLowerCase()}%`
 
-    const { data, error } = await supabase
-      .from("users")
-      .select("id, email, full_name, avatar_url")
-      .or(`full_name.ilike.${searchTerm},email.ilike.${searchTerm}`)
-      .order("full_name", { ascending: true })
+    const rows = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        full_name: users.full_name,
+        avatar_url: users.avatar_url,
+      })
+      .from(users)
+      .where(or(ilike(users.full_name, searchTerm), ilike(users.email, searchTerm)))
+      .orderBy(asc(users.full_name))
       .limit(10)
 
-    if (error) {
-      throw new Error(error.message)
-    }
+    const result = rows.map((u) => ({
+      id: u.id,
+      name: u.full_name ?? u.email,
+      email: u.email,
+      avatar: u.avatar_url ?? null,
+    }))
 
-    const users = (data ?? []).map(
-      (u: {
-        id: string
-        email: string
-        full_name: string | null
-        avatar_url: string | null
-      }) => ({
-        id: u.id,
-        name: u.full_name ?? u.email,
-        email: u.email,
-        avatar: u.avatar_url ?? null,
-      }),
-    )
-
-    return NextResponse.json({ data: users })
+    return NextResponse.json({ data: result })
   } catch (error) {
     logProductionRuntimeError("api-users-search-get", error)
     return NextResponse.json({ data: [] })

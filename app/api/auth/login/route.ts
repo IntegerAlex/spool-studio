@@ -1,32 +1,18 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { users } from "@/db/schema"
 import { verifyPassword } from "@/lib/auth/password"
 import { createSession } from "@/lib/auth/session"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { logAuditEvent } from "@/services/audit-log-service"
-import type { UserRole } from "@/types/index"
-
-// The password_hash column must be added to the users table:
-//   ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash text;
-//
-// It is intentionally left out of the generated DB types to avoid breaking
-// existing queries. This route casts the response to access it.
-
-interface UserRowWithPassword {
-  id: string
-  email: string
-  full_name: string | null
-  role: UserRole
-  avatar_url: string | null
-  password_hash: string | null
-}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const email = (body.email as string)?.trim()
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const password = (body.password as string)?.trim()
 
     if (!email || !password) {
@@ -36,14 +22,14 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = await createServerSupabaseClient()
-    const { data: user, error: queryError } = await supabase
-      .from("users")
-      .select("id, email, full_name, role, avatar_url, password_hash")
-      .eq("email", email)
-      .single()
+    const rows = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+    const user = rows[0]
 
-    if (queryError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 },
@@ -51,8 +37,7 @@ export async function POST(request: Request) {
     }
 
     // Cast to include password_hash — safe once the column is added to the table
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const userWithPassword = user as UserRowWithPassword
+    const userWithPassword = user
 
     if (!userWithPassword.password_hash) {
       return NextResponse.json(
@@ -89,7 +74,7 @@ export async function POST(request: Request) {
     response.cookies.set(
       session.cookie.name,
       session.cookie.value,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       session.cookie.options as Parameters<typeof response.cookies.set>[2],
     )
 

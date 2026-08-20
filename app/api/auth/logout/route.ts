@@ -8,7 +8,7 @@ export async function POST() {
   response.cookies.set(
     session.name,
     session.value,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     session.options as Parameters<typeof response.cookies.set>[2],
   )
 

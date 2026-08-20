@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { getPool } from "@/lib/db"
+import { db } from "@/db"
+import { assetComments, contentAssets, portalTokens } from "@/db/schema"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 interface RouteContext {
@@ -19,12 +21,15 @@ export async function POST(request: Request, context: RouteContext) {
       )
     }
 
-    const pool = getPool()
-
-    const { rows: tokenRows } = await pool.query(
-      `SELECT id, client_id, expires_at FROM portal_tokens WHERE token = $1`,
-      [token],
-    )
+    const tokenRows = await db
+      .select({
+        id: portalTokens.id,
+        client_id: portalTokens.client_id,
+        expires_at: portalTokens.expires_at,
+      })
+      .from(portalTokens)
+      .where(eq(portalTokens.token, token))
+      .limit(1)
 
     if (tokenRows.length === 0) {
       return NextResponse.json(
@@ -41,10 +46,15 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Token has expired" }, { status: 401 })
     }
 
-    const { rows: assetRows } = await pool.query(
-      `SELECT id, client_id, status FROM content_assets WHERE id = $1`,
-      [assetId],
-    )
+    const assetRows = await db
+      .select({
+        id: contentAssets.id,
+        client_id: contentAssets.client_id,
+        status: contentAssets.status,
+      })
+      .from(contentAssets)
+      .where(eq(contentAssets.id, assetId))
+      .limit(1)
 
     if (assetRows.length === 0) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 })
@@ -58,9 +68,9 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const body = await request.json()
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const decision = body.decision as string
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const comment = body.comment as string | undefined
 
     if (decision !== "approved" && decision !== "revision_requested") {
@@ -70,33 +80,30 @@ export async function POST(request: Request, context: RouteContext) {
       )
     }
 
-// oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic external payload
-    const updates: Record<string, unknown> = {}
     if (decision === "approved") {
-      updates.status = "approved"
-      updates.approved_at = new Date().toISOString()
+      await db
+        .update(contentAssets)
+        .set({ status: "approved", approved_at: new Date() })
+        .where(eq(contentAssets.id, assetId))
     } else {
-      updates.status = "revision_requested"
-      updates.approved_at = null
-      updates.approved_by = null
+      await db
+        .update(contentAssets)
+        .set({
+          status: "revision_requested",
+          approved_at: null,
+          approved_by: null,
+        })
+        .where(eq(contentAssets.id, assetId))
     }
 
-    const setClauses = Object.keys(updates)
-      .map((key, idx) => `${key} = $${idx + 1}`)
-      .join(", ")
-    const values = Object.values(updates)
-
-    await pool.query(
-      `UPDATE content_assets SET ${setClauses}, updated_at = NOW() WHERE id = $${values.length + 1}`,
-      [...values, assetId],
-    )
-
     if (comment?.trim()) {
-      await pool.query(
-        `INSERT INTO asset_comments (id, asset_id, user_id, type, message, revision_status, created_at, updated_at)
-         VALUES (gen_random_uuid()::text, $1, NULL, 'comment', $2, NULL, NOW(), NOW())`,
-        [assetId, `[Client Portal] ${comment}`],
-      )
+      // SAFETY: user_id is NOT NULL; portal approvals are unattributed, so it is set to null at insert.
+      await db.insert(assetComments).values({
+        asset_id: assetId,
+        user_id: null as never,
+        type: "comment",
+        message: `[Client Portal] ${comment}`,
+      })
     }
 
     return NextResponse.json({ data: { success: true, decision } })

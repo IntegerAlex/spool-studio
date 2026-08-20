@@ -1,5 +1,7 @@
+import { and, desc, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { getPool } from "@/lib/db"
+import { db } from "@/db"
+import { clients, contentAssets, portalTokens } from "@/db/schema"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 interface RouteContext {
@@ -14,12 +16,15 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Token is required" }, { status: 400 })
     }
 
-    const pool = getPool()
-
-    const { rows: tokenRows } = await pool.query(
-      `SELECT id, client_id, expires_at FROM portal_tokens WHERE token = $1`,
-      [token],
-    )
+    const tokenRows = await db
+      .select({
+        id: portalTokens.id,
+        client_id: portalTokens.client_id,
+        expires_at: portalTokens.expires_at,
+      })
+      .from(portalTokens)
+      .where(eq(portalTokens.token, token))
+      .limit(1)
 
     if (tokenRows.length === 0) {
       return NextResponse.json(
@@ -38,23 +43,48 @@ export async function GET(_request: Request, context: RouteContext) {
 
     const clientId = portalToken.client_id
 
-    const { rows: clientRows } = await pool.query(
-      `SELECT id, name, slug, instagram_handle, brand_color FROM clients WHERE id = $1`,
-      [clientId],
-    )
+    const clientRows = await db
+      .select({
+        id: clients.id,
+        name: clients.name,
+        slug: clients.slug,
+        instagram_handle: clients.instagram_handle,
+        brand_color: clients.brand_color,
+      })
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .limit(1)
 
     if (clientRows.length === 0) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 })
     }
 
-    const { rows: assetRows } = await pool.query(
-      `SELECT id, title, type, status, thumbnail_url, drive_file_url,
-              mime_type, file_size, created_at, updated_at
-       FROM content_assets
-       WHERE client_id = $1 AND status IN ('uploaded', 'ready_for_review', 'revision_requested', 'approved')
-       ORDER BY created_at DESC`,
-      [clientId],
-    )
+    const assetRows = await db
+      .select({
+        id: contentAssets.id,
+        title: contentAssets.title,
+        type: contentAssets.type,
+        status: contentAssets.status,
+        thumbnail_url: contentAssets.thumbnail_url,
+        drive_file_url: contentAssets.drive_file_url,
+        mime_type: contentAssets.mime_type,
+        file_size: contentAssets.file_size,
+        created_at: contentAssets.created_at,
+        updated_at: contentAssets.updated_at,
+      })
+      .from(contentAssets)
+      .where(
+        and(
+          eq(contentAssets.client_id, clientId),
+          inArray(contentAssets.status, [
+            "uploaded",
+            "ready_for_review",
+            "revision_requested",
+            "approved",
+          ]),
+        ),
+      )
+      .orderBy(desc(contentAssets.created_at))
 
     return NextResponse.json({
       data: {

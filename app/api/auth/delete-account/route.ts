@@ -1,73 +1,84 @@
-import { type PoolClient } from "pg"
+import { eq, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { contentAssets, portalTokens, users } from "@/db/schema"
 import { requireUser, verifyPassword } from "@/lib/auth"
 import { destroySession } from "@/lib/auth/session"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 
 export async function POST(request: Request) {
-  let client: PoolClient | null = null
-
   try {
     const user = await requireUser()
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { password } = (await request
       .json()
       .catch(() => ({ password: "" }))) as { password?: string }
 
-    const pool = getPool()
-    client = await pool.connect()
+    const result = await db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ password_hash: users.password_hash })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1)
 
-    await client.query("BEGIN")
-
-    const { rows } = await client.query(
-      "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
-      [user.id],
-    )
-
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const passwordHash = (rows[0]?.password_hash as string | null) ?? null
-    if (passwordHash) {
-      const valid = await verifyPassword(password ?? "", passwordHash)
-      if (!valid) {
-        await client.query("ROLLBACK")
-        return NextResponse.json(
-          { error: "Current password is incorrect" },
-          { status: 401 },
-        )
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
+      const passwordHash = (rows[0]?.password_hash as string | null) ?? null
+      if (passwordHash) {
+        const valid = await verifyPassword(password ?? "", passwordHash)
+        if (!valid) {
+          return { error: "password_incorrect" }
+        }
       }
-    }
 
-    // portal_tokens.created_by is NO ACTION, so null it before delete.
-    await client.query(
-      "UPDATE portal_tokens SET created_by = NULL WHERE created_by = $1",
-      [user.id],
-    )
+      // portal_tokens.created_by is NO ACTION, so null it before delete.
+      await tx
+        .update(portalTokens)
+        .set({ created_by: null })
+        .where(eq(portalTokens.created_by, user.id))
 
-    // Denormalized references on content_assets have no FK; clear best-effort.
-    try {
-      await client.query(
-        `UPDATE content_assets
-         SET created_by = NULL, uploaded_by = NULL, approved_by = NULL,
-             scheduled_by = NULL, assigned_to = NULL
-         WHERE created_by = $1 OR uploaded_by = $1 OR approved_by = $1
-            OR scheduled_by = $1 OR assigned_to = $1`,
-        [user.id],
+      // Denormalized references on content_assets have no FK; clear best-effort.
+      try {
+        await tx
+          .update(contentAssets)
+          .set({
+            // SAFETY: created_by is NOT NULL; cleared best-effort before account row removal.
+            created_by: null as never,
+            uploaded_by: null,
+            approved_by: null,
+            scheduled_by: null,
+            assigned_to: null,
+          })
+          .where(
+            or(
+              eq(contentAssets.created_by, user.id),
+              eq(contentAssets.uploaded_by, user.id),
+              eq(contentAssets.approved_by, user.id),
+              eq(contentAssets.scheduled_by, user.id),
+              eq(contentAssets.assigned_to, user.id),
+            ),
+          )
+      } catch {
+        // content_assets may be absent in some deployments; safe to skip.
+      }
+
+      // team_members, push_subscriptions, password_resets and
+      // user_notification_prefs cascade via ON DELETE CASCADE.
+      await tx.delete(users).where(eq(users.id, user.id))
+
+      return { ok: true }
+    })
+
+    if (result?.error === "password_incorrect") {
+      return NextResponse.json(
+        { error: "Current password is incorrect" },
+        { status: 401 },
       )
-    } catch {
-      // content_assets may be absent in some deployments; safe to skip.
     }
-
-    // team_members, push_subscriptions, password_resets and
-    // user_notification_prefs cascade via ON DELETE CASCADE.
-    await client.query("DELETE FROM users WHERE id = $1", [user.id])
-
-    await client.query("COMMIT")
 
     try {
       await logAuditEvent({
@@ -85,24 +96,15 @@ export async function POST(request: Request) {
     response.cookies.set(
       session.name,
       session.value,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       session.options as Parameters<typeof response.cookies.set>[2],
     )
     return response
   } catch (error) {
-    if (client) {
-      try {
-        await client.query("ROLLBACK")
-      } catch {
-        // Ignore rollback failure.
-      }
-    }
     logProductionRuntimeError("api-auth-delete-account", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
     )
-  } finally {
-    if (client) client.release()
   }
 }

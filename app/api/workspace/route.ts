@@ -1,6 +1,8 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { teamMembers, workspaces } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 
@@ -10,10 +12,15 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const pool = getPool()
-    const { rows } = await pool.query(
-      "SELECT id, name, logo, created_at FROM workspaces LIMIT 1",
-    )
+    const rows = await db
+      .select({
+        id: workspaces.id,
+        name: workspaces.name,
+        logo: workspaces.logo,
+        created_at: workspaces.created_at,
+      })
+      .from(workspaces)
+      .limit(1)
 
     if (rows.length === 0) {
       return NextResponse.json({
@@ -28,10 +35,16 @@ export async function GET() {
     }
 
     const ws = rows[0]
-    const { rows: members } = await pool.query(
-      "SELECT tm.id, tm.user_id, tm.workspace_id, tm.role, tm.joined_at FROM team_members tm WHERE tm.workspace_id = $1",
-      [ws.id],
-    )
+    const members = await db
+      .select({
+        id: teamMembers.id,
+        user_id: teamMembers.user_id,
+        workspace_id: teamMembers.workspace_id,
+        role: teamMembers.role,
+        joined_at: teamMembers.joined_at,
+      })
+      .from(teamMembers)
+      .where(eq(teamMembers.workspace_id, ws.id))
 
     return NextResponse.json({
       data: {
@@ -64,36 +77,31 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { name, logo } = await request.json()
-    const pool = getPool()
 
-    const { rows } = await pool.query("SELECT id FROM workspaces LIMIT 1")
+    const existing = await db
+      .select({ id: workspaces.id })
+      .from(workspaces)
+      .limit(1)
     let wsId: string
 
-    if (rows.length === 0) {
-      wsId = crypto.randomUUID()
-      await pool.query(
-        "INSERT INTO workspaces (id, name, logo, created_at) VALUES ($1, $2, $3, NOW())",
-        [wsId, name || "My Workspace", logo || null],
-      )
+    if (existing.length === 0) {
+      const inserted = await db
+        .insert(workspaces)
+        .values({ name: name || "My Workspace", logo: logo || null })
+        .returning({ id: workspaces.id })
+      wsId = inserted[0].id
     } else {
-      wsId = rows[0].id
-      const sets: string[] = []
-      const vals: any[] = []
-      let idx = 1
+      wsId = existing[0].id
+      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic workspace field set; values are scalars
+      const sets: Record<string, unknown> = {}
       if (name !== undefined) {
-        sets.push(`name = $${idx++}`)
-        vals.push(name)
+        sets.name = name
       }
       if (logo !== undefined) {
-        sets.push(`logo = $${idx++}`)
-        vals.push(logo)
+        sets.logo = logo
       }
-      if (sets.length > 0) {
-        vals.push(wsId)
-        await pool.query(
-          `UPDATE workspaces SET ${sets.join(", ")} WHERE id = $${idx}`,
-          vals,
-        )
+      if (Object.keys(sets).length > 0) {
+        await db.update(workspaces).set(sets).where(eq(workspaces.id, wsId))
       }
     }
 

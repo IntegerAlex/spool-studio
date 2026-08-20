@@ -1,6 +1,8 @@
+import { eq, isNull, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { notifications } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function POST() {
@@ -9,11 +11,12 @@ export async function POST() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const pool = getPool()
-    await pool.query(
-      "UPDATE notifications SET read = true WHERE user_id = $1 OR user_id IS NULL",
-      [user.id],
-    )
+    await db
+      .update(notifications)
+      .set({ read: true })
+      .where(
+        or(eq(notifications.user_id, user.id), isNull(notifications.user_id)),
+      )
 
     return NextResponse.json({ success: true })
   } catch (error) {

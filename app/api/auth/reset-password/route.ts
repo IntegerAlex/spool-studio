@@ -1,6 +1,8 @@
+import { and, eq, gt } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { passwordResets, users } from "@/db/schema"
 import { hashPassword, verifyToken } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function POST(request: Request) {
@@ -29,13 +31,19 @@ export async function POST(request: Request) {
       )
     }
 
-    const pool = getPool()
-    const { rows } = await pool.query(
-      "SELECT id FROM password_reset_tokens WHERE user_id = $1 AND token = $2 AND used = false AND expires_at > NOW()",
-      [decoded.sub, token],
-    )
+    const resetRows = await db
+      .select({ id: passwordResets.id })
+      .from(passwordResets)
+      .where(
+        and(
+          eq(passwordResets.user_id, decoded.sub),
+          eq(passwordResets.token_hash, token),
+          gt(passwordResets.expires_at, new Date()),
+        ),
+      )
+      .limit(1)
 
-    if (rows.length === 0) {
+    if (resetRows.length === 0) {
       return NextResponse.json(
         { error: "Invalid or expired reset token" },
         { status: 400 },
@@ -44,14 +52,13 @@ export async function POST(request: Request) {
 
     const passwordHash = await hashPassword(password)
 
-    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [
-      passwordHash,
-      decoded.sub,
-    ])
-    await pool.query(
-      "UPDATE password_reset_tokens SET used = true WHERE user_id = $1",
-      [decoded.sub],
-    )
+    await db
+      .update(users)
+      .set({ password_hash: passwordHash })
+      .where(eq(users.id, decoded.sub))
+    await db
+      .delete(passwordResets)
+      .where(eq(passwordResets.user_id, decoded.sub))
 
     return NextResponse.json({
       message: "Password has been reset successfully.",

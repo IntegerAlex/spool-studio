@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { uploadSessions } from "@/db/schema"
 import { getPresignedUploadUrl } from "@/integrations/r2/r2-service"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function POST(request: Request) {
@@ -30,21 +31,15 @@ export async function POST(request: Request) {
       expiresIn: 3600,
     })
 
-    const pool = getPool()
-    await pool.query(
-      `INSERT INTO upload_sessions (id, asset_id, user_id, r2_key, file_name, mime_type, file_size, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-       ON CONFLICT DO NOTHING`,
-      [
-        randomUUID(),
-        assetId,
-        user.id,
-        r2Key,
-        fileName,
-        mimeType || "application/octet-stream",
-        fileSize || 0,
-      ],
-    )
+    await db.insert(uploadSessions).values({
+      asset_id: assetId,
+      user_id: user.id,
+      r2_key: r2Key,
+      file_name: fileName,
+      mime_type: mimeType || "application/octet-stream",
+      file_size: fileSize || 0,
+      status: "pending",
+    })
 
     return NextResponse.json({ uploadUrl, key: r2Key })
   } catch (error) {

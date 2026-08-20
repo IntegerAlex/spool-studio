@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { users } from "@/db/schema"
 import { createSession, hashPassword } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 
@@ -22,27 +23,25 @@ export async function POST(request: Request) {
       )
     }
 
-    const pool = getPool()
-
     const passwordHash = await hashPassword(password)
-    const userId = crypto.randomUUID()
     const validRoles = ["admin", "designer", "approver"]
     const userRole = validRoles.includes(role) ? role : "designer"
 
+    let userId: string
     try {
-      await pool.query(
-        `INSERT INTO users (id, email, full_name, role, password_hash, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-        [
-          userId,
+      const inserted = await db
+        .insert(users)
+        .values({
           email,
-          fullName || email.split("@")[0],
-          userRole,
-          passwordHash,
-        ],
-      )
-    } catch (err: any) {
-      if (err.code === "23505") {
+          full_name: fullName || email.split("@")[0],
+          role: userRole,
+          password_hash: passwordHash,
+        })
+        .returning({ id: users.id })
+      userId = inserted[0].id
+    } catch (err) {
+      // SAFETY: Postgres unique-violation error carries a `code` field; narrowed for the 23505 check.
+      if ((err as { code?: string } | null)?.code === "23505") {
         return NextResponse.json(
           { error: "A user with this email already exists" },
           { status: 409 },
@@ -83,11 +82,14 @@ export async function POST(request: Request) {
       // Audit logging should not block registration.
     }
 
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const cookieOptions = session.cookie.options as Parameters<
+      typeof response.cookies.set
+    >[2]
     response.cookies.set(
       session.cookie.name,
       session.cookie.value,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-      session.cookie.options as Parameters<typeof response.cookies.set>[2],
+      cookieOptions,
     )
 
     return response

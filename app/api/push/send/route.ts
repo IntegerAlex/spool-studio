@@ -1,6 +1,8 @@
+import { and, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { pushSubscriptions } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 interface PushPayload {
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { userId, title, body: notifBody, url } = body as PushPayload
 
     if (!userId || !title || !notifBody) {
@@ -62,12 +64,14 @@ export async function POST(request: Request) {
       )
     }
 
-    const pool = getPool()
-
-    const { rows: subscriptions } = await pool.query(
-      "SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1",
-      [userId],
-    )
+    const subscriptions = await db
+      .select({
+        endpoint: pushSubscriptions.endpoint,
+        p256dh: pushSubscriptions.p256dh,
+        auth: pushSubscriptions.auth,
+      })
+      .from(pushSubscriptions)
+      .where(eq(pushSubscriptions.user_id, userId))
 
     if (subscriptions.length === 0) {
       return NextResponse.json({
@@ -97,10 +101,14 @@ export async function POST(request: Request) {
     }
 
     if (failedEndpoints.length > 0) {
-      await pool.query(
-        "DELETE FROM push_subscriptions WHERE user_id = $1 AND endpoint = ANY($2)",
-        [userId, failedEndpoints],
-      )
+      await db
+        .delete(pushSubscriptions)
+        .where(
+          and(
+            eq(pushSubscriptions.user_id, userId),
+            inArray(pushSubscriptions.endpoint, failedEndpoints),
+          ),
+        )
     }
 
     return NextResponse.json({

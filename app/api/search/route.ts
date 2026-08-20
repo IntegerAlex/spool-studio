@@ -1,6 +1,8 @@
+import { ilike, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { clients, contentAssets } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function GET(request: Request) {
@@ -15,36 +17,46 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: { clients: [], assets: [] } })
     }
 
-    const pool = getPool()
     const term = `%${q.toLowerCase()}%`
 
-    const { rows: clients } = await pool.query(
-      `SELECT id, name, slug, instagram_handle
-       FROM clients
-       WHERE lower(name) LIKE $1 OR lower(slug) LIKE $1 OR lower(instagram_handle) LIKE $1
-       ORDER BY name
-       LIMIT 5`,
-      [term],
-    )
+    const clientsRows = await db
+      .select({
+        id: clients.id,
+        name: clients.name,
+        slug: clients.slug,
+        instagram_handle: clients.instagram_handle,
+      })
+      .from(clients)
+      .where(
+        or(
+          ilike(clients.name, term),
+          ilike(clients.slug, term),
+          ilike(clients.instagram_handle, term),
+        ),
+      )
+      .orderBy(clients.name)
+      .limit(5)
 
-    const { rows: assets } = await pool.query(
-      `SELECT id, title, type
-       FROM content_assets
-       WHERE lower(title) LIKE $1
-       ORDER BY title
-       LIMIT 5`,
-      [term],
-    )
+    const assetsRows = await db
+      .select({
+        id: contentAssets.id,
+        title: contentAssets.title,
+        type: contentAssets.type,
+      })
+      .from(contentAssets)
+      .where(ilike(contentAssets.title, term))
+      .orderBy(contentAssets.title)
+      .limit(5)
 
     return NextResponse.json({
       data: {
-        clients: clients.map((c) => ({
+        clients: clientsRows.map((c) => ({
           id: c.id,
           name: c.name,
           slug: c.slug,
           instagramHandle: c.instagram_handle,
         })),
-        assets: assets.map((a) => ({
+        assets: assetsRows.map((a) => ({
           id: a.id,
           title: a.title,
           type: a.type,

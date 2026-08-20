@@ -1,6 +1,8 @@
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { pushSubscriptions } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function POST(request: Request) {
@@ -20,12 +22,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const pool = getPool()
-
-    const { rows: existing } = await pool.query(
-      "SELECT id FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2",
-      [endpoint, user.id],
-    )
+    const existing = await db
+      .select({ id: pushSubscriptions.id })
+      .from(pushSubscriptions)
+      .where(
+        and(
+          eq(pushSubscriptions.endpoint, endpoint),
+          eq(pushSubscriptions.user_id, user.id),
+        ),
+      )
+      .limit(1)
 
     if (existing.length > 0) {
       return NextResponse.json({
@@ -33,12 +39,15 @@ export async function POST(request: Request) {
       })
     }
 
-    const { rows } = await pool.query(
-      `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, user_id, endpoint, created_at`,
-      [user.id, endpoint, p256dh, auth],
-    )
+    const rows = await db
+      .insert(pushSubscriptions)
+      .values({ user_id: user.id, endpoint, p256dh, auth })
+      .returning({
+        id: pushSubscriptions.id,
+        user_id: pushSubscriptions.user_id,
+        endpoint: pushSubscriptions.endpoint,
+        created_at: pushSubscriptions.created_at,
+      })
 
     return NextResponse.json({ data: rows[0] }, { status: 201 })
   } catch (error) {

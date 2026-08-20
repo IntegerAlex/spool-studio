@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { users } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth/get-user"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 
 export async function GET() {
   try {
@@ -10,14 +12,14 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = await createServerSupabaseClient()
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("id, email, full_name, role, avatar_url")
-      .eq("id", authUser.id)
-      .single()
+    const rows = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, authUser.id))
+      .limit(1)
+    const user = rows[0]
 
-    if (error || !user) {
+    if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 

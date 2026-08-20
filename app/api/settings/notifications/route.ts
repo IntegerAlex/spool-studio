@@ -1,6 +1,8 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { userNotificationPrefs } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export interface NotificationPrefs {
@@ -25,13 +27,19 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const pool = getPool()
-    const { rows } = await pool.query(
-      `SELECT email_on_asset_uploaded, email_on_revision_requested,
-              email_on_comment_added, email_on_approval_decision, push_enabled
-       FROM user_notification_prefs WHERE user_id = $1`,
-      [user.id],
-    )
+    const rows = await db
+      .select({
+        email_on_asset_uploaded: userNotificationPrefs.email_on_asset_uploaded,
+        email_on_revision_requested:
+          userNotificationPrefs.email_on_revision_requested,
+        email_on_comment_added: userNotificationPrefs.email_on_comment_added,
+        email_on_approval_decision:
+          userNotificationPrefs.email_on_approval_decision,
+        push_enabled: userNotificationPrefs.push_enabled,
+      })
+      .from(userNotificationPrefs)
+      .where(eq(userNotificationPrefs.user_id, user.id))
+      .limit(1)
 
     if (rows.length === 0) {
       return NextResponse.json(DEFAULT_PREFS)
@@ -69,28 +77,27 @@ export async function PUT(request: Request) {
       pushEnabled: Boolean(body.pushEnabled),
     }
 
-    const pool = getPool()
-    await pool.query(
-      `INSERT INTO user_notification_prefs
-         (user_id, email_on_asset_uploaded, email_on_revision_requested,
-          email_on_comment_added, email_on_approval_decision, push_enabled, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       ON CONFLICT (user_id) DO UPDATE SET
-         email_on_asset_uploaded = EXCLUDED.email_on_asset_uploaded,
-         email_on_revision_requested = EXCLUDED.email_on_revision_requested,
-         email_on_comment_added = EXCLUDED.email_on_comment_added,
-         email_on_approval_decision = EXCLUDED.email_on_approval_decision,
-         push_enabled = EXCLUDED.push_enabled,
-         updated_at = NOW()`,
-      [
-        user.id,
-        prefs.emailOnAssetUploaded,
-        prefs.emailOnRevisionRequested,
-        prefs.emailOnCommentAdded,
-        prefs.emailOnApprovalDecision,
-        prefs.pushEnabled,
-      ],
-    )
+    await db
+      .insert(userNotificationPrefs)
+      .values({
+        user_id: user.id,
+        email_on_asset_uploaded: prefs.emailOnAssetUploaded,
+        email_on_revision_requested: prefs.emailOnRevisionRequested,
+        email_on_comment_added: prefs.emailOnCommentAdded,
+        email_on_approval_decision: prefs.emailOnApprovalDecision,
+        push_enabled: prefs.pushEnabled,
+      })
+      .onConflictDoUpdate({
+        target: userNotificationPrefs.user_id,
+        set: {
+          email_on_asset_uploaded: prefs.emailOnAssetUploaded,
+          email_on_revision_requested: prefs.emailOnRevisionRequested,
+          email_on_comment_added: prefs.emailOnCommentAdded,
+          email_on_approval_decision: prefs.emailOnApprovalDecision,
+          push_enabled: prefs.pushEnabled,
+          updated_at: new Date(),
+        },
+      })
 
     return NextResponse.json({
       message: "Notification preferences updated",

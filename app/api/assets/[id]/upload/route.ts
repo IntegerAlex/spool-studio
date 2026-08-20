@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { getFileMetadata } from "@/integrations/r2/r2-service"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { finalizeAssetUpload, uploadAssetFile } from "@/services/assets-service"
 
 export const runtime = "nodejs"
@@ -234,23 +233,6 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const file = fileValue
-
-    const routeSupabase = await createServerSupabaseClient()
-    const [routeUserResult, routeSessionResult] = await Promise.all([
-      routeSupabase.auth.getUser(),
-      routeSupabase.auth.getSession(),
-    ])
-
-    console.info(
-      "[upload][auth] " +
-        JSON.stringify({
-          assetId,
-          authSource: "route-cookie-store",
-          userExists: Boolean(routeUserResult.data.user),
-          sessionExists: Boolean(routeSessionResult.data.session),
-          cookiesPresent: Boolean(request.headers.get("cookie")),
-        }),
-    )
 
     console.info("[upload][start]", {
       assetId,

@@ -1,6 +1,8 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { contentAssets, uploadQueue } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import type { UploadQueueStatus } from "@/types/index"
 
@@ -10,15 +12,21 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const pool = getPool()
-    const { rows } = await pool.query(
-      `SELECT q.id, q.asset_id, q.scheduled_date, q.platform, q.status, q.caption, q.hashtags, q.created_at
-       FROM upload_queue q
-       JOIN content_assets a ON a.id = q.asset_id
-       WHERE a.created_by = $1
-       ORDER BY q.scheduled_date ASC`,
-      [user.id],
-    )
+    const rows = await db
+      .select({
+        id: uploadQueue.id,
+        asset_id: uploadQueue.asset_id,
+        scheduled_date: uploadQueue.scheduled_date,
+        platform: uploadQueue.platform,
+        status: uploadQueue.status,
+        caption: uploadQueue.caption,
+        hashtags: uploadQueue.hashtags,
+        created_at: uploadQueue.created_at,
+      })
+      .from(uploadQueue)
+      .innerJoin(contentAssets, eq(contentAssets.id, uploadQueue.asset_id))
+      .where(eq(contentAssets.created_by, user.id))
+      .orderBy(uploadQueue.scheduled_date)
 
     return NextResponse.json({
       data: rows.map((r) => ({
@@ -26,7 +34,7 @@ export async function GET() {
         assetId: r.asset_id,
         scheduledDate: r.scheduled_date,
         platform: r.platform,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+        // SAFETY: r.status is the DB enum string; narrowed to the UploadQueueStatus union.
         status: r.status as UploadQueueStatus,
         caption: r.caption,
         hashtags: r.hashtags,
@@ -58,26 +66,20 @@ export async function POST(request: Request) {
       )
     }
 
-    const pool = getPool()
-    const id = crypto.randomUUID()
-    await pool.query(
-      `INSERT INTO upload_queue (id, asset_id, scheduled_date, platform, status, caption, hashtags, created_at, recurrence)
-       VALUES ($1, $2, $3, $4, 'scheduled', $5, $6, NOW(), $7)`,
-      [
-        id,
-        assetId,
-        scheduledDate,
+    // SAFETY: hashtags/recurrence arrive from a parsed JSON payload; runtime shape matches the DB column.
+    const rows = await db
+      .insert(uploadQueue)
+      .values({
+        asset_id: assetId,
+        scheduled_date: scheduledDate,
         platform,
-        caption || null,
-        hashtags ? JSON.stringify(hashtags) : null,
-        recurrence ? JSON.stringify(recurrence) : null,
-      ],
-    )
+        status: "scheduled",
+        caption: caption || null,
+        hashtags: (hashtags as never) || null,
+        recurrence: (recurrence as never) || null,
+      })
+      .returning()
 
-    const { rows } = await pool.query(
-      "SELECT * FROM upload_queue WHERE id = $1",
-      [id],
-    )
     const r = rows[0]
 
     return NextResponse.json(

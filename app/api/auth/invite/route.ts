@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { users } from "@/db/schema"
 import { hashPassword, requireUser } from "@/lib/auth"
 import { signToken } from "@/lib/auth/jwt"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 
@@ -39,12 +41,11 @@ export async function POST(request: Request) {
     const validRoles = ["admin", "designer", "approver"]
     const userRole = validRoles.includes(role) ? role : "designer"
 
-    const pool = getPool()
-
-    const { rows: existing } = await pool.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email],
-    )
+    const existing = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
 
     if (existing.length > 0) {
       return NextResponse.json(
@@ -53,15 +54,19 @@ export async function POST(request: Request) {
       )
     }
 
-    const userId = crypto.randomUUID()
     const randomPassword = generateRandomPassword()
     const passwordHash = await hashPassword(randomPassword)
 
-    await pool.query(
-      `INSERT INTO users (id, email, full_name, role, password_hash, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-      [userId, email, email.split("@")[0], userRole, passwordHash],
-    )
+    const inserted = await db
+      .insert(users)
+      .values({
+        email,
+        full_name: email.split("@")[0],
+        role: userRole,
+        password_hash: passwordHash,
+      })
+      .returning({ id: users.id })
+    const userId = inserted[0].id
 
     const resetToken = await signToken({ sub: userId, email, role: userRole })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"

@@ -1,6 +1,8 @@
+import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
+import { db } from "@/db"
+import { passwordResets, users } from "@/db/schema"
 import { signToken } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
 export async function POST(request: Request) {
@@ -11,41 +13,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    const pool = getPool()
-    const { rows } = await pool.query(
-      "SELECT id, email FROM users WHERE email = $1",
-      [email],
-    )
+    const userRows = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+    const user = userRows[0]
 
-    if (rows.length === 0) {
+    if (!user) {
       return NextResponse.json({
         message: "If that email exists, a reset link has been sent.",
       })
     }
 
-    const user = rows[0]
     const resetToken = await signToken({
       sub: user.id,
       email: user.email,
       role: "designer",
     })
 
-    const { rows: existing } = await pool.query(
-      "SELECT id FROM password_reset_tokens WHERE user_id = $1",
-      [user.id],
-    )
-
-    if (existing.length > 0) {
-      await pool.query(
-        "UPDATE password_reset_tokens SET token = $1, expires_at = NOW() + INTERVAL '1 hour', used = false WHERE user_id = $2",
-        [resetToken, user.id],
-      )
-    } else {
-      await pool.query(
-        "INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour')",
-        [crypto.randomUUID(), user.id, resetToken],
-      )
-    }
+    // Replace any previous reset token for this user.
+    await db.delete(passwordResets).where(eq(passwordResets.user_id, user.id))
+    await db.insert(passwordResets).values({
+      user_id: user.id,
+      token_hash: resetToken,
+      expires_at: new Date(Date.now() + 60 * 60 * 1000),
+    })
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const resetUrl = `${appUrl}/reset-password?token=${resetToken}`
