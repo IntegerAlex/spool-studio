@@ -23,12 +23,13 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import type React from "react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { type AuditLogEntry, logsApi } from "@/lib/api-client"
+import { logsApi } from "@/lib/api-client"
 
 function getActionIcon(action: string): React.ReactNode {
   if (action.includes("login") || action.includes("auth"))
@@ -113,11 +114,6 @@ const ACTION_FILTERS = [
 const ITEMS_PER_PAGE = 20
 
 export default function LogsPage() {
-  const [logs, setLogs] = useState<AuditLogEntry[]>([])
-  const [total, setTotal] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
   const [searchQuery, setSearchQuery] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [dateFilter, setDateFilter] = useState("all")
@@ -166,38 +162,20 @@ export default function LogsPage() {
     return undefined
   }, [actionFilter])
 
-  const loadLogs = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      const offset = (currentPage - 1) * ITEMS_PER_PAGE
-      const dateRange = getDateRange()
-      const result = await logsApi.getAll({
-        limit: ITEMS_PER_PAGE,
-        offset,
-        action: getActionParam(),
-        search: searchQuery || undefined,
-        ...dateRange,
-      })
-      setLogs(result.entries)
-      setTotal(result.total)
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load audit logs"
-      setError(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentPage, searchQuery, getActionParam, getDateRange])
+  const filters = useMemo(() => ({
+    limit: ITEMS_PER_PAGE,
+    offset: (currentPage - 1) * ITEMS_PER_PAGE,
+    action: getActionParam(),
+    search: searchQuery || undefined,
+    ...getDateRange(),
+  }), [currentPage, searchQuery, getActionParam, getDateRange])
 
-  useEffect(() => {
-    void loadLogs()
-  }, [loadLogs])
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [])
-
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["logs", filters],
+    queryFn: () => logsApi.getAll(filters),
+  })
+  const logs = data?.entries ?? []
+  const total = data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE))
 
   const actionCounts = useMemo(() => {
@@ -241,7 +219,7 @@ export default function LogsPage() {
         </div>
         <Button
           variant="outline"
-          onClick={() => void loadLogs()}
+          onClick={() => refetch()}
           className="flex items-center gap-2 self-start sm:self-center h-9 px-3 text-xs border-white/10 bg-transparent text-zinc-300 hover:bg-white/5"
         >
           <RefreshCw
@@ -343,7 +321,7 @@ export default function LogsPage() {
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-sm text-red-400">{error ? (error as Error).message : ""}</p>
           </div>
         ) : logs.length > 0 ? (
           <AnimatePresence>

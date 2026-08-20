@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ClientList } from "@/components/clients/client-list"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import ErrorBoundary from "@/components/ui/error-boundary"
@@ -8,21 +8,11 @@ import { clientsApi } from "@/lib/api-client"
 import type { Client } from "@/types/index"
 
 export default function ClientsPage() {
-  const [clients, setClients] = useState<Client[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    const loadClients = async () => {
-      try {
-        const data = await clientsApi.getAll()
-        setClients(data)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadClients()
-  }, [])
+  const queryClient = useQueryClient()
+  const { data: clients = [], isLoading } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.getAll(),
+  })
 
   if (isLoading) {
     return (
@@ -61,7 +51,7 @@ export default function ClientsPage() {
           clients={clients}
           onCreated={(client) => {
             console.info("[clients-page] created client", client)
-            setClients((prev) => [client, ...prev])
+            queryClient.setQueryData<Client[]>(["clients"], (prev) => prev ? [client, ...prev] : [client])
           }}
         />
       </div>

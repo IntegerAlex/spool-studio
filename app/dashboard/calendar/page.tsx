@@ -31,6 +31,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import { assetsApi, calendarApi, clientsApi } from "@/lib/api-client"
 import { downloadICS, eventsToICS } from "@/lib/calendar-ics"
@@ -212,11 +213,9 @@ function computeNewStart(
 
 export default function CalendarPage() {
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<ViewMode>("month")
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [clients, setClients] = useState<CalendarClientOption[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [composerStart, setComposerStart] = useState<Date | null>(null)
   const [jumpOpen, setJumpOpen] = useState(false)
@@ -230,21 +229,13 @@ export default function CalendarPage() {
   const [includeDrafts, setIncludeDrafts] = useState(false)
   const draggedEventId = useRef<string | null>(null)
 
-  const clientsById = useMemo(
-    () => new Map(clients.map((c) => [c.id, c])),
-    [clients],
-  )
-
-  const loadData = useCallback(async (drafts: boolean) => {
-    const data = await calendarApi.getMany(undefined, { includeDrafts: drafts })
-    setEvents(data)
-  }, [])
-
-  useEffect(() => {
-    let active = true
-    setIsLoading(true)
-    Promise.all([
-      loadData(includeDrafts),
+  const { data: eventsData, isLoading: isLoadingEvents } = useQuery({
+    queryKey: ["calendar", { includeDrafts }],
+    queryFn: () => calendarApi.getMany(undefined, { includeDrafts }),
+  })
+  const { data: clientsData, isLoading: isLoadingClients } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () =>
       clientsApi.getAll().then((list: Client[]) =>
         list.map((c) => ({
           id: c.id,
@@ -252,20 +243,48 @@ export default function CalendarPage() {
           brandColor: c.brandColor,
         })),
       ),
-    ])
-      .then(([, clientOpts]) => {
-        if (active) setClients(clientOpts)
+  })
+  const events: CalendarEvent[] = eventsData ?? []
+  const clients: CalendarClientOption[] = clientsData ?? []
+  const isLoading = isLoadingEvents || isLoadingClients
+
+  const clientsById = useMemo(
+    () => new Map(clients.map((c) => [c.id, c])),
+    [clients],
+  )
+
+  const rescheduleMutation = useMutation({
+    mutationFn: ({ event, newStart }: { event: CalendarEvent; newStart: Date }) =>
+      calendarApi.reschedule(event, newStart),
+    onMutate: async ({ event, newStart }) => {
+      await queryClient.cancelQueries({ queryKey: ["calendar"] })
+      const previous = queryClient.getQueryData<CalendarEvent[]>([
+        "calendar",
+        { includeDrafts },
+      ])
+      queryClient.setQueryData<CalendarEvent[]>(
+        ["calendar", { includeDrafts }],
+        (prev) =>
+          (prev ?? []).map((e) =>
+            e.id === event.id ? { ...e, start: eventStartString(event.kind, newStart) } : e,
+          ),
+      )
+      return { previous }
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["calendar", { includeDrafts }], ctx.previous)
+      toast({
+        title: "Could not reschedule",
+        description: err instanceof Error ? err.message : "Please try again",
+        variant: "destructive",
       })
-      .catch(() => {
-        toast({ title: "Failed to load calendar", variant: "destructive" })
-      })
-      .finally(() => {
-        if (active) setIsLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [loadData, includeDrafts, toast])
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["calendar"] })
+      queryClient.invalidateQueries({ queryKey: ["queue"] })
+      queryClient.invalidateQueries({ queryKey: ["assets"] })
+    },
+  })
 
   const visibleEvents = useMemo(
     () =>
@@ -301,30 +320,10 @@ export default function CalendarPage() {
   )
 
   const handleReschedule = useCallback(
-    async (event: CalendarEvent, newStart: Date) => {
-      const optimisticStart = eventStartString(event.kind, newStart)
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === event.id ? { ...e, start: optimisticStart } : e,
-        ),
-      )
-      try {
-        await calendarApi.reschedule(event, newStart)
-        await loadData(includeDrafts)
-      } catch (err) {
-        setEvents((prev) =>
-          prev.map((e) =>
-            e.id === event.id ? { ...e, start: event.start } : e,
-          ),
-        )
-        toast({
-          title: "Could not reschedule",
-          description: err instanceof Error ? err.message : "Please try again",
-          variant: "destructive",
-        })
-      }
+    (event: CalendarEvent, newStart: Date) => {
+      rescheduleMutation.mutate({ event, newStart })
     },
-    [loadData, includeDrafts, toast],
+    [rescheduleMutation],
   )
 
   const handleDrop = useCallback(
@@ -689,7 +688,11 @@ export default function CalendarPage() {
             <ScheduleComposer
               start={composerStart}
               onClose={() => setComposerStart(null)}
-              onCreated={() => loadData(includeDrafts)}
+              onCreated={() => {
+                queryClient.invalidateQueries({ queryKey: ["calendar"] })
+                queryClient.invalidateQueries({ queryKey: ["queue"] })
+                queryClient.invalidateQueries({ queryKey: ["assets"] })
+              }}
             />
           )}
         </AnimatePresence>

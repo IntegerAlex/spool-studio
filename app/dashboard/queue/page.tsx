@@ -9,7 +9,8 @@ import {
   RotateCcw,
   Upload,
 } from "lucide-react"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Button } from "@/components/ui/button"
 import {
@@ -75,10 +76,31 @@ function toDatetimeLocal(iso?: string | null): string {
 }
 
 export default function QueuePage() {
-  const [queue, setQueue] = useState<UploadQueue[]>([])
-  const [assets, setAssets] = useState<Map<string, Asset>>(new Map())
-  const [clients, setClients] = useState<Map<string, Client>>(new Map())
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: queueData, isLoading: queueLoading } = useQuery({
+    queryKey: ["queue"],
+    queryFn: () => queueApi.getAll(),
+  })
+  const { data: assetsData, isLoading: assetsLoading } = useQuery({
+    queryKey: ["assets"],
+    queryFn: () => assetsApi.getAll(),
+  })
+  const { data: clientsData, isLoading: clientsLoading } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.getAll(),
+  })
+
+  const queue = queueData ?? []
+  const assets = useMemo(
+    () => new Map<string, Asset>((assetsData ?? []).map((a) => [a.id, a])),
+    [assetsData],
+  )
+  const clients = useMemo(
+    () => new Map<string, Client>((clientsData ?? []).map((c) => [c.id, c])),
+    [clientsData],
+  )
+  const isLoading = queueLoading || assetsLoading || clientsLoading
+
   const [isDragging, setIsDragging] = useState(false)
   const [uploadingAssetIds, setUploadingAssetIds] = useState<Set<string>>(
     new Set(),
@@ -90,26 +112,6 @@ export default function QueuePage() {
     null,
   )
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [queueData, assetsData, clientsData] = await Promise.all([
-          queueApi.getAll(),
-          assetsApi.getAll(),
-          clientsApi.getAll(),
-        ])
-
-        setQueue(queueData ?? [])
-        setAssets(new Map((assetsData ?? []).map((a) => [a.id, a])))
-        setClients(new Map((clientsData ?? []).map((c) => [c.id, c])))
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadData()
-  }, [])
 
   const _handleCopyCaption = (caption: string) => {
     navigator.clipboard.writeText(caption)
@@ -152,8 +154,7 @@ export default function QueuePage() {
 
         try {
           await assetsApi.uploadFile(targetAssetId, file)
-          const assetsData = await assetsApi.getAll()
-          setAssets(new Map(assetsData.map((a) => [a.id, a])))
+          await queryClient.invalidateQueries({ queryKey: ["assets"] })
         } catch (err) {
           const message = err instanceof Error ? err.message : "Upload failed"
           setUploadErrors((prev) => new Map(prev).set(targetAssetId, message))
@@ -209,8 +210,7 @@ export default function QueuePage() {
       await queueApi.update(editing.id, {
         scheduledDate: new Date(editing.date).toISOString(),
       })
-      const queueData = await queueApi.getAll()
-      setQueue(queueData ?? [])
+      await queryClient.invalidateQueries({ queryKey: ["queue"] })
       toast({
         title: "Schedule updated",
         description: "The upload schedule was updated.",
@@ -228,9 +228,10 @@ export default function QueuePage() {
   const handleRetry = async (id: string) => {
     try {
       await queueApi.update(id, { status: "pending" })
-      setQueue((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: "pending" } : q)),
+      queryClient.setQueryData<UploadQueue[]>(["queue"], (prev) =>
+        (prev ?? []).map((q) => (q.id === id ? { ...q, status: "pending" } : q)),
       )
+      await queryClient.invalidateQueries({ queryKey: ["queue"] })
       toast({
         title: "Retry scheduled",
         description: "The item will be retried.",
@@ -247,7 +248,10 @@ export default function QueuePage() {
   const handleCancel = async (id: string) => {
     try {
       await queueApi.delete(id)
-      setQueue((prev) => prev.filter((q) => q.id !== id))
+      queryClient.setQueryData<UploadQueue[]>(["queue"], (prev) =>
+        (prev ?? []).filter((q) => q.id !== id),
+      )
+      await queryClient.invalidateQueries({ queryKey: ["queue"] })
       toast({
         title: "Item removed",
         description: "The queue item was cancelled.",

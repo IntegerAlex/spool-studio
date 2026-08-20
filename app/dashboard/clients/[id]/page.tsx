@@ -1,49 +1,46 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { ClientDetail } from "@/components/clients/client-detail"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { assetsApi, clientsApi } from "@/lib/api-client"
-import type { Asset, Client } from "@/types/index"
 
 export default function ClientDetailPage() {
   const params = useParams()
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
   const clientId = params.id as string | undefined
 
-  const [client, setClient] = useState<Client | null>(null)
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const clientQuery = useQuery({
+    queryKey: ["clients", clientId],
+    queryFn: () => clientsApi.getById(clientId!),
+    enabled: !!clientId,
+  })
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        console.info("[client-detail] params", params)
-        if (!clientId) {
-          setError("Client id is required")
-          setIsLoading(false)
-          return
-        }
-        setError(null)
-        const [clientData, assetsData] = await Promise.all([
-          clientsApi.getById(clientId),
-          assetsApi.getByClientId(clientId),
-        ])
-        setClient(clientData)
-        setAssets(assetsData)
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load client"
-        setError(message)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  const assetsQuery = useQuery({
+    queryKey: ["assets", { clientId }],
+    queryFn: () => assetsApi.getByClientId(clientId!),
+    enabled: !!clientId,
+  })
 
-    loadData()
-  }, [clientId, params])
+  const isLoading = clientQuery.isLoading || assetsQuery.isLoading
+  const error = clientQuery.error || assetsQuery.error
+
+  if (!clientId) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumb
+          items={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Clients", href: "/dashboard/clients" },
+            { label: "Error" },
+          ]}
+        />
+        <div className="text-center py-12">
+          <p className="text-[#71717a]">Client id is required</p>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (
@@ -73,13 +70,13 @@ export default function ClientDetailPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-[#71717a]">{error}</p>
+          <p className="text-[#71717a]">{(error as Error).message}</p>
         </div>
       </div>
     )
   }
 
-  if (!client) {
+  if (!clientQuery.data) {
     return (
       <div className="space-y-6">
         <Breadcrumb
@@ -102,10 +99,10 @@ export default function ClientDetailPage() {
         items={[
           { label: "Dashboard", href: "/dashboard" },
           { label: "Clients", href: "/dashboard/clients" },
-          { label: client.name },
+          { label: clientQuery.data.name },
         ]}
       />
-      <ClientDetail client={client} assets={assets} />
+      <ClientDetail client={clientQuery.data} assets={assetsQuery.data ?? []} />
     </div>
   )
 }

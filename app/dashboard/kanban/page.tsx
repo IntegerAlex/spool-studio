@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import ErrorBoundary from "@/components/ui/error-boundary"
 import { PageSkeleton } from "@/components/ui/page-skeleton"
@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast"
 import { assetsApi, kanbanApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import type { Asset, KanbanClientOption } from "@/types/index"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 const AssetFormDialog = dynamic(
   () =>
@@ -40,34 +41,25 @@ const AssetFormDialog = dynamic(
   },
 )
 
+type BoardData = { assets: Asset[]; clients: KanbanClientOption[] }
+
 export default function KanbanPage() {
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [clients, setClients] = useState<KanbanClientOption[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedClient, setSelectedClient] = useState<string>("all")
   const { toast } = useToast()
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setError(null)
-        const { assets: assetsData, clients: clientsData } =
-          await kanbanApi.getBoard()
-        setAssets(assetsData)
-        setClients(clientsData)
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load kanban data"
-        setError(message)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  const {
+    data: boardData,
+    isLoading,
+    error,
+  } = useQuery<BoardData>({
+    queryKey: ["board"],
+    queryFn: () => kanbanApi.getBoard(),
+  })
 
-    loadData()
-  }, [])
+  const assets = boardData?.assets ?? []
+  const clients = boardData?.clients ?? []
 
   const filteredAssets = useMemo(() => {
     return assets.filter((asset) => {
@@ -80,30 +72,32 @@ export default function KanbanPage() {
     })
   }, [assets, searchQuery, selectedClient])
 
-  const handleStatusChange = async (
-    assetId: string,
-    newStatus: Asset["status"],
-  ) => {
-    let previousAssets: Asset[] = []
-    setAssets((prev) => {
-      previousAssets = prev
-      return prev.map((item) =>
-        item.id === assetId
-          ? {
-              ...item,
-              status: newStatus,
-            }
-          : item,
-      )
-    })
-
-    try {
-      const updated = await assetsApi.update(assetId, { status: newStatus })
-      setAssets((prev) =>
-        prev.map((item) => (item.id === assetId ? updated : item)),
-      )
-    } catch (err) {
-      setAssets(previousAssets)
+  const statusMutation = useMutation({
+    mutationFn: ({
+      assetId,
+      newStatus,
+    }: {
+      assetId: string
+      newStatus: Asset["status"]
+    }) => assetsApi.update(assetId, { status: newStatus }),
+    onMutate: async ({ assetId, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: ["board"] })
+      const previous = queryClient.getQueryData<BoardData>(["board"])
+      queryClient.setQueryData<BoardData>(["board"], (old) => {
+        if (!old) return old as unknown as BoardData
+        return {
+          ...old,
+          assets: old.assets.map((item) =>
+            item.id === assetId ? { ...item, status: newStatus } : item,
+          ),
+        }
+      })
+      return { previous }
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["board"], context.previous)
+      }
       const message =
         err instanceof Error ? err.message : "Failed to update status"
       toast({
@@ -111,7 +105,25 @@ export default function KanbanPage() {
         description: message,
         variant: "destructive",
       })
-    }
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<BoardData>(["board"], (old) => {
+        if (!old) return old as unknown as BoardData
+        return {
+          ...old,
+          assets: old.assets.map((item) =>
+            item.id === updated.id ? updated : item,
+          ),
+        }
+      })
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["board"] })
+    },
+  })
+
+  const handleStatusChange = (assetId: string, newStatus: Asset["status"]) => {
+    statusMutation.mutate({ assetId, newStatus })
   }
 
   if (isLoading) {
@@ -140,7 +152,9 @@ export default function KanbanPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground">
+            {error instanceof Error ? error.message : "Failed to load kanban data"}
+          </p>
         </div>
       </div>
     )
@@ -241,7 +255,13 @@ export default function KanbanPage() {
 
             <AssetFormDialog
               mode="create"
-              onSaved={(asset) => setAssets((prev) => [asset, ...prev])}
+              onSaved={(asset) => {
+                queryClient.setQueryData<BoardData>(["board"], (old) => {
+                  if (!old) return old as unknown as BoardData
+                  return { ...old, assets: [asset, ...old.assets] }
+                })
+                queryClient.invalidateQueries({ queryKey: ["board"] })
+              }}
               trigger={
                 <Button variant="accent">
                   <Plus className="w-4 h-4 mr-2" />

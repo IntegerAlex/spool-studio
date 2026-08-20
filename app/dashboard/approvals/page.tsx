@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { StatusBadge } from "@/components/assets/status-badge"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Button } from "@/components/ui/button"
@@ -10,43 +11,23 @@ import { assetsApi, clientsApi } from "@/lib/api-client"
 import { getAssetIcon } from "@/lib/asset-display"
 import type { Asset, Client } from "@/types/index"
 
+const APPROVAL_STATUSES: string[] = ["draft", "ready_for_review", "revision_requested"]
+
 export default function ApprovalsPage() {
-  const [assets, setAssets] = useState<Asset[]>([])
-  const [clients, setClients] = useState<Map<string, Client>>(new Map())
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [pendingAction, setPendingAction] = useState<
-    Record<string, "approve" | "reject" | null>
-  >({})
+  const queryClient = useQueryClient()
   const { toast } = useToast()
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setError(null)
-        const [assetsData, clientsData] = await Promise.all([
-          assetsApi.getByStatuses([
-            "draft",
-            "ready_for_review",
-            "revision_requested",
-          ]),
-          clientsApi.getAll(),
-        ])
-
-        const clientMap = new Map(clientsData.map((c) => [c.id, c]))
-        setClients(clientMap)
-        setAssets(assetsData)
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load approvals"
-        setError(message)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadData()
-  }, [])
+  const { data: assets = [], isLoading: assetsLoading, error: assetsError } = useQuery({
+    queryKey: ["approvals", APPROVAL_STATUSES],
+    queryFn: () => assetsApi.getByStatuses(APPROVAL_STATUSES),
+  })
+  const { data: clientsData = [], isLoading: clientsLoading, error: clientsError } = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.getAll(),
+  })
+  const isLoading = assetsLoading || clientsLoading
+  const error = assetsError || clientsError
+  const clients = useMemo(() => new Map(clientsData.map((c) => [c.id, c])), [clientsData])
 
   const readyForReview = assets.filter(
     (a) => a.status === "draft" || a.status === "ready_for_review",
@@ -55,41 +36,27 @@ export default function ApprovalsPage() {
     (a) => a.status === "revision_requested",
   )
 
-  const handleApprovalAction = async (
-    assetId: string,
-    action: "approve" | "reject",
-  ) => {
-    try {
-      setPendingAction((prev) => ({ ...prev, [assetId]: action }))
+  const mutation = useMutation({
+    mutationFn: async ({ assetId, action }: { assetId: string; action: "approve" | "reject" }) => {
       const response = await fetch(`/api/assets/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assetId }),
       })
       const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Request failed")
-      }
-
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-      const updated = payload.data as Asset
-      setAssets((prev) =>
-        prev.map((asset) => (asset.id === updated.id ? updated : asset)),
-      )
-      toast({
-        title: action === "approve" ? "Asset approved" : "Revision requested",
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Approval failed"
-      toast({
-        title: action === "approve" ? "Approval failed" : "Rejection failed",
-        description: message,
-        variant: "destructive",
-      })
-    } finally {
-      setPendingAction((prev) => ({ ...prev, [assetId]: null }))
-    }
-  }
+      if (!response.ok) throw new Error(payload.error ?? "Request failed")
+      return payload.data as Asset
+    },
+    onSuccess: (_updated, { action }) => {
+      queryClient.invalidateQueries({ queryKey: ["approvals"] })
+      queryClient.invalidateQueries({ queryKey: ["assets"] })
+      toast({ title: action === "approve" ? "Asset approved" : "Revision requested" })
+    },
+    onError: (err: Error, { action }) => {
+      toast({ title: action === "approve" ? "Approval failed" : "Rejection failed", description: err.message, variant: "destructive" })
+    },
+  })
+  const handleApprovalAction = (assetId: string, action: "approve" | "reject") => mutation.mutate({ assetId, action })
 
   const renderAssetRow = (
     asset: Asset,
@@ -97,8 +64,8 @@ export default function ApprovalsPage() {
     isPending: boolean,
   ) => {
     const AssetIcon = getAssetIcon(asset)
-    const isApproving = pendingAction[asset.id] === "approve"
-    const isRejecting = pendingAction[asset.id] === "reject"
+    const isApproving = mutation.isPending && mutation.variables?.assetId === asset.id && mutation.variables?.action === "approve"
+    const isRejecting = mutation.isPending && mutation.variables?.assetId === asset.id && mutation.variables?.action === "reject"
     const isBusy = isApproving || isRejecting
 
     return (
@@ -192,7 +159,7 @@ export default function ApprovalsPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">{error}</p>
+          <p className="text-muted-foreground">{(error as Error).message}</p>
         </div>
       </div>
     )
