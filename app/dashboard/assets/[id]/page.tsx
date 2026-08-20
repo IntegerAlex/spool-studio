@@ -3,7 +3,7 @@
 import { Copy, MoreHorizontal, Upload } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
-import { mutate } from "swr"
+import { useQueryClient } from "@tanstack/react-query"
 import { AssetActivitySection } from "@/components/assets/asset-activity-section"
 import { AssetCommentsSection } from "@/components/assets/asset-comments-section"
 import { AssetFormDialog } from "@/components/assets/asset-form-dialog"
@@ -55,6 +55,7 @@ export default function AssetDetailPage() {
   const assetId = params.id as string | undefined
   const router = useRouter()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   const [asset, setAsset] = useState<Asset | null>(null)
   const [client, setClient] = useState<Client | null>(null)
@@ -371,7 +372,7 @@ export default function AssetDetailPage() {
                     asset={asset}
                     onSaved={(updated) => {
                       setAsset(updated)
-                      mutate("/api/assets")
+                      queryClient.invalidateQueries({ queryKey: ["assets"] })
                       clientsApi
                         .getById(updated.clientId)
                         .then(setClient)
@@ -405,7 +406,7 @@ export default function AssetDetailPage() {
                       asset={asset}
                       onSaved={(updated) => {
                         setAsset(updated)
-                        mutate("/api/assets")
+                        queryClient.invalidateQueries({ queryKey: ["assets"] })
                         clientsApi
                           .getById(updated.clientId)
                           .then(setClient)
@@ -819,7 +820,7 @@ export default function AssetDetailPage() {
                 try {
                   await assetsApi.delete(asset.id)
                   toast({ title: "Asset deleted" })
-                  mutate("/api/assets")
+                  queryClient.invalidateQueries({ queryKey: ["assets"] })
                   clearApiClientCache()
                   router.refresh()
                   router.push("/dashboard/assets")

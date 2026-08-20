@@ -4,7 +4,7 @@ import { Eye, MoreVertical, Pencil, Upload } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import React, { useCallback, useState } from "react"
-import { mutate } from "swr"
+import { useQueryClient } from "@tanstack/react-query"
 import { AssetFormDialog } from "@/components/assets/asset-form-dialog"
 import { StatusBadge } from "@/components/assets/status-badge"
 import { Button } from "@/components/ui/button"
@@ -92,6 +92,7 @@ function AssetCardImpl({ asset, onThumbnailClick, usersById }: AssetCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   // Removed per-card current user fetch and debug logging to avoid per-card async work and noisy renders
 
   const openAsset = () => {
@@ -390,7 +391,7 @@ function AssetCardImpl({ asset, onThumbnailClick, usersById }: AssetCardProps) {
                   await assetsApi.delete(asset.id)
                   toast({ title: "Asset deleted successfully" })
                   setShowDeleteDialog(false)
-                  mutate("/api/assets")
+                  queryClient.invalidateQueries({ queryKey: ["assets"] })
                   clearApiClientCache()
                   router.refresh()
                 } catch (err) {

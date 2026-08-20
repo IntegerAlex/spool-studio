@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import useSWR, { mutate } from "swr"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { PreviewShell } from "@/components/preview"
 import {
   Pagination,
@@ -146,18 +146,21 @@ function formatUserLabel(user: User | undefined): string {
 }
 
 export default function AssetsPage() {
+  const queryClient = useQueryClient()
   const {
     data: rawAssets,
     error: assetsError,
     isLoading: assetsLoading,
-  } = useSWR<Asset[]>("/api/assets", fetchJson)
+  } = useQuery({ queryKey: ["assets"], queryFn: () => fetchJson<Asset[]>("/api/assets") })
   const {
     data: rawClients,
     error: clientsError,
     isLoading: clientsLoading,
-  } = useSWR<Client[]>("/api/clients", fetchJson)
-  const [users, setUsers] = useState<User[]>([])
-  const [usersLoading, setUsersLoading] = useState(true)
+  } = useQuery({ queryKey: ["clients"], queryFn: () => fetchJson<Client[]>("/api/clients") })
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(),
+  })
 
   const assets = useMemo(
     () => (rawAssets ?? []).map(hydrateAssetDates),
@@ -170,21 +173,6 @@ export default function AssetsPage() {
   const isLoading = assetsLoading || clientsLoading || usersLoading
   const error = assetsError?.message ?? clientsError?.message ?? null
 
-  useEffect(() => {
-    let isActive = true
-    usersApi
-      .getAll()
-      .then((data) => {
-        if (isActive) setUsers(data)
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (isActive) setUsersLoading(false)
-      })
-    return () => {
-      isActive = false
-    }
-  }, [])
   const [searchInput, setSearchInput] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState<AssetStatus | "all">(
@@ -886,12 +874,8 @@ export default function AssetsPage() {
           <AssetFormDialog
             mode="create"
             onSaved={(saved) => {
-              mutate(
-                "/api/assets",
-                (current) => [saved, ...(current ?? [])],
-                false,
-              )
-              mutate("/api/assets")
+              queryClient.setQueryData<Asset[]>(["assets"], (current) => [saved, ...(current ?? [])])
+              queryClient.invalidateQueries({ queryKey: ["assets"] })
             }}
             trigger={
               <Button variant="accent">

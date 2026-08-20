@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 import { LoadingBar } from "@/components/layout/loading-bar"
 import PerfClient from "@/components/perf/client-perf"
-import { SWRProvider } from "@/lib/swr-config"
+import { QueryProvider } from "@/lib/query-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -50,7 +50,7 @@ export default function RootLayout({
       <body
         className={`${inter.className} bg-background text-foreground antialiased`}
       >
-        <SWRProvider>
+        <QueryProvider>
           <Suspense fallback={null}>
             <LoadingBar />
           </Suspense>
@@ -67,7 +67,7 @@ export default function RootLayout({
           </div>
           {children}
           <Toaster />
-        </SWRProvider>
+        </QueryProvider>
         {process.env.NEXT_PUBLIC_PERF_DIAG === "1" && <PerfClient />}
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
