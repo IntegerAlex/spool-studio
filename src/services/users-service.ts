@@ -32,7 +32,9 @@ export async function getCurrentUserProfile(): Promise<User | null> {
   }
 }
 
-export async function getOrCreateCurrentUserProfile(): Promise<User> {
+import { cache } from "react"
+
+export const getOrCreateCurrentUserProfile = cache(async (): Promise<User> => {
   const authUser = await getCurrentUser()
   if (!authUser) {
     throw new Error("Unauthorized")
@@ -66,7 +68,7 @@ export async function getOrCreateCurrentUserProfile(): Promise<User> {
   }
 
   return mapped
-}
+})
 
 export async function getUsers(): Promise<User[]> {
   try {

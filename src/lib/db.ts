@@ -15,11 +15,13 @@ export function getPool(): Pool {
 
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL?.includes("sslmode=require")
-      ? { rejectUnauthorized: false }
+    ssl: process.env.DATABASE_URL?.includes("sslmode=")
+      ? process.env.DATABASE_URL.includes("sslmode=verify-full")
+        ? { rejectUnauthorized: true }
+        : { rejectUnauthorized: false }
       : false,
     max: parseInt(
-      process.env.DB_POOL_MAX ?? (process.env.VERCEL ? "1" : "5"),
+      process.env.DB_POOL_MAX ?? (process.env.VERCEL ? "10" : "10"),
       10,
     ),
     idleTimeoutMillis: parseInt(

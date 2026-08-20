@@ -3,9 +3,11 @@ import { verifyToken } from "./jwt"
 import { SESSION_COOKIE_NAME, validateSession } from "./session"
 import type { AuthUser } from "./types"
 
-export async function getCurrentUser(): Promise<AuthUser | null> {
+import { cache } from "react"
+
+export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
   return validateSession()
-}
+})
 
 export async function requireUser(): Promise<AuthUser> {
   const user = await getCurrentUser()

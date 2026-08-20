@@ -217,14 +217,11 @@ function getWeekStart(date: Date) {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   try {
-    // Stage 1: Fetch asset summaries and recent activity logs in parallel
-    const [assetSummaries, assetLogs] = await Promise.all([
+    const [assetSummaries, assetLogs, serviceClients] = await Promise.all([
       listAssetSummaries(),
       listRecentActivity({ limit: 50 }),
+      getClients(),
     ])
-
-    // Stage 2: Fetch clients using the pre-fetched asset summaries
-    const serviceClients = await getClients(assetSummaries)
     const repositoryClients = serviceClients
     const rawSupabaseCount = serviceClients.length
 
