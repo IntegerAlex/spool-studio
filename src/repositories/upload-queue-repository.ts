@@ -83,6 +83,7 @@ export async function deleteUploadQueueItemsByAssetId(
 
 export async function listUploadQueueForUser(
   userId: string,
+  limit = 200,
 ): Promise<DbUploadQueueListItem[]> {
   return db
     .select({
@@ -99,6 +100,7 @@ export async function listUploadQueueForUser(
     .innerJoin(contentAssets, eq(contentAssets.id, uploadQueue.asset_id))
     .where(eq(contentAssets.created_by, userId))
     .orderBy(uploadQueue.scheduled_date)
+    .limit(limit)
 }
 
 export async function getOwnedUploadQueueItem(

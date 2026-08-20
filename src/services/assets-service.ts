@@ -247,9 +247,9 @@ export function getAssetR2Key(
   return `clients/${clientId}/assets/${assetId}/${fileName}`
 }
 
-export async function getAssets(): Promise<Asset[]> {
+export async function getAssets(limit = 200): Promise<Asset[]> {
   try {
-    const rows = await listAssets()
+    const rows = await listAssets(limit)
     return rows
       .map((asset) => mapAsset(asset))
       .filter((asset): asset is Asset => Boolean(asset))
@@ -261,9 +261,10 @@ export async function getAssets(): Promise<Asset[]> {
 
 export async function getAssetsByStatuses(
   statuses: readonly AssetStatus[],
+  limit = 200,
 ): Promise<Asset[]> {
   try {
-    const rows = await listAssetsByStatuses(statuses)
+    const rows = await listAssetsByStatuses(statuses, limit)
     return rows
       .map((asset) => mapAsset(asset))
       .filter((asset): asset is Asset => Boolean(asset))
@@ -273,9 +274,9 @@ export async function getAssetsByStatuses(
   }
 }
 
-export async function getAssetsByClientId(clientId: string): Promise<Asset[]> {
+export async function getAssetsByClientId(clientId: string, limit = 200): Promise<Asset[]> {
   try {
-    const rows = await listAssetsByClientId(clientId)
+    const rows = await listAssetsByClientId(clientId, limit)
     return rows
       .map((asset) => mapAsset(asset))
       .filter((asset): asset is Asset => Boolean(asset))

@@ -54,22 +54,25 @@ export type DbKanbanAsset = Pick<
   | "updated_at"
 >
 
-export async function listAssets(): Promise<DbAsset[]> {
+export async function listAssets(limit = 200): Promise<DbAsset[]> {
   const rows = await db
     .select()
     .from(contentAssets)
     .orderBy(desc(contentAssets.updated_at))
+    .limit(limit)
   return rows
 }
 
 export async function listAssetsByStatuses(
   statuses: readonly AssetStatus[],
+  limit = 200,
 ): Promise<DbAsset[]> {
   const rows = await db
     .select()
     .from(contentAssets)
     .where(inArray(contentAssets.status, [...statuses]))
     .orderBy(desc(contentAssets.updated_at))
+    .limit(limit)
   return rows
 }
 
@@ -106,7 +109,7 @@ export async function listDashboardAssetSummaries(): Promise<
   return rows
 }
 
-export async function listKanbanAssets(): Promise<DbKanbanAsset[]> {
+export async function listKanbanAssets(limit = 300): Promise<DbKanbanAsset[]> {
   const rows = await db
     .select({
       id: contentAssets.id,
@@ -124,6 +127,7 @@ export async function listKanbanAssets(): Promise<DbKanbanAsset[]> {
     })
     .from(contentAssets)
     .orderBy(desc(contentAssets.updated_at))
+    .limit(limit)
   return rows
 }
 
@@ -174,12 +178,14 @@ export async function getWeeklyCountsGroupedByClient(
 
 export async function listAssetsByClientId(
   clientId: string,
+  limit = 200,
 ): Promise<DbAsset[]> {
   const rows = await db
     .select()
     .from(contentAssets)
     .where(eq(contentAssets.client_id, clientId))
     .orderBy(desc(contentAssets.updated_at))
+    .limit(limit)
   return rows
 }
 

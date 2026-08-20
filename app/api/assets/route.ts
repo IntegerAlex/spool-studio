@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const clientId = searchParams.get("clientId")
     const statusesParam = searchParams.get("statuses")
 
+    const limit = Math.min(parseInt(searchParams.get("limit") ?? "200", 10) || 200, 500)
     let assets
     if (statusesParam) {
       const statuses = statusesParam
@@ -23,11 +24,11 @@ export async function GET(request: Request) {
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
           assetStatusValues.includes(s as AssetStatus),
         )
-      assets = await getAssetsByStatuses(statuses)
+      assets = await getAssetsByStatuses(statuses, limit)
     } else if (clientId) {
-      assets = await getAssetsByClientId(clientId)
+      assets = await getAssetsByClientId(clientId, limit)
     } else {
-      assets = await getAssets()
+      assets = await getAssets(limit)
     }
     const response = NextResponse.json({ data: assets })
     response.headers.set(
