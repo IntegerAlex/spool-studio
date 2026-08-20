@@ -192,9 +192,14 @@ async function fetchJson<T>(
   }
 
   if (!response.ok) {
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const payload = (await response.json()) as ApiEnvelope<T>
-    throw new Error(payload.error ?? "Request failed")
+    if (response.status === 401 && typeof window !== "undefined" && !requestUrl.includes("/api/auth/")) {
+      window.location.href = "/login"
+    }
+    let msg = "Request failed"
+    try { const j = (await response.clone().json()) as ApiEnvelope<T>; msg = j.error ?? msg } catch {}
+    const err = new Error(msg) as Error & { status?: number }
+    err.status = response.status
+    throw err
   }
 
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
