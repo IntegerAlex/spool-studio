@@ -22,6 +22,7 @@ import {
 import { assetsApi, clientsApi, queueApi } from "@/lib/api-client"
 import { getAssetIcon } from "@/lib/asset-display"
 import { cn } from "@/lib/utils"
+import { toast } from "@/hooks/use-toast"
 import type { Asset, Client, UploadQueue } from "@/types/index"
 
 function getQueueStatusLabel(status: UploadQueue["status"]): string {
@@ -63,6 +64,16 @@ function getProgressWidth(status: UploadQueue["status"]): string {
   }
 }
 
+function toDatetimeLocal(iso?: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`
+}
+
 export default function QueuePage() {
   const [queue, setQueue] = useState<UploadQueue[]>([])
   const [assets, setAssets] = useState<Map<string, Asset>>(new Map())
@@ -74,6 +85,9 @@ export default function QueuePage() {
   )
   const [uploadErrors, setUploadErrors] = useState<Map<string, string>>(
     new Map(),
+  )
+  const [editing, setEditing] = useState<{ id: string; date: string } | null>(
+    null,
   )
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -175,6 +189,75 @@ export default function QueuePage() {
     if (e.target.files && e.target.files.length > 0) {
       void handleFiles(e.target.files)
       e.target.value = ""
+    }
+  }
+
+  const handleDownload = (asset?: Asset) => {
+    if (asset?.driveFileUrl) {
+      window.open(asset.driveFileUrl, "_blank")
+    } else {
+      toast({
+        title: "No file available",
+        description: "No file available for download",
+      })
+    }
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!editing) return
+    try {
+      await queueApi.update(editing.id, {
+        scheduledDate: new Date(editing.date).toISOString(),
+      })
+      const queueData = await queueApi.getAll()
+      setQueue(queueData ?? [])
+      toast({
+        title: "Schedule updated",
+        description: "The upload schedule was updated.",
+      })
+      setEditing(null)
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Update failed",
+        description: "Could not update the schedule.",
+      })
+    }
+  }
+
+  const handleRetry = async (id: string) => {
+    try {
+      await queueApi.update(id, { status: "pending" })
+      setQueue((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, status: "pending" } : q)),
+      )
+      toast({
+        title: "Retry scheduled",
+        description: "The item will be retried.",
+      })
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Retry failed",
+        description: "Could not retry the item.",
+      })
+    }
+  }
+
+  const handleCancel = async (id: string) => {
+    try {
+      await queueApi.delete(id)
+      setQueue((prev) => prev.filter((q) => q.id !== id))
+      toast({
+        title: "Item removed",
+        description: "The queue item was cancelled.",
+      })
+    } catch {
+      toast({
+        variant: "destructive",
+        title: "Cancel failed",
+        description: "Could not remove the item.",
+      })
     }
   }
 
@@ -447,20 +530,47 @@ export default function QueuePage() {
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator className="bg-[var(--color-border)]" />
-                      <DropdownMenuItem className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
+                      <DropdownMenuItem
+                        className="cursor-pointer hover:bg-[var(--color-bg-hover)]"
+                        onSelect={(e) => {
+                          e.preventDefault()
+                          handleDownload(asset)
+                        }}
+                      >
                         <Download className="mr-2 h-4 w-4" />
                         Download Asset
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="cursor-pointer hover:bg-[var(--color-bg-hover)]">
+                      <DropdownMenuItem
+                        className="cursor-pointer hover:bg-[var(--color-bg-hover)]"
+                        onSelect={(e) => {
+                          e.preventDefault()
+                          setEditing({
+                            id: item.id,
+                            date: toDatetimeLocal(item.scheduledDate),
+                          })
+                        }}
+                      >
                         Edit Schedule
                       </DropdownMenuItem>
                       {isFailed && (
-                        <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
+                        <DropdownMenuItem
+                          className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]"
+                          onSelect={(e) => {
+                            e.preventDefault()
+                            void handleRetry(item.id)
+                          }}
+                        >
                           <RotateCcw className="mr-2 h-4 w-4" />
                           Retry
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]">
+                      <DropdownMenuItem
+                        className="cursor-pointer text-[#fca5a5] hover:bg-[rgba(239,68,68,0.1)]"
+                        onSelect={(e) => {
+                          e.preventDefault()
+                          void handleCancel(item.id)
+                        }}
+                      >
                         Cancel
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -493,6 +603,46 @@ export default function QueuePage() {
           <p className="text-[12px] text-[var(--color-text-faint)] mt-0.5">
             Upload scheduling will appear here when assets are approved
           </p>
+        </div>
+      )}
+
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setEditing(null)}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-[12px] border border-[var(--color-border)] bg-[var(--color-bg-surface)] p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-[15px] font-semibold text-white">
+              Edit schedule
+            </h3>
+            <input
+              type="datetime-local"
+              value={editing.date}
+              onChange={(e) =>
+                setEditing({ ...editing, date: e.target.value })
+              }
+              className="w-full rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg-app)] px-3 py-2 text-[13px] text-white"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditing(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="submit-btn"
+                onClick={() => void handleSaveSchedule()}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

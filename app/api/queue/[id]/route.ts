@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 import { db } from "@/db"
-import { uploadQueue } from "@/db/schema"
+import { contentAssets, uploadQueue } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 
@@ -79,13 +79,39 @@ export async function PATCH(
   }
 }
 
-export async function DELETE() {
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
   try {
     const user = await requireUser()
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    await db.delete(uploadQueue).where(eq(uploadQueue.status, "completed"))
+    const { id } = await params
+
+    // Verify ownership: the queue item must belong to an asset the user created
+    // before allowing deletion (prevents deleting unrelated items).
+    const owned = await db
+      .select({ id: uploadQueue.id })
+      .from(uploadQueue)
+      .innerJoin(contentAssets, eq(contentAssets.id, uploadQueue.asset_id))
+      .where(
+        and(
+          eq(uploadQueue.id, id),
+          eq(contentAssets.created_by, user.id),
+        ),
+      )
+      .limit(1)
+
+    if (owned.length === 0) {
+      return NextResponse.json(
+        { error: "Queue item not found" },
+        { status: 404 },
+      )
+    }
+
+    await db.delete(uploadQueue).where(eq(uploadQueue.id, id))
     return NextResponse.json({ success: true })
   } catch (error) {
     logProductionRuntimeError("api-queue-delete", error)

@@ -9,6 +9,7 @@ import type {
   ClientReference,
   Json,
   Notification,
+  NotificationPrefs,
   RecurrenceRule,
   SearchResults,
   UploadQueue,
@@ -439,6 +440,21 @@ export const authApi = {
       body: JSON.stringify({ password }),
     })
   },
+
+  invite: async (
+    email: string,
+    role: "admin" | "designer" | "approver",
+  ): Promise<{ userId: string; email: string; role: string }> => {
+    const data = await fetchJson<{
+      userId: string
+      email: string
+      role: string
+    }>("/api/auth/invite", {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    })
+    return { userId: data.userId, email: data.email, role: data.role }
+  },
 }
 
 export const clientsApi = {
@@ -845,6 +861,22 @@ export const notificationsApi = {
   },
 }
 
+// Notification *preferences* (settings page) — distinct from the notifications list API above.
+export const notificationPrefsApi = {
+  getAll: async (): Promise<NotificationPrefs> => {
+    return fetchJson<NotificationPrefs>("/api/settings/notifications")
+  },
+
+  update: async (
+    prefs: Partial<NotificationPrefs>,
+  ): Promise<NotificationPrefs> => {
+    return fetchJson<NotificationPrefs>("/api/settings/notifications", {
+      method: "PUT",
+      body: JSON.stringify(prefs),
+    })
+  },
+}
+
 export const searchApi = {
   search: async (query: string): Promise<SearchResults> => {
     const q = query.trim()
@@ -880,8 +912,8 @@ export const queueApi = {
     })
   },
 
-  delete: async (): Promise<void> => {
-    await fetchJson("/api/queue", { method: "DELETE" })
+  delete: async (id: string): Promise<void> => {
+    await fetchJson(`/api/queue/${id}`, { method: "DELETE" })
   },
 }
 

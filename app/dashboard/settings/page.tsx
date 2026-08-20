@@ -21,9 +21,9 @@ import ErrorBoundary from "@/components/ui/error-boundary"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/hooks/use-toast"
-import { authApi, usersApi, workspaceApi } from "@/lib/api-client"
+import { authApi, notificationPrefsApi, usersApi, workspaceApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import type { User, Workspace } from "@/types/index"
+import type { NotificationPrefs, User, Workspace } from "@/types/index"
 
 const sections = [
   {
@@ -120,6 +120,13 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  const [prefs, setPrefs] = useState<NotificationPrefs | null>(null)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<
+    "admin" | "designer" | "approver"
+  >("designer")
+  const [inviteLoading, setInviteLoading] = useState(false)
+
   const handleDeleteAccount = async () => {
     setDeleteError(null)
     if (!deletePassword) {
@@ -156,6 +163,19 @@ export default function SettingsPage() {
     }
 
     loadData()
+  }, [])
+
+  useEffect(() => {
+    const loadPrefs = async () => {
+      try {
+        const data = await notificationPrefsApi.getAll()
+        setPrefs(data)
+      } catch (err) {
+        console.error("[settings] failed to load notification prefs", err)
+      }
+    }
+
+    loadPrefs()
   }, [])
 
   const handleSaveWorkspace = async () => {
@@ -536,29 +556,96 @@ export default function SettingsPage() {
                 )}
 
                 {activeSection === "team" && (
-                  <Button
-                    className="submit-btn"
-                    onClick={() => {
-                      toast({
-                        title: "Invite feature coming soon",
-                        description:
-                          "You can add team members directly from the Clients page.",
-                      })
-                    }}
-                  >
-                    Invite member
-                  </Button>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] text-[var(--color-text-muted)]">
+                        Email
+                      </label>
+                      <Input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="teammate@company.com"
+                        className="h-9 w-64"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] text-[var(--color-text-muted)]">
+                        Role
+                      </label>
+                      <select
+                        value={inviteRole}
+                        onChange={(e) =>
+                          // SAFETY: the <select> only offers these three exact values.
+                          setInviteRole(
+                            e.target.value as
+                              | "admin"
+                              | "designer"
+                              | "approver",
+                          )
+                        }
+                        className="h-9 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg-app)] px-2 text-[13px] text-white"
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="designer">Designer</option>
+                        <option value="approver">Approver</option>
+                      </select>
+                    </div>
+                    <Button
+                      className="submit-btn h-9"
+                      disabled={inviteLoading || !inviteEmail}
+                      onClick={async () => {
+                        setInviteLoading(true)
+                        try {
+                          await authApi.invite(inviteEmail, inviteRole)
+                          toast({
+                            title: "Invitation sent",
+                            description: `An invite was sent to ${inviteEmail}.`,
+                          })
+                          setInviteEmail("")
+                        } catch (err) {
+                          toast({
+                            variant: "destructive",
+                            title: "Invite failed",
+                            description:
+                              err instanceof Error
+                                ? err.message
+                                : "Could not send invite.",
+                          })
+                        } finally {
+                          setInviteLoading(false)
+                        }
+                      }}
+                    >
+                      {inviteLoading ? "Sending..." : "Invite member"}
+                    </Button>
+                  </div>
                 )}
 
                 {activeSection === "notifications" && (
                   <Button
                     className="submit-btn"
-                    onClick={() => {
-                      toast({
-                        title: "Preferences saved",
-                        description:
-                          "Notification preferences have been updated.",
-                      })
+                    disabled={!prefs}
+                    onClick={async () => {
+                      if (!prefs) return
+                      try {
+                        const updated = await notificationPrefsApi.update(prefs)
+                        setPrefs(updated)
+                        toast({
+                          title: "Preferences saved",
+                          description:
+                            "Notification preferences have been updated.",
+                        })
+                      } catch (err) {
+                        toast({
+                          variant: "destructive",
+                          title: "Save failed",
+                          description:
+                            err instanceof Error
+                              ? err.message
+                              : "Could not save preferences.",
+                        })
+                      }
                     }}
                   >
                     Save preferences
@@ -693,29 +780,33 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="content-card-body space-y-3">
-                  {[
+                  {([
                     {
                       id: "approvals",
+                      field: "emailOnApprovalDecision" as const,
                       label: "Asset approvals",
                       description:
                         "Get notified when assets are ready for review",
                     },
                     {
                       id: "revisions",
+                      field: "emailOnRevisionRequested" as const,
                       label: "Revision requests",
                       description: "Get notified when revisions are requested",
                     },
                     {
                       id: "uploads",
+                      field: "emailOnAssetUploaded" as const,
                       label: "Upload confirmations",
                       description: "Get notified when assets are uploaded",
                     },
                     {
                       id: "comments",
+                      field: "emailOnCommentAdded" as const,
                       label: "New comments",
                       description: "Get notified about comments on your assets",
                     },
-                  ].map((pref) => (
+                  ] as const).map((pref) => (
                     <div
                       key={pref.id}
                       className="flex min-h-11 items-center justify-between gap-4 rounded-[10px] border border-[var(--color-border)] px-4 py-3"
@@ -732,8 +823,16 @@ export default function SettingsPage() {
                       <label className="toggle-switch">
                         <input
                           type="checkbox"
-                          defaultChecked
                           className="toggle-input"
+                          disabled={!prefs}
+                          checked={prefs ? Boolean(prefs[pref.field]) : false}
+                          onChange={(e) =>
+                            setPrefs((prev) =>
+                              prev
+                                ? { ...prev, [pref.field]: e.target.checked }
+                                : prev,
+                            )
+                          }
                         />
                         <span className="toggle-track">
                           <span className="toggle-thumb" />
@@ -755,17 +854,47 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="content-card-body">
-                  <div className="flex flex-col items-center justify-center gap-3 rounded-[10px] border border-dashed border-[var(--color-border)] px-4 py-12 text-center">
-                    <CalendarCheck className="size-7 text-[var(--color-text-muted)]" />
-                    <p className="text-[13px] font-semibold text-white">
-                      No integrations connected
-                    </p>
-                    <p className="max-w-sm text-[11.5px] text-[var(--color-text-muted)]">
-                      Connect services like Mailgun or R2 to streamline your
-                      workflow. Configured integrations will appear here.
-                    </p>
-                  </div>
+                <div className="content-card-body grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {[
+                    {
+                      name: "Mailgun",
+                      configured: Boolean(
+                        process.env.NEXT_PUBLIC_MAILGUN_DOMAIN,
+                      ),
+                    },
+                    {
+                      name: "R2 / S3",
+                      configured: Boolean(process.env.NEXT_PUBLIC_R2_ENDPOINT),
+                    },
+                    { name: "PostgreSQL", configured: true },
+                  ].map((integration) => (
+                    <div
+                      key={integration.name}
+                      className="flex flex-col gap-2 rounded-[10px] border border-[var(--color-border)] px-4 py-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-[13px] font-semibold text-white">
+                          {integration.name}
+                        </p>
+                        <span
+                          className={
+                            integration.configured
+                              ? "rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                              : "rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+                          }
+                        >
+                          {integration.configured
+                            ? "Configured"
+                            : "Not configured"}
+                        </span>
+                      </div>
+                      <p className="text-[11.5px] text-[var(--color-text-muted)]">
+                        {integration.configured
+                          ? "Connected and operational."
+                          : "Not configured in this environment."}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </Card>
             )}

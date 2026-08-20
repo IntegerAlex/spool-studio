@@ -202,6 +202,14 @@ export interface Notification {
   createdAt: string
 }
 
+export interface NotificationPrefs {
+  emailOnAssetUploaded: boolean
+  emailOnRevisionRequested: boolean
+  emailOnCommentAdded: boolean
+  emailOnApprovalDecision: boolean
+  pushEnabled: boolean
+}
+
 export interface SearchResults {
   clients: {
     id: string
