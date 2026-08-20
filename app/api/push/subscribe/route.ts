@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { pushSubscriptions } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  getPushSubscriptionByUserAndEndpoint,
+  insertPushSubscription,
+} from "@/repositories/push-subscriptions-repository"
 
 export async function POST(request: Request) {
   try {
@@ -22,34 +23,35 @@ export async function POST(request: Request) {
       )
     }
 
-    const existing = await db
-      .select({ id: pushSubscriptions.id })
-      .from(pushSubscriptions)
-      .where(
-        and(
-          eq(pushSubscriptions.endpoint, endpoint),
-          eq(pushSubscriptions.user_id, user.id),
-        ),
-      )
-      .limit(1)
+    const existing = await getPushSubscriptionByUserAndEndpoint(
+      user.id,
+      endpoint,
+    )
 
-    if (existing.length > 0) {
+    if (existing) {
       return NextResponse.json({
-        data: { id: existing[0].id, message: "Subscription already exists" },
+        data: { id: existing.id, message: "Subscription already exists" },
       })
     }
 
-    const rows = await db
-      .insert(pushSubscriptions)
-      .values({ user_id: user.id, endpoint, p256dh, auth })
-      .returning({
-        id: pushSubscriptions.id,
-        user_id: pushSubscriptions.user_id,
-        endpoint: pushSubscriptions.endpoint,
-        created_at: pushSubscriptions.created_at,
-      })
+    const row = await insertPushSubscription({
+      user_id: user.id,
+      endpoint,
+      p256dh,
+      auth,
+    })
 
-    return NextResponse.json({ data: rows[0] }, { status: 201 })
+    return NextResponse.json(
+      {
+        data: {
+          id: row.id,
+          user_id: row.user_id,
+          endpoint: row.endpoint,
+          created_at: row.created_at,
+        },
+      },
+      { status: 201 },
+    )
   } catch (error) {
     logProductionRuntimeError("api-push-subscribe", error)
     const message =

@@ -1,9 +1,11 @@
-import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { contentAssets, uploadQueue } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  deleteUploadQueueItem,
+  getOwnedUploadQueueItem,
+  updateUploadQueueItem,
+} from "@/repositories/upload-queue-repository"
 
 export async function PATCH(
   request: Request,
@@ -17,7 +19,7 @@ export async function PATCH(
     const { id } = await params
     const updates = await request.json()
 
-    const set: Partial<typeof uploadQueue.$inferInsert> = {}
+    const set: Parameters<typeof updateUploadQueueItem>[1] = {}
 
     if (updates.status !== undefined) {
       set.status = updates.status
@@ -47,20 +49,8 @@ export async function PATCH(
       )
     }
 
-    const rows = await db
-      .update(uploadQueue)
-      .set(set)
-      .where(eq(uploadQueue.id, id))
-      .returning()
+    const r = await updateUploadQueueItem(id, set)
 
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { error: "Queue item not found" },
-        { status: 404 },
-      )
-    }
-
-    const r = rows[0]
     return NextResponse.json({
       id: r.id,
       assetId: r.asset_id,
@@ -92,26 +82,16 @@ export async function DELETE(
 
     // Verify ownership: the queue item must belong to an asset the user created
     // before allowing deletion (prevents deleting unrelated items).
-    const owned = await db
-      .select({ id: uploadQueue.id })
-      .from(uploadQueue)
-      .innerJoin(contentAssets, eq(contentAssets.id, uploadQueue.asset_id))
-      .where(
-        and(
-          eq(uploadQueue.id, id),
-          eq(contentAssets.created_by, user.id),
-        ),
-      )
-      .limit(1)
+    const owned = await getOwnedUploadQueueItem(id, user.id)
 
-    if (owned.length === 0) {
+    if (!owned) {
       return NextResponse.json(
         { error: "Queue item not found" },
         { status: 404 },
       )
     }
 
-    await db.delete(uploadQueue).where(eq(uploadQueue.id, id))
+    await deleteUploadQueueItem(id)
     return NextResponse.json({ success: true })
   } catch (error) {
     logProductionRuntimeError("api-queue-delete", error)

@@ -1,8 +1,11 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { assetComments, contentAssets, portalTokens } from "@/db/schema"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
+import {
+  getAssetById,
+  updateAsset,
+} from "@/repositories/assets-repository"
+import { insertComment } from "@/repositories/asset-comments-repository"
 
 interface RouteContext {
   params: Promise<{ token: string; id: string }>
@@ -21,24 +24,14 @@ export async function POST(request: Request, context: RouteContext) {
       )
     }
 
-    const tokenRows = await db
-      .select({
-        id: portalTokens.id,
-        client_id: portalTokens.client_id,
-        expires_at: portalTokens.expires_at,
-      })
-      .from(portalTokens)
-      .where(eq(portalTokens.token, token))
-      .limit(1)
-
-    if (tokenRows.length === 0) {
+    const portalToken = await getPortalTokenByToken(token)
+    if (!portalToken) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 },
       )
     }
 
-    const portalToken = tokenRows[0]
     if (
       portalToken.expires_at &&
       new Date(portalToken.expires_at) < new Date()
@@ -46,21 +39,12 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Token has expired" }, { status: 401 })
     }
 
-    const assetRows = await db
-      .select({
-        id: contentAssets.id,
-        client_id: contentAssets.client_id,
-        status: contentAssets.status,
-      })
-      .from(contentAssets)
-      .where(eq(contentAssets.id, assetId))
-      .limit(1)
-
-    if (assetRows.length === 0) {
+    const asset = await getAssetById(assetId)
+    if (!asset) {
       return NextResponse.json({ error: "Asset not found" }, { status: 404 })
     }
 
-    if (assetRows[0].client_id !== portalToken.client_id) {
+    if (asset.client_id !== portalToken.client_id) {
       return NextResponse.json(
         { error: "Asset does not belong to this client" },
         { status: 403 },
@@ -81,24 +65,18 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     if (decision === "approved") {
-      await db
-        .update(contentAssets)
-        .set({ status: "approved", approved_at: new Date() })
-        .where(eq(contentAssets.id, assetId))
+      await updateAsset(assetId, { status: "approved", approved_at: new Date() })
     } else {
-      await db
-        .update(contentAssets)
-        .set({
-          status: "revision_requested",
-          approved_at: null,
-          approved_by: null,
-        })
-        .where(eq(contentAssets.id, assetId))
+      await updateAsset(assetId, {
+        status: "revision_requested",
+        approved_at: null,
+        approved_by: null,
+      })
     }
 
     if (comment?.trim()) {
       // SAFETY: user_id is NOT NULL; portal approvals are unattributed, so it is set to null at insert.
-      await db.insert(assetComments).values({
+      await insertComment({
         asset_id: assetId,
         user_id: null as never,
         type: "comment",

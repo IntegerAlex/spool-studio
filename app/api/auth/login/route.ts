@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { users } from "@/db/schema"
 import { verifyPassword } from "@/lib/auth/password"
 import { createSession } from "@/lib/auth/session"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
+import { getUserByEmail } from "@/repositories/users-repository"
 
 export async function POST(request: Request) {
   try {
@@ -22,12 +20,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const rows = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1)
-    const user = rows[0]
+    const user = await getUserByEmail(email)
 
     if (!user) {
       return NextResponse.json(
@@ -36,17 +29,14 @@ export async function POST(request: Request) {
       )
     }
 
-    // Cast to include password_hash — safe once the column is added to the table
-    const userWithPassword = user
-
-    if (!userWithPassword.password_hash) {
+    if (!user.password_hash) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 },
       )
     }
 
-    const valid = await verifyPassword(password, userWithPassword.password_hash)
+    const valid = await verifyPassword(password, user.password_hash)
     if (!valid) {
       return NextResponse.json(
         { error: "Invalid credentials" },

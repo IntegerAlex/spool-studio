@@ -1,10 +1,18 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { teamMembers, workspaces } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
+import {
+  getFirstWorkspace,
+  insertWorkspace,
+  updateWorkspace,
+} from "@/repositories/workspaces-repository"
+import { listTeamMembersByWorkspaceId } from "@/repositories/team-members-repository"
+
+type WorkspaceUpdateFields = {
+  name?: string
+  logo?: string | null
+}
 
 export async function GET() {
   try {
@@ -12,17 +20,9 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rows = await db
-      .select({
-        id: workspaces.id,
-        name: workspaces.name,
-        logo: workspaces.logo,
-        created_at: workspaces.created_at,
-      })
-      .from(workspaces)
-      .limit(1)
+    const ws = await getFirstWorkspace()
 
-    if (rows.length === 0) {
+    if (!ws) {
       return NextResponse.json({
         data: {
           id: null,
@@ -34,17 +34,7 @@ export async function GET() {
       })
     }
 
-    const ws = rows[0]
-    const members = await db
-      .select({
-        id: teamMembers.id,
-        user_id: teamMembers.user_id,
-        workspace_id: teamMembers.workspace_id,
-        role: teamMembers.role,
-        joined_at: teamMembers.joined_at,
-      })
-      .from(teamMembers)
-      .where(eq(teamMembers.workspace_id, ws.id))
+    const members = await listTeamMembersByWorkspaceId(ws.id)
 
     return NextResponse.json({
       data: {
@@ -78,30 +68,26 @@ export async function PUT(request: Request) {
 
     const { name, logo } = await request.json()
 
-    const existing = await db
-      .select({ id: workspaces.id })
-      .from(workspaces)
-      .limit(1)
+    const existing = await getFirstWorkspace()
     let wsId: string
 
-    if (existing.length === 0) {
-      const inserted = await db
-        .insert(workspaces)
-        .values({ name: name || "My Workspace", logo: logo || null })
-        .returning({ id: workspaces.id })
-      wsId = inserted[0].id
+    if (!existing) {
+      const inserted = await insertWorkspace({
+        name: name || "My Workspace",
+        logo: logo || null,
+      })
+      wsId = inserted.id
     } else {
-      wsId = existing[0].id
-      // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic workspace field set; values are scalars
-      const sets: Record<string, unknown> = {}
+      wsId = existing.id
+      const updates: WorkspaceUpdateFields = {}
       if (name !== undefined) {
-        sets.name = name
+        updates.name = name
       }
       if (logo !== undefined) {
-        sets.logo = logo
+        updates.logo = logo
       }
-      if (Object.keys(sets).length > 0) {
-        await db.update(workspaces).set(sets).where(eq(workspaces.id, wsId))
+      if (Object.keys(updates).length > 0) {
+        await updateWorkspace(wsId, updates)
       }
     }
 

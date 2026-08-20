@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { contentAssets, uploadQueue } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import type { UploadQueueStatus } from "@/types/index"
+import {
+  insertUploadQueueItem,
+  listUploadQueueForUser,
+} from "@/repositories/upload-queue-repository"
 
 export async function GET() {
   try {
@@ -12,21 +13,7 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rows = await db
-      .select({
-        id: uploadQueue.id,
-        asset_id: uploadQueue.asset_id,
-        scheduled_date: uploadQueue.scheduled_date,
-        platform: uploadQueue.platform,
-        status: uploadQueue.status,
-        caption: uploadQueue.caption,
-        hashtags: uploadQueue.hashtags,
-        created_at: uploadQueue.created_at,
-      })
-      .from(uploadQueue)
-      .innerJoin(contentAssets, eq(contentAssets.id, uploadQueue.asset_id))
-      .where(eq(contentAssets.created_by, user.id))
-      .orderBy(uploadQueue.scheduled_date)
+    const rows = await listUploadQueueForUser(user.id)
 
     return NextResponse.json({
       data: rows.map((r) => ({
@@ -67,20 +54,15 @@ export async function POST(request: Request) {
     }
 
     // SAFETY: hashtags/recurrence arrive from a parsed JSON payload; runtime shape matches the DB column.
-    const rows = await db
-      .insert(uploadQueue)
-      .values({
-        asset_id: assetId,
-        scheduled_date: scheduledDate,
-        platform,
-        status: "scheduled",
-        caption: caption || null,
-        hashtags: (hashtags as never) || null,
-        recurrence: (recurrence as never) || null,
-      })
-      .returning()
-
-    const r = rows[0]
+    const r = await insertUploadQueueItem({
+      asset_id: assetId,
+      scheduled_date: scheduledDate,
+      platform,
+      status: "scheduled",
+      caption: caption || null,
+      hashtags: (hashtags as never) || null,
+      recurrence: (recurrence as never) || null,
+    })
 
     return NextResponse.json(
       {

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { users } from "@/db/schema"
 import { createSession, hashPassword } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
+import { insertUser } from "@/repositories/users-repository"
 
 export async function POST(request: Request) {
   try {
@@ -29,16 +28,13 @@ export async function POST(request: Request) {
 
     let userId: string
     try {
-      const inserted = await db
-        .insert(users)
-        .values({
-          email,
-          full_name: fullName || email.split("@")[0],
-          role: userRole,
-          password_hash: passwordHash,
-        })
-        .returning({ id: users.id })
-      userId = inserted[0].id
+      const inserted = await insertUser({
+        email,
+        full_name: fullName || email.split("@")[0],
+        role: userRole,
+        password_hash: passwordHash,
+      })
+      userId = inserted.id
     } catch (err) {
       // SAFETY: Postgres unique-violation error carries a `code` field; narrowed for the 23505 check.
       if ((err as { code?: string } | null)?.code === "23505") {

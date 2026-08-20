@@ -1,9 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { pushSubscriptions } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  deletePushSubscriptionsForUser,
+  listPushSubscriptionsByUserId,
+} from "@/repositories/push-subscriptions-repository"
 
 interface PushPayload {
   userId: string
@@ -64,14 +65,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const subscriptions = await db
-      .select({
-        endpoint: pushSubscriptions.endpoint,
-        p256dh: pushSubscriptions.p256dh,
-        auth: pushSubscriptions.auth,
-      })
-      .from(pushSubscriptions)
-      .where(eq(pushSubscriptions.user_id, userId))
+    const subscriptions = await listPushSubscriptionsByUserId(userId)
 
     if (subscriptions.length === 0) {
       return NextResponse.json({
@@ -101,14 +95,7 @@ export async function POST(request: Request) {
     }
 
     if (failedEndpoints.length > 0) {
-      await db
-        .delete(pushSubscriptions)
-        .where(
-          and(
-            eq(pushSubscriptions.user_id, userId),
-            inArray(pushSubscriptions.endpoint, failedEndpoints),
-          ),
-        )
+      await deletePushSubscriptionsForUser(userId, failedEndpoints)
     }
 
     return NextResponse.json({

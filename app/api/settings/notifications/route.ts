@@ -1,9 +1,10 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { userNotificationPrefs } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  getUserNotificationPrefs,
+  upsertUserNotificationPrefs,
+} from "@/repositories/user-notification-prefs-repository"
 
 export interface NotificationPrefs {
   emailOnAssetUploaded: boolean
@@ -27,31 +28,17 @@ export async function GET() {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rows = await db
-      .select({
-        email_on_asset_uploaded: userNotificationPrefs.email_on_asset_uploaded,
-        email_on_revision_requested:
-          userNotificationPrefs.email_on_revision_requested,
-        email_on_comment_added: userNotificationPrefs.email_on_comment_added,
-        email_on_approval_decision:
-          userNotificationPrefs.email_on_approval_decision,
-        push_enabled: userNotificationPrefs.push_enabled,
-      })
-      .from(userNotificationPrefs)
-      .where(eq(userNotificationPrefs.user_id, user.id))
-      .limit(1)
-
-    if (rows.length === 0) {
+    const prefs = await getUserNotificationPrefs(user.id)
+    if (!prefs) {
       return NextResponse.json(DEFAULT_PREFS)
     }
 
-    const row = rows[0]
     return NextResponse.json({
-      emailOnAssetUploaded: row.email_on_asset_uploaded,
-      emailOnRevisionRequested: row.email_on_revision_requested,
-      emailOnCommentAdded: row.email_on_comment_added,
-      emailOnApprovalDecision: row.email_on_approval_decision,
-      pushEnabled: row.push_enabled,
+      emailOnAssetUploaded: prefs.email_on_asset_uploaded,
+      emailOnRevisionRequested: prefs.email_on_revision_requested,
+      emailOnCommentAdded: prefs.email_on_comment_added,
+      emailOnApprovalDecision: prefs.email_on_approval_decision,
+      pushEnabled: prefs.push_enabled,
     })
   } catch (error) {
     logProductionRuntimeError("api-settings-notifications-get", error)
@@ -77,27 +64,14 @@ export async function PUT(request: Request) {
       pushEnabled: Boolean(body.pushEnabled),
     }
 
-    await db
-      .insert(userNotificationPrefs)
-      .values({
-        user_id: user.id,
-        email_on_asset_uploaded: prefs.emailOnAssetUploaded,
-        email_on_revision_requested: prefs.emailOnRevisionRequested,
-        email_on_comment_added: prefs.emailOnCommentAdded,
-        email_on_approval_decision: prefs.emailOnApprovalDecision,
-        push_enabled: prefs.pushEnabled,
-      })
-      .onConflictDoUpdate({
-        target: userNotificationPrefs.user_id,
-        set: {
-          email_on_asset_uploaded: prefs.emailOnAssetUploaded,
-          email_on_revision_requested: prefs.emailOnRevisionRequested,
-          email_on_comment_added: prefs.emailOnCommentAdded,
-          email_on_approval_decision: prefs.emailOnApprovalDecision,
-          push_enabled: prefs.pushEnabled,
-          updated_at: new Date(),
-        },
-      })
+    await upsertUserNotificationPrefs({
+      user_id: user.id,
+      email_on_asset_uploaded: prefs.emailOnAssetUploaded,
+      email_on_revision_requested: prefs.emailOnRevisionRequested,
+      email_on_comment_added: prefs.emailOnCommentAdded,
+      email_on_approval_decision: prefs.emailOnApprovalDecision,
+      push_enabled: prefs.pushEnabled,
+    })
 
     return NextResponse.json({
       message: "Notification preferences updated",

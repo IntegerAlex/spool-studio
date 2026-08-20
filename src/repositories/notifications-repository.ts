@@ -1,4 +1,4 @@
-import { desc, eq, isNull, or } from "drizzle-orm"
+import { and, desc, eq, isNull, or } from "drizzle-orm"
 import { db } from "@/db"
 import { notifications } from "@/db/schema"
 import { emitEvent } from "@/lib/event-bus"
@@ -70,6 +70,39 @@ export async function markNotificationAsRead(
     .update(notifications)
     .set({ read: true })
     .where(eq(notifications.id, notificationId))
+}
+
+export async function markNotificationAsReadForUser(
+  notificationId: string,
+  userId: string,
+): Promise<NotificationRow | null> {
+  const rows = await db
+    .update(notifications)
+    .set({ read: true })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        or(eq(notifications.user_id, userId), isNull(notifications.user_id)),
+      ),
+    )
+    .returning()
+  return rows[0] ?? null
+}
+
+export async function deleteNotificationForUser(
+  notificationId: string,
+  userId: string,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(notifications)
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        or(eq(notifications.user_id, userId), isNull(notifications.user_id)),
+      ),
+    )
+    .returning({ id: notifications.id })
+  return deleted.length > 0
 }
 
 export async function markAllNotificationsAsRead(

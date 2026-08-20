@@ -1,8 +1,13 @@
-import { desc, eq } from "drizzle-orm"
+import { desc, eq, ilike, or } from "drizzle-orm"
 import { db, type FlexibleInsert } from "@/db"
 import { clients } from "@/db/schema"
 
 export type DbClient = typeof clients.$inferSelect
+
+export type DbPortalClient = Pick<
+  DbClient,
+  "id" | "name" | "slug" | "instagram_handle" | "brand_color"
+>
 
 export async function listClients(): Promise<DbClient[]> {
   const rows = await db.select().from(clients).orderBy(desc(clients.created_at))
@@ -29,6 +34,23 @@ export async function getClientById(
 ): Promise<DbClient | null> {
   const rows = await db
     .select()
+    .from(clients)
+    .where(eq(clients.id, clientId))
+    .limit(1)
+  return rows[0] ?? null
+}
+
+export async function getPortalClientById(
+  clientId: string,
+): Promise<DbPortalClient | null> {
+  const rows = await db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      slug: clients.slug,
+      instagram_handle: clients.instagram_handle,
+      brand_color: clients.brand_color,
+    })
     .from(clients)
     .where(eq(clients.id, clientId))
     .limit(1)
@@ -63,4 +85,30 @@ export async function updateClient(
 
 export async function deleteClient(clientId: string): Promise<void> {
   await db.delete(clients).where(eq(clients.id, clientId))
+}
+
+export async function searchClients(
+  term: string,
+  limit = 5,
+): Promise<
+  Pick<DbClient, "id" | "name" | "slug" | "instagram_handle">[]
+> {
+  const rows = await db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      slug: clients.slug,
+      instagram_handle: clients.instagram_handle,
+    })
+    .from(clients)
+    .where(
+      or(
+        ilike(clients.name, term),
+        ilike(clients.slug, term),
+        ilike(clients.instagram_handle, term),
+      ),
+    )
+    .orderBy(clients.name)
+    .limit(limit)
+  return rows
 }

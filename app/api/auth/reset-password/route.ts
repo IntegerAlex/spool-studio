@@ -1,9 +1,11 @@
-import { and, eq, gt } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { passwordResets, users } from "@/db/schema"
 import { hashPassword, verifyToken } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { updateUser } from "@/repositories/users-repository"
+import {
+  deletePasswordResetsByUserId,
+  getPasswordResetByTokenHash,
+} from "@/repositories/password-resets-repository"
 
 export async function POST(request: Request) {
   try {
@@ -31,19 +33,13 @@ export async function POST(request: Request) {
       )
     }
 
-    const resetRows = await db
-      .select({ id: passwordResets.id })
-      .from(passwordResets)
-      .where(
-        and(
-          eq(passwordResets.user_id, decoded.sub),
-          eq(passwordResets.token_hash, token),
-          gt(passwordResets.expires_at, new Date()),
-        ),
-      )
-      .limit(1)
+    const reset = await getPasswordResetByTokenHash(token)
 
-    if (resetRows.length === 0) {
+    if (
+      !reset ||
+      reset.user_id !== decoded.sub ||
+      reset.expires_at <= new Date()
+    ) {
       return NextResponse.json(
         { error: "Invalid or expired reset token" },
         { status: 400 },
@@ -52,13 +48,8 @@ export async function POST(request: Request) {
 
     const passwordHash = await hashPassword(password)
 
-    await db
-      .update(users)
-      .set({ password_hash: passwordHash })
-      .where(eq(users.id, decoded.sub))
-    await db
-      .delete(passwordResets)
-      .where(eq(passwordResets.user_id, decoded.sub))
+    await updateUser(decoded.sub, { password_hash: passwordHash })
+    await deletePasswordResetsByUserId(decoded.sub)
 
     return NextResponse.json({
       message: "Password has been reset successfully.",

@@ -1,9 +1,23 @@
-import { desc, eq, inArray, sql } from "drizzle-orm"
+import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm"
 import { db, type FlexibleInsert } from "@/db"
 import { assetRevisions, contentAssets } from "@/db/schema"
 import type { AssetStatus } from "@/types/index"
 
 export type DbAsset = typeof contentAssets.$inferSelect
+
+export type DbPortalAsset = Pick<
+  DbAsset,
+  | "id"
+  | "title"
+  | "type"
+  | "status"
+  | "thumbnail_url"
+  | "drive_file_url"
+  | "mime_type"
+  | "file_size"
+  | "created_at"
+  | "updated_at"
+>
 export type DbAssetSummary = Pick<
   DbAsset,
   | "client_id"
@@ -167,6 +181,54 @@ export async function listAssetsByClientId(
     .where(eq(contentAssets.client_id, clientId))
     .orderBy(desc(contentAssets.updated_at))
   return rows
+}
+
+export async function searchAssetsByTitle(
+  term: string,
+  limit = 5,
+): Promise<Pick<DbAsset, "id" | "title" | "type">[]> {
+  const rows = await db
+    .select({
+      id: contentAssets.id,
+      title: contentAssets.title,
+      type: contentAssets.type,
+    })
+    .from(contentAssets)
+    .where(ilike(contentAssets.title, term))
+    .orderBy(contentAssets.title)
+    .limit(limit)
+  return rows
+}
+
+export async function listPortalAssetsByClientId(
+  clientId: string,
+): Promise<DbPortalAsset[]> {
+  return db
+    .select({
+      id: contentAssets.id,
+      title: contentAssets.title,
+      type: contentAssets.type,
+      status: contentAssets.status,
+      thumbnail_url: contentAssets.thumbnail_url,
+      drive_file_url: contentAssets.drive_file_url,
+      mime_type: contentAssets.mime_type,
+      file_size: contentAssets.file_size,
+      created_at: contentAssets.created_at,
+      updated_at: contentAssets.updated_at,
+    })
+    .from(contentAssets)
+    .where(
+      and(
+        eq(contentAssets.client_id, clientId),
+        inArray(contentAssets.status, [
+          "uploaded",
+          "ready_for_review",
+          "revision_requested",
+          "approved",
+        ]),
+      ),
+    )
+    .orderBy(desc(contentAssets.created_at))
 }
 
 export async function getAssetById(assetId: string): Promise<DbAsset | null> {

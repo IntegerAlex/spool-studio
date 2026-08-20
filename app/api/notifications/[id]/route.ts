@@ -1,9 +1,10 @@
-import { and, eq, isNull, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { notifications } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  deleteNotificationForUser,
+  markNotificationAsReadForUser,
+} from "@/repositories/notifications-repository"
 
 export async function PATCH(
   _request: Request,
@@ -15,43 +16,24 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const rows = await db
-      .update(notifications)
-      .set({ read: true })
-      .where(
-        and(
-          eq(notifications.id, id),
-          or(eq(notifications.user_id, user.id), isNull(notifications.user_id)),
-        ),
-      )
-      .returning({
-        id: notifications.id,
-        user_id: notifications.user_id,
-        type: notifications.type,
-        title: notifications.title,
-        message: notifications.message,
-        related_asset_id: notifications.related_asset_id,
-        read: notifications.read,
-        created_at: notifications.created_at,
-      })
+    const row = await markNotificationAsReadForUser(id, user.id)
 
-    if (rows.length === 0) {
+    if (!row) {
       return NextResponse.json(
         { error: "Notification not found" },
         { status: 404 },
       )
     }
 
-    const r = rows[0]
     return NextResponse.json({
-      id: r.id,
-      userId: r.user_id,
-      type: r.type,
-      title: r.title,
-      message: r.message,
-      relatedAssetId: r.related_asset_id,
-      read: r.read,
-      createdAt: r.created_at,
+      id: row.id,
+      userId: row.user_id,
+      type: row.type,
+      title: row.title,
+      message: row.message,
+      relatedAssetId: row.related_asset_id,
+      read: row.read,
+      createdAt: row.created_at,
     })
   } catch (error) {
     logProductionRuntimeError("api-notifications-patch", error)
@@ -72,17 +54,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const deleted = await db
-      .delete(notifications)
-      .where(
-        and(
-          eq(notifications.id, id),
-          or(eq(notifications.user_id, user.id), isNull(notifications.user_id)),
-        ),
-      )
-      .returning({ id: notifications.id })
+    const deleted = await deleteNotificationForUser(id, user.id)
 
-    if (deleted.length === 0) {
+    if (!deleted) {
       return NextResponse.json(
         { error: "Notification not found" },
         { status: 404 },

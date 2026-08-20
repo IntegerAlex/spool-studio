@@ -1,9 +1,7 @@
-import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { pushSubscriptions } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { deletePushSubscriptionByUserAndEndpoint } from "@/repositories/push-subscriptions-repository"
 
 export async function POST(request: Request) {
   try {
@@ -22,14 +20,7 @@ export async function POST(request: Request) {
       )
     }
 
-    await db
-      .delete(pushSubscriptions)
-      .where(
-        and(
-          eq(pushSubscriptions.user_id, user.id),
-          eq(pushSubscriptions.endpoint, endpoint),
-        ),
-      )
+    await deletePushSubscriptionByUserAndEndpoint(user.id, endpoint)
 
     return NextResponse.json({ data: { success: true } })
   } catch (error) {

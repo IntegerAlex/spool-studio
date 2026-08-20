@@ -1,11 +1,9 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { users } from "@/db/schema"
 import { hashPassword, requireUser } from "@/lib/auth"
 import { signToken } from "@/lib/auth/jwt"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
+import { getUserByEmail, insertUser } from "@/repositories/users-repository"
 
 function generateRandomPassword(): string {
   const chars =
@@ -41,13 +39,9 @@ export async function POST(request: Request) {
     const validRoles = ["admin", "designer", "approver"]
     const userRole = validRoles.includes(role) ? role : "designer"
 
-    const existing = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1)
+    const existing = await getUserByEmail(email)
 
-    if (existing.length > 0) {
+    if (existing) {
       return NextResponse.json(
         { error: "A user with this email already exists" },
         { status: 409 },
@@ -57,16 +51,13 @@ export async function POST(request: Request) {
     const randomPassword = generateRandomPassword()
     const passwordHash = await hashPassword(randomPassword)
 
-    const inserted = await db
-      .insert(users)
-      .values({
-        email,
-        full_name: email.split("@")[0],
-        role: userRole,
-        password_hash: passwordHash,
-      })
-      .returning({ id: users.id })
-    const userId = inserted[0].id
+    const inserted = await insertUser({
+      email,
+      full_name: email.split("@")[0],
+      role: userRole,
+      password_hash: passwordHash,
+    })
+    const userId = inserted.id
 
     const resetToken = await signToken({ sub: userId, email, role: userRole })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"

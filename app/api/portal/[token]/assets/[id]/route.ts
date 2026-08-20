@@ -1,11 +1,13 @@
-import { eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { portalTokens, users } from "@/db/schema"
-import { getAssetById, listRevisionsByAssetId } from "@/repositories/assets-repository"
+import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
+import {
+  getAssetById,
+  listRevisionsByAssetId,
+} from "@/repositories/assets-repository"
 import { getClientById } from "@/repositories/clients-repository"
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
-import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { listUsersByIds } from "@/repositories/users-repository"
 
 interface RouteContext {
   params: Promise<{ token: string; id: string }>
@@ -24,24 +26,14 @@ export async function GET(_request: Request, context: RouteContext) {
       )
     }
 
-    const tokenRows = await db
-      .select({
-        id: portalTokens.id,
-        client_id: portalTokens.client_id,
-        expires_at: portalTokens.expires_at,
-      })
-      .from(portalTokens)
-      .where(eq(portalTokens.token, token))
-      .limit(1)
-
-    if (tokenRows.length === 0) {
+    const portalToken = await getPortalTokenByToken(token)
+    if (!portalToken) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 },
       )
     }
 
-    const portalToken = tokenRows[0]
     if (
       portalToken.expires_at &&
       new Date(portalToken.expires_at) < new Date()
@@ -79,17 +71,13 @@ export async function GET(_request: Request, context: RouteContext) {
       if (r.uploaded_by) userIds.add(r.uploaded_by)
     })
 
-    const userRows = userIds.size
-      ? await db
-          .select({
-            id: users.id,
-            full_name: users.full_name,
-            avatar_url: users.avatar_url,
-          })
-          .from(users)
-          .where(inArray(users.id, [...userIds]))
-      : []
-    const userMap = new Map(userRows.map((u) => [u.id, u]))
+    const userRows = userIds.size ? await listUsersByIds([...userIds]) : []
+    const userMap = new Map(
+      userRows.map((u) => [
+        u.id,
+        { id: u.id, full_name: u.full_name, avatar_url: u.avatar_url },
+      ]),
+    )
 
     return NextResponse.json({
       client,

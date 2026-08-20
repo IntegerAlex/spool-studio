@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server"
-import { asc, ilike, or } from "drizzle-orm"
 import { requireUser } from "@/lib/auth"
-import { db } from "@/db"
-import { users } from "@/db/schema"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { searchUsers } from "@/repositories/users-repository"
 
 export async function GET(request: Request) {
   try {
@@ -20,17 +18,7 @@ export async function GET(request: Request) {
 
     const searchTerm = `%${q.trim().toLowerCase()}%`
 
-    const rows = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        full_name: users.full_name,
-        avatar_url: users.avatar_url,
-      })
-      .from(users)
-      .where(or(ilike(users.full_name, searchTerm), ilike(users.email, searchTerm)))
-      .orderBy(asc(users.full_name))
-      .limit(10)
+    const rows = await searchUsers(searchTerm, 10)
 
     const result = rows.map((u) => ({
       id: u.id,

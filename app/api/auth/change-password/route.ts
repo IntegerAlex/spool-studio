@@ -1,10 +1,8 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { users } from "@/db/schema"
 import { hashPassword, requireUser, verifyPassword } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
+import { getUserById, updateUser } from "@/repositories/users-repository"
 
 export async function POST(request: Request) {
   try {
@@ -28,18 +26,12 @@ export async function POST(request: Request) {
       )
     }
 
-    const rows = await db
-      .select({ password_hash: users.password_hash })
-      .from(users)
-      .where(eq(users.id, user.id))
-      .limit(1)
-
-    if (rows.length === 0) {
+    const existing = await getUserById(user.id)
+    if (!existing) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const passwordHash = rows[0].password_hash as string | null
+    const passwordHash = existing.password_hash
     if (!passwordHash) {
       return NextResponse.json(
         { error: "No password set for this account" },
@@ -56,10 +48,7 @@ export async function POST(request: Request) {
     }
 
     const newHash = await hashPassword(newPassword)
-    await db
-      .update(users)
-      .set({ password_hash: newHash })
-      .where(eq(users.id, user.id))
+    await updateUser(user.id, { password_hash: newHash })
 
     try {
       await logAuditEvent({

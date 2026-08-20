@@ -1,9 +1,10 @@
-import { desc, eq, gt, isNull, or } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { clients, portalTokens } from "@/db/schema"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import {
+  insertPortalToken,
+  listActivePortalTokensWithClientName,
+} from "@/repositories/portal-tokens-repository"
 
 export async function POST(request: Request) {
   try {
@@ -32,23 +33,25 @@ export async function POST(request: Request) {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + expiresInDays)
 
-    const rows = await db
-      .insert(portalTokens)
-      .values({
-        client_id: clientId,
-        token: crypto.randomUUID(),
-        expires_at: expiresAt,
-        created_by: user.id,
-      })
-      .returning({
-        id: portalTokens.id,
-        client_id: portalTokens.client_id,
-        token: portalTokens.token,
-        expires_at: portalTokens.expires_at,
-        created_at: portalTokens.created_at,
-      })
+    const created = await insertPortalToken({
+      client_id: clientId,
+      token: crypto.randomUUID(),
+      expires_at: expiresAt,
+      created_by: user.id,
+    })
 
-    return NextResponse.json({ data: rows[0] }, { status: 201 })
+    return NextResponse.json(
+      {
+        data: {
+          id: created.id,
+          client_id: created.client_id,
+          token: created.token,
+          expires_at: created.expires_at,
+          created_at: created.created_at,
+        },
+      },
+      { status: 201 },
+    )
   } catch (error) {
     logProductionRuntimeError("api-portal-token-post", error)
     const message =
@@ -64,24 +67,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const rows = await db
-      .select({
-        id: portalTokens.id,
-        client_id: portalTokens.client_id,
-        token: portalTokens.token,
-        expires_at: portalTokens.expires_at,
-        created_at: portalTokens.created_at,
-        client_name: clients.name,
-      })
-      .from(portalTokens)
-      .innerJoin(clients, eq(clients.id, portalTokens.client_id))
-      .where(
-        or(
-          isNull(portalTokens.expires_at),
-          gt(portalTokens.expires_at, new Date()),
-        ),
-      )
-      .orderBy(desc(portalTokens.created_at))
+    const rows = await listActivePortalTokensWithClientName()
 
     return NextResponse.json({ data: rows })
   } catch (error) {

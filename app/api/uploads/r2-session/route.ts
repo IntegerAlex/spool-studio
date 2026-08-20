@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { uploadSessions } from "@/db/schema"
 import { getPresignedUploadUrl } from "@/integrations/r2/r2-service"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { insertUploadSession } from "@/repositories/upload-sessions-repository"
 
 export async function POST(request: Request) {
   try {
@@ -31,7 +30,7 @@ export async function POST(request: Request) {
       expiresIn: 3600,
     })
 
-    await db.insert(uploadSessions).values({
+    await insertUploadSession({
       asset_id: assetId,
       user_id: user.id,
       r2_key: r2Key,

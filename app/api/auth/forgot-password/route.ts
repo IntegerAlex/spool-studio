@@ -1,9 +1,11 @@
-import { eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-import { db } from "@/db"
-import { passwordResets, users } from "@/db/schema"
 import { signToken } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { getUserByEmail } from "@/repositories/users-repository"
+import {
+  deletePasswordResetsByUserId,
+  insertPasswordReset,
+} from "@/repositories/password-resets-repository"
 
 export async function POST(request: Request) {
   try {
@@ -13,12 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 })
     }
 
-    const userRows = await db
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1)
-    const user = userRows[0]
+    const user = await getUserByEmail(email)
 
     if (!user) {
       return NextResponse.json({
@@ -33,8 +30,8 @@ export async function POST(request: Request) {
     })
 
     // Replace any previous reset token for this user.
-    await db.delete(passwordResets).where(eq(passwordResets.user_id, user.id))
-    await db.insert(passwordResets).values({
+    await deletePasswordResetsByUserId(user.id)
+    await insertPasswordReset({
       user_id: user.id,
       token_hash: resetToken,
       expires_at: new Date(Date.now() + 60 * 60 * 1000),
