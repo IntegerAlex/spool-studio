@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import {
+  type DbAssetSummary,
   listAssetSummaries,
   listAssetsByClientId,
 } from "@/repositories/assets-repository"
@@ -297,7 +297,7 @@ function mapClient(
 }
 
 export async function getClients(
-  preFetchedAssetSummaries?: any[],
+  preFetchedAssetSummaries?: DbAssetSummary[],
 ): Promise<Client[]> {
   try {
     const [clients, assetSummaries] = await Promise.all([
@@ -372,7 +372,6 @@ export async function createClient(input: ClientInput): Promise<Client> {
   }
 
   await getOrCreateCurrentUserProfile()
-  const supabase = await createServerSupabaseClient()
 
   const calculatedWeeklyGoal =
     (input.weeklyPosterGoal ?? 0) + (input.weeklyReelGoal ?? 0)
@@ -396,11 +395,11 @@ export async function createClient(input: ClientInput): Promise<Client> {
     contract_end_date: input.contractEndDate ?? null,
   }
 
-  const record = await insertClient(insertData, supabase)
+  const record = await insertClient(insertData)
 
   const updatedRecord = record
 
-  const assetSummaries = await listAssetSummaries(supabase)
+  const assetSummaries = await listAssetSummaries()
   const mapped = mapClient(updatedRecord, assetSummaries)
 
   if (!mapped) {
@@ -488,7 +487,7 @@ export async function updateClient(
 
   const record = await updateClientRow(
     clientId,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     updates as Parameters<typeof updateClientRow>[1],
   )
   const assetSummaries = await listAssetSummaries()

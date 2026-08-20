@@ -1,7 +1,8 @@
+import type { FlexibleInsert } from "@/db"
+import type { clientReferences } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth"
 import { sendReferenceNotification } from "@/lib/notifications/mailgun"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { listAssetsByClientId } from "@/repositories/assets-repository"
 import {
   deleteClientReference as deleteClientReferenceRow,
@@ -12,7 +13,6 @@ import {
 } from "@/repositories/client-references-repository"
 import { getClientById } from "@/repositories/clients-repository"
 import { getUserById } from "@/repositories/users-repository"
-import type { Database } from "@/types/database"
 import type { ClientReference, ClientReferenceType } from "@/types/index"
 
 const allowedProtocols = new Set(["http:", "https:"])
@@ -106,8 +106,6 @@ export async function createClientReference(
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
   const title = normalizeText(input.title)
   if (!title) {
     throw new Error("Title is required")
@@ -115,16 +113,13 @@ export async function createClientReference(
 
   const url = validateReferenceUrl(input.url)
 
-  const record = await insertClientReference(
-    {
-      client_id: input.clientId,
-      title,
-      url,
-      description: normalizeDescription(input.description),
-      type: input.type ?? "other",
-    },
-    supabase,
-  )
+  const record = await insertClientReference({
+    client_id: input.clientId,
+    title,
+    url,
+    description: normalizeDescription(input.description),
+    type: input.type ?? "other",
+  })
 
   const mapped = mapReference(record)
   if (!mapped) {
@@ -133,9 +128,9 @@ export async function createClientReference(
   // Handle Notifications async (do not block reference creation)
   ;(async () => {
     try {
-      const client = await getClientById(input.clientId, supabase)
+      const client = await getClientById(input.clientId)
       const clientName = client?.name || "Unknown Client"
-      const assets = await listAssetsByClientId(input.clientId, supabase)
+      const assets = await listAssetsByClientId(input.clientId)
 
       const assignedIds = new Set<string>()
       for (const asset of assets) {
@@ -147,7 +142,7 @@ export async function createClientReference(
       for (const designerId of assignedIds) {
         if (designerId === user.id) continue // Don't notify the person who added it
 
-        const designer = await getUserById(designerId, supabase)
+        const designer = await getUserById(designerId)
         if (designer?.email) {
           void sendReferenceNotification({
             clientId: input.clientId,
@@ -187,9 +182,7 @@ export async function updateClientReference(
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
-  const updates: Database["public"]["Tables"]["client_references"]["Update"] =
+  const updates: Partial<FlexibleInsert<typeof clientReferences.$inferInsert>> =
     {}
 
   if (input.title !== undefined) {
@@ -212,7 +205,7 @@ export async function updateClientReference(
     updates.type = input.type
   }
 
-  const record = await updateClientReferenceRow(referenceId, updates, supabase)
+  const record = await updateClientReferenceRow(referenceId, updates)
   const mapped = mapReference(record)
   if (!mapped) {
     throw new Error("Failed to map client reference")
@@ -229,6 +222,5 @@ export async function removeClientReference(
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-  await deleteClientReferenceRow(referenceId, supabase)
+  await deleteClientReferenceRow(referenceId)
 }

@@ -8,7 +8,6 @@ export interface ReportOptions {
   isMonthly?: boolean
   month?: number
   year?: number
-  client?: any
 }
 
 export interface MonthlyReportPayload {
@@ -82,7 +81,6 @@ export async function generateReport(
     isMonthly = false,
     month,
     year,
-    client,
   } = options
 
   // For custom ranges, normalize endDate to end-of-day so the entire final day is included.
@@ -92,7 +90,7 @@ export async function generateReport(
     effectiveEndDate.setUTCHours(23, 59, 59, 999)
   }
 
-  const clientRecord = await getClientById(clientId, client)
+  const clientRecord = await getClientById(clientId)
   if (!clientRecord) {
     return null
   }
@@ -101,7 +99,6 @@ export async function generateReport(
     clientId,
     startDate,
     effectiveEndDate,
-    client,
   )
 
   const postersDelivered = dbAssets.filter(
@@ -202,7 +199,6 @@ export async function generateMonthlyReport(
   clientId: string,
   month: number,
   year: number,
-  client?: any,
 ): Promise<MonthlyReportPayload | null> {
   const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0))
   const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
@@ -214,6 +210,5 @@ export async function generateMonthlyReport(
     isMonthly: true,
     month,
     year,
-    client,
   })
 }

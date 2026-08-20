@@ -1,13 +1,22 @@
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { listRecentActivity } from "@/repositories/asset-activity-repository"
 import {
+  type DbAssetSummary,
   listAssetSummaries,
   listAssetsByIds,
 } from "@/repositories/assets-repository"
-import type { listClients } from "@/repositories/clients-repository"
 import { getClients } from "@/services/clients-service"
+import type { Json } from "@/types"
 import type { Client } from "@/types/index"
-import type { Json } from "@/types/database"
+
+type ActivityClient = {
+  id: string
+  name: string
+  updatedAt?: Date
+  createdAt?: Date
+  updated_at?: string | Date
+  created_at?: string | Date
+}
 
 export interface ClientPerformanceItem {
   id: string
@@ -139,8 +148,8 @@ function getActivityDetail(
 
 function buildRecentActivity(
   assetLogs: Awaited<ReturnType<typeof listRecentActivity>>,
-  assets: any[],
-  clients: Awaited<ReturnType<typeof listClients>>,
+  assets: Awaited<ReturnType<typeof listAssetsByIds>>,
+  clients: ActivityClient[],
 ): DashboardSummary["recentActivity"] {
   const assetById = new Map(assets.map((asset) => [asset.id, asset]))
   const items: DashboardSummary["recentActivity"] = []
@@ -151,7 +160,7 @@ function buildRecentActivity(
       continue
     }
 
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const metadata = (entry.metadata as Record<string, Json>) ?? {}
     const detail = getActivityDetail(entry.action, metadata)
     const timestamp = new Date(entry.created_at)
@@ -167,10 +176,9 @@ function buildRecentActivity(
     })
   }
 
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-  for (const client of clients as any[]) {
-    const rawUpdated = client.updatedAt ?? client.updated_at
-    const rawCreated = client.createdAt ?? client.created_at
+  for (const client of clients) {
+    const rawUpdated = client.updatedAt ?? client.updated_at ?? Date.now()
+    const rawCreated = client.createdAt ?? client.created_at ?? Date.now()
     const timestamp = new Date(rawUpdated)
     const isCreateEvent =
       rawCreated && rawUpdated
@@ -212,7 +220,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     // Stage 1: Fetch asset summaries and recent activity logs in parallel
     const [assetSummaries, assetLogs] = await Promise.all([
       listAssetSummaries(),
-      listRecentActivity(undefined, { limit: 50 }),
+      listRecentActivity({ limit: 50 }),
     ])
 
     // Stage 2: Fetch clients using the pre-fetched asset summaries
@@ -227,13 +235,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     nextWeek.setDate(now.getDate() + 7)
 
     // Use pre-fetched asset summaries for aggregate computations
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const activeAssets = (assetSummaries as any[]).filter(
+    const activeAssets = assetSummaries.filter(
       (asset) => asset.status !== "archived" && asset.status !== "failed",
     )
 
     // Pre-group assets by client_id for O(1) lookups in the client loop
-    const assetsByClientId = new Map<string, any[]>()
+    const assetsByClientId = new Map<string, DbAssetSummary[]>()
     for (const asset of activeAssets) {
       const cid = asset.client_id
       if (!cid) continue
@@ -389,7 +396,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     const activityAssetIds = Array.from(
       new Set(assetLogs.map((a) => a.asset_id).filter(Boolean)),
     )
-    let activityAssets: any[] = []
+    let activityAssets: Awaited<ReturnType<typeof listAssetsByIds>> = []
     try {
       activityAssets = await listAssetsByIds(activityAssetIds)
     } catch {
@@ -416,10 +423,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
       ],
       recentActivity: buildRecentActivity(
         assetLogs,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-        activityAssets as any,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-        repositoryClients as any,
+        activityAssets,
+        // SAFETY: this cast is safe because the value already conforms to the asserted type.
+        repositoryClients,
       ).slice(0, 50),
       totalDeliverables,
       totalReelsPlanned,

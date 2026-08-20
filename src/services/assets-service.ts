@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm"
+import { db } from "@/db"
+import { assetRevisions } from "@/db/schema"
 import { deleteFile, uploadFile } from "@/integrations/r2/r2-service"
 import { extractAssetMetadata } from "@/lib/asset-metadata"
 import {
@@ -12,7 +15,6 @@ import {
   sendRevisionUploadNotification,
 } from "@/lib/notifications/mailgun"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
 import {
   deleteAsset as deleteAssetRow,
@@ -29,14 +31,14 @@ import { getUserById } from "@/repositories/users-repository"
 import { logAssetActivity } from "@/services/activity-service"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getOrCreateCurrentUserProfile } from "@/services/users-service"
-import type { Database, Json } from "@/types/database"
-import type { Asset, AssetRevision, AssetStatus } from "@/types/index"
+import type { AssetStatus, AssetType, Json } from "@/types"
+import type { Asset, AssetRevision } from "@/types/index"
 
 export interface AssetInput {
   clientId: string
   title: string
-  type: Database["public"]["Enums"]["asset_type"]
-  status?: Database["public"]["Enums"]["asset_status"]
+  type: AssetType
+  status?: AssetStatus
   driveFileUrl?: string
   thumbnailUrl?: string
   assignedTo?: string | null
@@ -74,7 +76,7 @@ function splitScheduledAt(value?: string | null): ScheduledAtParts {
 function combinePublishDateTime(
   publishDate?: string | null,
   publishTime?: string | null,
-  scheduledAt?: string | null,
+  scheduledAt?: string | Date | null,
 ): Date | null {
   if (scheduledAt) {
     const fallback = new Date(scheduledAt)
@@ -159,7 +161,7 @@ function mapAssetRevisions(
     mediaHeight: rev.media_height ?? undefined,
     durationSeconds: rev.duration_seconds ?? undefined,
     changeNote: rev.change_note ?? undefined,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     metadata: (rev.metadata as Record<string, Json>) ?? undefined,
     createdAt: new Date(rev.created_at),
   }))
@@ -201,11 +203,10 @@ function logAssetStatusTransition(
 
 async function transitionAssetStatus(
   assetId: string,
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   nextStatus: AssetStatus,
   _triggerSource: string,
 ): Promise<void> {
-  const currentAsset = await getAssetById(assetId, supabase)
+  const currentAsset = await getAssetById(assetId)
   if (!currentAsset) {
     throw new Error("Asset not found")
   }
@@ -219,7 +220,7 @@ async function transitionAssetStatus(
   if (currentAsset.status !== nextStatus) {
   }
 
-  await updateAssetRow(assetId, { status: nextStatus }, supabase)
+  await updateAssetRow(assetId, { status: nextStatus })
 
   emitEvent({
     type: "asset:status-changed",
@@ -301,7 +302,7 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
             mediaHeight: latest.media_height ?? undefined,
             durationSeconds: latest.duration_seconds ?? undefined,
             changeNote: latest.change_note ?? undefined,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+            // SAFETY: this cast is safe because the value already conforms to the asserted type.
             metadata: (latest.metadata as Record<string, Json>) ?? undefined,
             createdAt: new Date(latest.created_at),
           }
@@ -345,21 +346,18 @@ export async function setAssetCurrentRevision(
   assetId: string,
   revisionId: string,
 ): Promise<void> {
-  const supabase = await createServerSupabaseClient()
   // Ensure the revision belongs to the asset
-  const { data: rev, error: revError } = await supabase
-    .from("asset_revisions")
-    .select("id,asset_id")
-    .eq("id", revisionId)
-    .maybeSingle()
-  if (revError) {
-    throw new Error(revError.message)
-  }
+  const revs = await db
+    .select({ id: assetRevisions.id, asset_id: assetRevisions.asset_id })
+    .from(assetRevisions)
+    .where(eq(assetRevisions.id, revisionId))
+    .limit(1)
+  const rev = revs[0]
   if (!rev || rev.asset_id !== assetId) {
     throw new Error("Revision not found for asset")
   }
 
-  await updateAssetRow(assetId, { current_revision_id: revisionId }, supabase)
+  await updateAssetRow(assetId, { current_revision_id: revisionId })
   try {
     await logAssetActivity({
       assetId,
@@ -377,8 +375,6 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
   await getOrCreateCurrentUserProfile()
 
   if (input.status === "scheduled" && !input.scheduledAt) {
@@ -386,7 +382,7 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
   }
 
   if (input.assignedTo) {
-    const assignedUser = await getUserById(input.assignedTo, supabase)
+    const assignedUser = await getUserById(input.assignedTo)
     if (!assignedUser) {
       throw new Error("Assigned user not found")
     }
@@ -394,26 +390,23 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
 
   const scheduledFields = splitScheduledAt(input.scheduledAt)
 
-  const record = await insertAsset(
-    {
-      client_id: input.clientId,
-      title: input.title,
-      type: input.type,
-      status: input.status ?? "draft",
-      drive_file_url: input.driveFileUrl ?? null,
-      thumbnail_url: input.thumbnailUrl ?? null,
-      assigned_to: input.assignedTo ?? null,
-      created_by: user.id,
-      scheduled_at: input.scheduledAt ?? null,
-      publish_date: input.publishDate ?? scheduledFields.publishDate,
-      publish_time: input.publishTime ?? scheduledFields.publishTime,
-      scheduled_by: input.scheduledBy ?? (input.scheduledAt ? user.id : null),
-      published_at: input.publishedAt ?? null,
-      approved_at: input.approvedAt ?? null,
-      approved_by: input.approvedBy ?? null,
-    },
-    supabase,
-  )
+  const record = await insertAsset({
+    client_id: input.clientId,
+    title: input.title,
+    type: input.type,
+    status: input.status ?? "draft",
+    drive_file_url: input.driveFileUrl ?? null,
+    thumbnail_url: input.thumbnailUrl ?? null,
+    assigned_to: input.assignedTo ?? null,
+    created_by: user.id,
+    scheduled_at: input.scheduledAt ?? null,
+    publish_date: input.publishDate ?? scheduledFields.publishDate,
+    publish_time: input.publishTime ?? scheduledFields.publishTime,
+    scheduled_by: input.scheduledBy ?? (input.scheduledAt ? user.id : null),
+    published_at: input.publishedAt ?? null,
+    approved_at: input.approvedAt ?? null,
+    approved_by: input.approvedBy ?? null,
+  })
 
   const storedRecord = record
 
@@ -494,7 +487,6 @@ export async function finalizeAssetUpload(
   }
 
   await getOrCreateCurrentUserProfile()
-  const supabase = await createServerSupabaseClient()
 
   console.info(
     "[upload][auth] " +
@@ -509,14 +501,14 @@ export async function finalizeAssetUpload(
 
   await getOrCreateCurrentUserProfile()
 
-  const asset = await getAssetById(assetId, supabase)
+  const asset = await getAssetById(assetId)
   if (!asset) {
     throw new Error("Asset not found")
   }
 
   let clientName = asset.client_id
   try {
-    const client = await getClientById(asset.client_id, supabase)
+    const client = await getClientById(asset.client_id)
     clientName = client?.name ?? clientName
   } catch {
     // Non-blocking: email can fall back to the client id.
@@ -528,7 +520,7 @@ export async function finalizeAssetUpload(
   let revisionNotificationVersion: number | null = null
 
   if (!isRevisionUpload) {
-    await transitionAssetStatus(assetId, supabase, "uploading", "upload-start")
+    await transitionAssetStatus(assetId, "uploading", "upload-start")
   }
 
   console.info("[upload][asset-check]", {
@@ -570,8 +562,8 @@ export async function finalizeAssetUpload(
     })
   }
 
-  const updated = await updateAssetRow(assetId, updates, supabase)
-  const persisted = await getAssetById(assetId, supabase)
+  const updated = await updateAssetRow(assetId, updates)
+  const persisted = await getAssetById(assetId)
   const mapped = mapAsset(persisted ?? updated)
 
   if (!mapped) {
@@ -631,29 +623,29 @@ export async function finalizeAssetUpload(
       },
     } as const
 
-    const { data: revisionData, error: revisionError } = await supabase
-      .from("asset_revisions")
-      .insert(revisionInsert)
-      .select("id")
-      .single()
-    if (revisionError) {
+    let revisionData: { id: string } | undefined
+    try {
+      const inserted = await db
+        .insert(assetRevisions)
+        // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion  // const-literal insert row at DB boundary
+        .values(revisionInsert as unknown as typeof assetRevisions.$inferInsert)
+        .returning({ id: assetRevisions.id })
+      revisionData = inserted[0]
+    } catch (revisionError) {
       console.error("[revision][create][failed]", {
         assetId,
         error: revisionError,
       })
-    } else if (revisionData) {
+    }
+    if (revisionData) {
       revisionNotificationVersion = versionNumber
 
       // update asset pointers to reference this new revision
-      await updateAssetRow(
-        assetId,
-        {
-          latest_revision_id: revisionData.id,
-          current_revision_id: revisionData.id,
-          revision_count: versionNumber,
-        },
-        supabase,
-      )
+      await updateAssetRow(assetId, {
+        latest_revision_id: revisionData.id,
+        current_revision_id: revisionData.id,
+        revision_count: versionNumber,
+      })
 
       try {
         const shouldLogRevision =
@@ -761,7 +753,6 @@ export async function uploadAssetFile(
   }
 
   await getOrCreateCurrentUserProfile()
-  const supabase = await createServerSupabaseClient()
 
   console.info(
     "[upload][auth] " +
@@ -776,14 +767,14 @@ export async function uploadAssetFile(
 
   await getOrCreateCurrentUserProfile()
 
-  const asset = await getAssetById(assetId, supabase)
+  const asset = await getAssetById(assetId)
   if (!asset) {
     throw new Error("Asset not found")
   }
 
   let clientName = asset.client_id
   try {
-    const client = await getClientById(asset.client_id, supabase)
+    const client = await getClientById(asset.client_id)
     clientName = client?.name ?? clientName
   } catch {
     // Non-blocking: email can fall back to the client id.
@@ -801,7 +792,7 @@ export async function uploadAssetFile(
   }
 
   if (!isRevisionUpload) {
-    await transitionAssetStatus(assetId, supabase, "uploading", "upload-start")
+    await transitionAssetStatus(assetId, "uploading", "upload-start")
   }
 
   console.info("[upload][asset-check]", {
@@ -860,8 +851,8 @@ export async function uploadAssetFile(
       })
     }
 
-    const updated = await updateAssetRow(assetId, updates, supabase)
-    const persisted = await getAssetById(assetId, supabase)
+    const updated = await updateAssetRow(assetId, updates)
+    const persisted = await getAssetById(assetId)
     let mapped = mapAsset(persisted ?? updated)
 
     if (!mapped) {
@@ -881,8 +872,8 @@ export async function uploadAssetFile(
         uploadedAt,
       })
 
-      await updateAssetRow(assetId, metadata.updates, supabase)
-      const refreshed = await getAssetById(assetId, supabase)
+      await updateAssetRow(assetId, metadata.updates)
+      const refreshed = await getAssetById(assetId)
       const refreshedMapped = mapAsset(refreshed)
       if (refreshedMapped) {
         mapped = refreshedMapped
@@ -908,30 +899,30 @@ export async function uploadAssetFile(
           metadata: metadata.extractedFields,
         }
 
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-        const revisionPayload = revisionInsert as any
-        const { data: revisionData, error: revisionError } = await supabase
-          .from("asset_revisions")
-          .insert(revisionPayload)
-          .select("id")
-          .single()
-        if (revisionError) {
+        let revisionData: { id: string } | undefined
+        try {
+          const inserted = await db
+            .insert(assetRevisions)
+            .values(
+              // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion  // insert row at DB boundary
+              revisionInsert as unknown as typeof assetRevisions.$inferInsert,
+            )
+            .returning({ id: assetRevisions.id })
+          revisionData = inserted[0]
+        } catch (revisionError) {
           console.error("[revision][create][failed]", {
             assetId,
             error: revisionError,
           })
-        } else if (revisionData) {
+        }
+        if (revisionData) {
           revisionNotificationVersion = versionNumber
 
-          await updateAssetRow(
-            assetId,
-            {
-              latest_revision_id: revisionData.id,
-              current_revision_id: revisionData.id,
-              revision_count: versionNumber,
-            },
-            supabase,
-          )
+          await updateAssetRow(assetId, {
+            latest_revision_id: revisionData.id,
+            current_revision_id: revisionData.id,
+            revision_count: versionNumber,
+          })
 
           try {
             console.log("[activity-log][revision]", {
@@ -1067,7 +1058,7 @@ export async function uploadAssetFile(
     }
   } catch (error) {
     try {
-      const currentAsset = await getAssetById(assetId, supabase)
+      const currentAsset = await getAssetById(assetId)
       if (
         !isRevisionUpload &&
         currentAsset &&
@@ -1080,7 +1071,7 @@ export async function uploadAssetFile(
           "failed",
           "upload-failure",
         )
-        await updateAssetRow(assetId, { status: "failed" }, supabase)
+        await updateAssetRow(assetId, { status: "failed" })
       }
     } catch (rollbackError) {
       logUploadFailure("status-transition", rollbackError, assetId, {
@@ -1101,7 +1092,6 @@ export async function updateAsset(
   input: Partial<AssetInput>,
 ): Promise<Asset> {
   const user = await getCurrentUser()
-  const supabase = await createServerSupabaseClient()
 
   if (user) {
     await getOrCreateCurrentUserProfile()
@@ -1161,9 +1151,8 @@ export async function updateAsset(
 
   const record = await updateAssetRow(
     assetId,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     updates as Parameters<typeof updateAssetRow>[1],
-    supabase,
   )
 
   const mapped = mapAsset(record)
@@ -1179,9 +1168,9 @@ export async function updateAsset(
   if (statusChanged) {
     logAssetStatusTransition(
       assetId,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       existing.status as AssetStatus,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       input.status as AssetStatus,
       "api-update",
     )
@@ -1261,8 +1250,7 @@ export async function approveAsset(
   userId: string,
 ): Promise<Asset> {
   await getOrCreateCurrentUserProfile()
-  const supabase = await createServerSupabaseClient()
-  const existing = await getAssetById(assetId, supabase)
+  const existing = await getAssetById(assetId)
   if (!existing) {
     throw new Error("Asset not found")
   }
@@ -1284,15 +1272,11 @@ export async function approveAsset(
   }
 
   const approvedAt = new Date().toISOString()
-  const updated = await updateAssetRow(
-    assetId,
-    {
-      status: "approved",
-      approved_at: approvedAt,
-      approved_by: userId,
-    },
-    supabase,
-  )
+  const updated = await updateAssetRow(assetId, {
+    status: "approved",
+    approved_at: approvedAt,
+    approved_by: userId,
+  })
 
   const mapped = mapAsset(updated)
   if (!mapped) {
@@ -1328,8 +1312,7 @@ export async function rejectAsset(
   userId: string,
 ): Promise<Asset> {
   await getOrCreateCurrentUserProfile()
-  const supabase = await createServerSupabaseClient()
-  const existing = await getAssetById(assetId, supabase)
+  const existing = await getAssetById(assetId)
   if (!existing) {
     throw new Error("Asset not found")
   }
@@ -1346,37 +1329,33 @@ export async function rejectAsset(
     throw new Error("Asset is not eligible for rejection")
   }
 
-  const updated = await updateAssetRow(
-    assetId,
-    {
-      status: "revision_requested",
-      approved_at: null,
-      approved_by: null,
-    },
-    supabase,
-  )
+  const updated = await updateAssetRow(assetId, {
+    status: "revision_requested",
+    approved_at: null,
+    approved_by: null,
+  })
 
   // Handle Notifications
   try {
     if (existing.assigned_to) {
-      const assignedDesigner = await getUserById(existing.assigned_to, supabase)
+      const assignedDesigner = await getUserById(existing.assigned_to)
 
       // Do not send if the user rejecting is the assigned designer
       if (assignedDesigner?.email && userId !== assignedDesigner.id) {
         let clientName = "Unknown Client"
         if (existing.client_id) {
-          const client = await getClientById(existing.client_id, supabase)
+          const client = await getClientById(existing.client_id)
           if (client) {
             clientName = client.name
           }
         }
 
-        const requestingUser = await getUserById(userId, supabase)
+        const requestingUser = await getUserById(userId)
 
         // Fetch latest comment to include in the email
         let latestCommentText = null
         try {
-          const comments = await listCommentsByAssetId(assetId, supabase, {
+          const comments = await listCommentsByAssetId(assetId, {
             limit: 1,
           })
           if (comments && comments.length > 0) {
@@ -1442,8 +1421,7 @@ export async function rejectAsset(
 }
 
 export async function removeAsset(assetId: string): Promise<void> {
-  const supabase = await createServerSupabaseClient()
-  const asset = await getAssetById(assetId, supabase)
+  const asset = await getAssetById(assetId)
   if (asset?.drive_file_id) {
     try {
       await deleteFile(asset.drive_file_id)

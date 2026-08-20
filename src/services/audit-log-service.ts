@@ -1,12 +1,12 @@
 import { getCurrentUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import type { Json } from "@/types/database"
 import {
   type AuditLogInput,
   type AuditLogListOptions,
   insertAuditLog,
   listAuditLogs,
 } from "@/repositories/audit-log-repository"
+import type { Json } from "@/types"
 
 export interface AuditLogEntry {
   id: string
@@ -35,7 +35,7 @@ function mapLog(
     entityType: row.entity_type,
     entityId: row.entity_id,
     entityName: row.entity_name,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     metadata: (row.metadata as Record<string, Json>) ?? {},
     ipAddress: row.ip_address,
     userAgent: row.user_agent,

@@ -1,9 +1,10 @@
+import { and, ne, sql } from "drizzle-orm"
+import { db } from "@/db"
+import { notifications, users } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth"
-import { getPool } from "@/lib/db"
 import { emitEvent } from "@/lib/event-bus"
 import { sendDesignerNotification } from "@/lib/notifications/mailgun"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import {
   deleteComment as deleteCommentRow,
   getCommentById,
@@ -19,14 +20,14 @@ import {
   getOrCreateCurrentUserProfile,
   getUsersByIds,
 } from "@/services/users-service"
-import type { Database } from "@/types/database"
-import type { AssetComment, CommentType, RevisionStatus } from "@/types/index"
+import type { CommentType, RevisionStatus } from "@/types"
+import type { AssetComment } from "@/types/index"
 
 export interface CommentInput {
   assetId: string
-  type: Database["public"]["Enums"]["comment_type"]
+  type: CommentType
   message: string
-  revisionStatus?: Database["public"]["Enums"]["revision_status"] | null
+  revisionStatus?: RevisionStatus | null
 }
 
 function mapComment(
@@ -40,11 +41,11 @@ function mapComment(
     id: comment.id,
     assetId: comment.asset_id,
     userId: comment.user_id,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     type: comment.type as CommentType,
     message: comment.message,
     isInternal: comment.type === "internal_note",
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     revisionStatus: comment.revision_status as RevisionStatus | null,
     createdAt: new Date(comment.created_at),
     updatedAt: new Date(comment.updated_at),
@@ -54,9 +55,10 @@ function mapComment(
 function parseMentionedUsernames(message: string): string[] {
   const mentionRegex = /@(\w+)/g
   const usernames: string[] = []
-  let match
-  while ((match = mentionRegex.exec(message)) !== null) {
+  let match: RegExpExecArray | null = mentionRegex.exec(message)
+  while (match !== null) {
     usernames.push(match[1].toLowerCase())
+    match = mentionRegex.exec(message)
   }
   return [...new Set(usernames)]
 }
@@ -69,26 +71,28 @@ async function createMentionNotifications(
 ): Promise<void> {
   if (mentionedUsernames.length === 0) return
 
-  const pool = getPool()
-
   for (const username of mentionedUsernames) {
     try {
-      const { rows: users } = await pool.query(
-        `SELECT id, full_name FROM users WHERE LOWER(REPLACE(full_name, ' ', '')) = $1 AND id != $2`,
-        [username, commenterId],
-      )
-
-      if (users.length > 0) {
-        const targetUser = users[0]
-        await pool.query(
-          `INSERT INTO notifications (id, user_id, type, title, message, related_asset_id, created_at)
-           VALUES (gen_random_uuid()::text, $1, 'comment', 'You were mentioned', $2, $3, NOW())`,
-          [
-            targetUser.id,
-            `You were mentioned in a comment on an asset: "${commentMessage.slice(0, 100)}${commentMessage.length > 100 ? "..." : ""}"`,
-            assetId,
-          ],
+      const userRows = await db
+        .select({ id: users.id, full_name: users.full_name })
+        .from(users)
+        .where(
+          and(
+            sql`LOWER(REPLACE(${users.full_name}, ' ', '')) = ${username}`,
+            ne(users.id, commenterId),
+          ),
         )
+        .limit(1)
+
+      if (userRows.length > 0) {
+        const targetUser = userRows[0]
+        await db.insert(notifications).values({
+          user_id: targetUser.id,
+          type: "comment",
+          title: "You were mentioned",
+          message: `You were mentioned in a comment on an asset: "${commentMessage.slice(0, 100)}${commentMessage.length > 100 ? "..." : ""}"`,
+          related_asset_id: assetId,
+        })
       }
     } catch (err) {
       console.error(
@@ -104,7 +108,7 @@ export async function getCommentsByAssetId(
   options?: { limit?: number; offset?: number },
 ): Promise<AssetComment[]> {
   try {
-    const rows = await listCommentsByAssetId(assetId, undefined, options)
+    const rows = await listCommentsByAssetId(assetId, options)
     return rows
       .map((row) => mapComment(row))
       .filter((comment): comment is AssetComment => Boolean(comment))
@@ -137,24 +141,19 @@ export async function createComment(
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
   await getOrCreateCurrentUserProfile()
 
   if (!input.message.trim()) {
     throw new Error("Message is required")
   }
 
-  const record = await insertComment(
-    {
-      asset_id: input.assetId,
-      user_id: user.id,
-      type: input.type,
-      message: input.message,
-      revision_status: input.revisionStatus ?? null,
-    },
-    supabase,
-  )
+  const record = await insertComment({
+    asset_id: input.assetId,
+    user_id: user.id,
+    type: input.type,
+    message: input.message,
+    revision_status: input.revisionStatus ?? null,
+  })
 
   const mapped = mapComment(record)
   if (!mapped) {
@@ -190,15 +189,15 @@ export async function createComment(
 
   // Handle Notifications
   try {
-    const asset = await getAssetById(input.assetId, supabase)
+    const asset = await getAssetById(input.assetId)
     if (asset?.assigned_to) {
-      const assignedDesigner = await getUserById(asset.assigned_to, supabase)
+      const assignedDesigner = await getUserById(asset.assigned_to)
 
       // Do not send if the user adding the comment is the assigned designer themselves
       if (assignedDesigner?.email && user.id !== assignedDesigner.id) {
         let clientName = "Unknown Client"
         if (asset.client_id) {
-          const client = await getClientById(asset.client_id, supabase)
+          const client = await getClientById(asset.client_id)
           if (client) {
             clientName = client.name
           }
@@ -262,9 +261,7 @@ export async function resolveRevision(
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
-  const existing = await getCommentById(commentId, supabase)
+  const existing = await getCommentById(commentId)
   if (!existing) {
     throw new Error("Comment not found")
   }
@@ -273,13 +270,9 @@ export async function resolveRevision(
     throw new Error("Only revision comments can be resolved")
   }
 
-  const record = await updateCommentRow(
-    commentId,
-    {
-      revision_status: "resolved",
-    },
-    supabase,
-  )
+  const record = await updateCommentRow(commentId, {
+    revision_status: "resolved",
+  })
 
   const mapped = mapComment(record)
   if (!mapped) {

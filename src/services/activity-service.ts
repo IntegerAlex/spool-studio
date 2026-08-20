@@ -1,7 +1,6 @@
 import { getCurrentUser } from "@/lib/auth"
 import { emitEvent } from "@/lib/event-bus"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import {
   insertActivity,
   listActivityByAssetId,
@@ -10,7 +9,7 @@ import {
   getOrCreateCurrentUserProfile,
   getUsersByIds,
 } from "@/services/users-service"
-import type { Json } from "@/types/database"
+import type { Json } from "@/types"
 import type { AssetActivityLog } from "@/types/index"
 
 export interface ActivityInput {
@@ -37,7 +36,7 @@ function toJson(value: unknown): Json {
 
   if (typeof value === "object") {
     return Object.fromEntries(
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
       Object.entries(value as Record<string, Json>).map(
         ([key, nestedValue]) => [key, toJson(nestedValue)],
       ),
@@ -56,7 +55,7 @@ function mapActivity(
     assetId: row.asset_id,
     userId: row.user_id,
     action: row.action,
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
     metadata: (row.metadata as Record<string, Json>) ?? {},
     createdAt: new Date(row.created_at),
   }
@@ -67,7 +66,7 @@ export async function getAssetActivity(
   options?: { limit?: number },
 ): Promise<AssetActivityLog[]> {
   try {
-    const rows = await listActivityByAssetId(assetId, undefined, options)
+    const rows = await listActivityByAssetId(assetId, options)
     return rows.map((row) => mapActivity(row))
   } catch (error) {
     logProductionRuntimeError("activity-loader", error, { assetId })
@@ -83,7 +82,7 @@ export async function getAssetActivityWithUsers(
   users: Awaited<ReturnType<typeof getUsersByIds>>
 }> {
   const activity = await getAssetActivity(assetId, options)
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+  // SAFETY: this cast is safe because the value already conforms to the asserted type.
   const userIds = Array.from(
     new Set(activity.map((entry) => entry.userId).filter(Boolean)),
   ) as string[]
@@ -99,19 +98,14 @@ export async function logAssetActivity(
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
   await getOrCreateCurrentUserProfile()
 
-  const record = await insertActivity(
-    {
-      asset_id: input.assetId,
-      user_id: user.id,
-      action: input.action,
-      metadata: toJson(input.metadata ?? {}),
-    },
-    supabase,
-  )
+  const record = await insertActivity({
+    asset_id: input.assetId,
+    user_id: user.id,
+    action: input.action,
+    metadata: toJson(input.metadata ?? {}),
+  })
 
   const mapped = mapActivity(record)
 

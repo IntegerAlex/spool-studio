@@ -1,6 +1,5 @@
 import { getCurrentUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { createServerSupabaseClient } from "@/lib/supabase/server"
 import {
   getUserById,
   insertUser,
@@ -39,9 +38,7 @@ export async function getOrCreateCurrentUserProfile(): Promise<User> {
     throw new Error("Unauthorized")
   }
 
-  const supabase = await createServerSupabaseClient()
-
-  const existing = await getUserById(authUser.id, supabase)
+  const existing = await getUserById(authUser.id)
   if (existing) {
     const mapped = mapUser(existing)
     if (!mapped) {
@@ -56,15 +53,12 @@ export async function getOrCreateCurrentUserProfile(): Promise<User> {
 
   const fullName = authUser.name ?? authUser.email
 
-  const inserted = await insertUser(
-    {
-      id: authUser.id,
-      email: authUser.email,
-      full_name: fullName,
-      avatar_url: authUser.avatarUrl ?? null,
-    },
-    supabase,
-  )
+  const inserted = await insertUser({
+    id: authUser.id,
+    email: authUser.email,
+    full_name: fullName,
+    avatar_url: authUser.avatarUrl ?? null,
+  })
 
   const mapped = mapUser(inserted)
   if (!mapped) {
