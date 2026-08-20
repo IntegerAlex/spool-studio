@@ -291,7 +291,7 @@ Open <http://localhost:3000>.
   `asset_activity_logs`, `upload_queue`, `portal_tokens`, plus audit logs.
   Types are centralized in `src/types/database.ts`.
 - **Storage** — Media is uploaded through presigned sessions to S3-compatible
-  storage; metadata is stored in PostgreSQL. `s3rver` can emulate S3 locally.
+  storage (e.g. Cloudflare R2); metadata is stored in PostgreSQL.
 - **Calendar** — Events are derived from three sources (contracts → `clients`,
   publishes/approvals → `content_assets`, uploads → `upload_queue`) and merged
   into a single normalized event list rendered across month/week/day views.
