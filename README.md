@@ -90,36 +90,6 @@ No client account is required.
 | Formatting     | Biome                                       |
 | Linting        | Biome, oxlint                               |
 
-## Project Structure
-
-```
-spool-studio/
-├── app/
-│   ├── (auth)/             # Authentication
-│   ├── (portal)/           # Client portal
-│   ├── api/                # API routes and SSE
-│   └── dashboard/          # Authenticated application
-│       ├── calendar/
-│       ├── kanban/
-│       ├── queue/
-│       ├── approvals/
-│       ├── assets/
-│       ├── clients/
-│       ├── notifications/
-│       ├── logs/
-│       └── settings/
-├── src/
-│   ├── components/
-│   ├── lib/
-│   └── types/
-├── scripts/
-├── public/
-├── biome.json
-├── tailwind.config.ts
-├── next.config.*
-└── package.json
-```
-
 ## Getting Started
 
 ### Requirements
@@ -199,24 +169,6 @@ pnpm build
 pnpm start
 ```
 
-## Scripts
-
-| Command                        | Description                          |
-| ------------------------------ | ------------------------------------ |
-| `pnpm dev`                     | Start the development server         |
-| `pnpm build`                   | Create a production build            |
-| `pnpm start`                   | Start the production server          |
-| `pnpm lint`                    | Run Biome checks                     |
-| `pnpm format`                  | Format the codebase                  |
-| `pnpm typecheck`               | Run TypeScript checks                |
-| `pnpm test`                    | Run Vitest                           |
-| `pnpm test:watch`              | Run Vitest in watch mode             |
-| `pnpm test:e2e`                | Run Playwright                       |
-| `pnpm db:migrate`              | Apply database migrations            |
-| `pnpm db:init`                 | Initialize the migration journal     |
-| `npx tsx scripts/seed.ts`      | Seed development data                |
-| `npx tsx scripts/fresh-db.ts`  | Reset the database                   |
-
 ## Testing
 
 Unit and integration tests use Vitest:
@@ -242,20 +194,6 @@ npx oxlint
 pnpm typecheck
 pnpm test
 ```
-
-## Roadmap
-
-- [ ] Recurring contracts
-- [ ] Multi-day events in week/day calendar views
-- [ ] Calendar filters
-- [ ] iCal import/export
-- [ ] Expanded email notifications
-- [ ] CI pipeline
-- [ ] Preview deployments
-- [ ] Self-hosting documentation
-- [ ] Docker support
-
-See the issue tracker for current work and feature requests.
 
 ## Contributing
 
