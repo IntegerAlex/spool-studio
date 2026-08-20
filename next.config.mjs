@@ -10,7 +10,12 @@ const projectRoot = dirname(fileURLToPath(import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // Vercel deploys via its own adapter, which (Next 16.3, Turbopack) skips
+  // emitting next-server.js.nft.json while the standalone finalizer still
+  // reads it — crashing the build with ENOENT. Standalone is unused on Vercel
+  // anyway, so only enable it for non-Vercel (Docker/self-hosted) builds.
+  // See https://github.com/vercel/next.js/issues/96646
+  output: process.env.VERCEL ? undefined : "standalone",
   turbopack: {
     // Next infers the wrong workspace root from a stray lockfile at ~/.
     // Pin it to this project directory so module resolution (tailwindcss,
