@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787158909439,
+      "tag": "0000_same_stepford_cuckoos",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787160162932,
+      "tag": "0001_luxuriant_roughhouse",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787164275925,
+      "tag": "0002_numerous_preak",
+      "breakpoints": true
+    }
+  ]
+}

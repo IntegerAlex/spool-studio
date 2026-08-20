@@ -2,6 +2,10 @@ import { Pool } from "pg"
 
 let pool: Pool | null = null
 
+/**
+ * Returns the app-wide PostgreSQL connection pool, shared by the Drizzle
+ * client (src/db/index.ts) and any remaining raw-query tooling.
+ */
 export function getPool(): Pool {
   if (pool) return pool
 
@@ -33,30 +37,4 @@ export function getPool(): Pool {
   })
 
   return pool
-}
-
-export async function query<T = any>(
-  text: string,
-  params?: any[],
-): Promise<{ rows: T[]; rowCount: number }> {
-  const client = await getPool().connect()
-  try {
-    const result = await client.query(text, params)
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    return { rows: result.rows as T[], rowCount: result.rowCount ?? 0 }
-  } finally {
-    client.release()
-  }
-}
-
-export async function queryOne<T = any>(
-  text: string,
-  params?: any[],
-): Promise<T | null> {
-  const { rows } = await query<T>(text, params)
-  return rows[0] ?? null
-}
-
-export async function queryVoid(text: string, params?: any[]): Promise<void> {
-  await query(text, params)
 }
