@@ -262,10 +262,19 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
     return null
   }
 
+  if (response.status === 401) {
+    if (typeof window !== "undefined" && !requestUrl.includes("/api/auth/")) {
+      window.location.href = "/login"
+    }
+    return null
+  }
+
   if (!response.ok) {
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const payload = (await response.json()) as ApiEnvelope<T>
-    throw new Error(payload.error ?? "Request failed")
+    const err = new Error(payload.error ?? "Request failed") as Error & { status?: number }
+    err.status = response.status
+    throw err
   }
 
 // SAFETY: this cast is safe because the value already conforms to the asserted type.

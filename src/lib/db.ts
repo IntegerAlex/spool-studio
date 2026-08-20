@@ -13,17 +13,15 @@ export function getPool(): Pool {
     throw new Error("DATABASE_URL environment variable is required")
   }
 
-  const urlHasSslMode = process.env.DATABASE_URL.includes("sslmode=")
-  const isVerifyFull = process.env.DATABASE_URL.includes("sslmode=verify-full")
-  // Strip sslmode from URL to silence pg-connection-string warning (we handle ssl via `ssl` option)
-  const sanitizedUrl = urlHasSslMode
-    ? process.env.DATABASE_URL.replace(/[?&]sslmode=[^&]+/, "").replace(/[?&]uselibpqcompat=[^&]+/, "")
-    : process.env.DATABASE_URL
   pool = new Pool({
-    connectionString: sanitizedUrl,
-    ssl: urlHasSslMode ? { rejectUnauthorized: isVerifyFull } : false,
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL?.includes("sslmode=require")
+      ? { rejectUnauthorized: false }
+      : process.env.DATABASE_URL?.includes("sslmode=verify-full")
+        ? { rejectUnauthorized: true }
+        : false,
     max: parseInt(
-      process.env.DB_POOL_MAX ?? (process.env.VERCEL ? "10" : "10"),
+      process.env.DB_POOL_MAX ?? (process.env.VERCEL ? "1" : "5"),
       10,
     ),
     idleTimeoutMillis: parseInt(
