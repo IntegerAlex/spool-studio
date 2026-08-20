@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next dev --turbopack",
-    "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
+    "build": "NODE_ENV=production node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
     "start": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next start",
     "lint": "biome check .",
     "format": "biome format --write .",
@@ -86,6 +86,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
+    "@next/env": "16.3.1",
     "@oxlint/plugins": "1.79.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
