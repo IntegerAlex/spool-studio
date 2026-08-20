@@ -16,6 +16,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
@@ -159,17 +160,21 @@ export function SidebarLayout({ user = null }: SidebarLayoutProps) {
 
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <Link
-                      href={item.href}
-                      className={`flex items-center gap-3 rounded-md px-3 py-2 text-[13px] transition-colors hover:bg-[var(--color-bg-hover)] ${
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.label}
+                      className={
                         isActive
-                          ? "bg-[var(--color-bg-active)] font-semibold text-[var(--color-text-primary)]"
-                          : "text-[var(--color-text-muted)]"
-                      }`}
+                          ? "bg-[var(--color-bg-active)] font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-bg-active)] data-[active=true]:bg-[var(--color-bg-active)]"
+                          : "text-[var(--color-text-muted)] hover:bg-[var(--color-bg-hover)] hover:text-[var(--color-text-primary)]"
+                      }
                     >
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-[var(--color-text-primary)]" : "opacity-70"}`} />
-                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </Link>
+                      <Link href={item.href}>
+                        <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-[var(--color-text-primary)]" : "opacity-70"}`} />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
               })}
@@ -178,11 +183,11 @@ export function SidebarLayout({ user = null }: SidebarLayoutProps) {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-[rgba(255,255,255,0.06)] px-3 py-2">
+      <SidebarFooter className="border-t border-[rgba(255,255,255,0.06)] px-3 py-2 group-data-[collapsible=icon]:px-0">
         <SidebarMenu>
           <SidebarMenuItem>
-            <div className="flex items-center gap-3 px-2 py-1">
-              <Avatar className="h-9 w-9 shrink-0 border border-[rgba(255,255,255,0.08)]">
+            <div className="flex items-center gap-3 px-2 py-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+              <Avatar className="h-9 w-9 shrink-0 border border-[rgba(255,255,255,0.08)] group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
                 <AvatarImage src={user?.avatarUrl ?? undefined} alt={displayName} />
                 <AvatarFallback className="bg-[var(--color-bg-overlay)] text-[12px] font-semibold text-[var(--color-text-secondary)]">
                   {initials}
