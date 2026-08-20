@@ -120,6 +120,7 @@ export async function logAssetActivity(
   try {
     emitEvent({
       type: "asset.activity",
+      userId: resolvedUserId,
       payload: {
         id: mapped.id,
         assetId: input.assetId,

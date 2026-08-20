@@ -2,6 +2,7 @@ export type EventPayload = {
   type: string
   payload?: unknown
   timestamp?: string
+  userId?: string
 }
 
 const listeners = new Set<(e: EventPayload) => void>()

@@ -234,6 +234,7 @@ async function transitionAssetStatus(
 
   emitEvent({
     type: "asset:status-changed",
+    userId: currentAsset.created_by ?? undefined,
     payload: { assetId, previousStatus: currentAsset.status, nextStatus },
   })
 }
@@ -1235,6 +1236,7 @@ export async function updateAsset(
 
     emitEvent({
       type: "asset:status-changed",
+      userId: user?.id,
       payload: {
         assetId,
         previousStatus: existing.status,
@@ -1343,6 +1345,7 @@ export async function approveAsset(
 
   emitEvent({
     type: "asset:status-changed",
+    userId,
     payload: {
       assetId,
       previousStatus: existing.status,
@@ -1456,6 +1459,7 @@ export async function rejectAsset(
 
   emitEvent({
     type: "asset:status-changed",
+    userId,
     payload: {
       assetId,
       previousStatus: existing.status,
