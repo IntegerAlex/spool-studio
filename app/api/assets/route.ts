@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     const response = NextResponse.json({ data: assets })
     response.headers.set(
       "Cache-Control",
-      "public, max-age=30, stale-while-revalidate=60",
+      "private, max-age=10, stale-while-revalidate=30",
     )
     return response
   } catch (error) {

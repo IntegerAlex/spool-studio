@@ -15,7 +15,7 @@ export async function GET() {
 
     const rows = await listUploadQueueForUser(user.id)
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       data: rows.map((r) => ({
         id: r.id,
         assetId: r.asset_id,
@@ -28,6 +28,8 @@ export async function GET() {
         createdAt: r.created_at,
       })),
     })
+    res.headers.set("Cache-Control", "private, max-age=10, stale-while-revalidate=30")
+    return res
   } catch (error) {
     logProductionRuntimeError("api-queue-get", error)
     return NextResponse.json(
