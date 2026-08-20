@@ -1,122 +1,66 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/types/database"
+import { desc, eq } from "drizzle-orm"
+import { db, type FlexibleInsert } from "@/db"
+import { clients } from "@/db/schema"
 
-export type DbClient = Database["public"]["Tables"]["clients"]["Row"]
+export type DbClient = typeof clients.$inferSelect
 
-const clientSelect =
-  "id,name,slug,instagram_handle,brand_color,monthly_reels_target,monthly_posts_target,monthly_goal,weekly_goal,weekly_poster_goal,weekly_reel_goal,created_by,created_at,updated_at,contract_start_date,contract_end_date"
-const clientOptionSelect = "id,name"
-
-async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient())
+export async function listClients(): Promise<DbClient[]> {
+  const rows = await db.select().from(clients).orderBy(desc(clients.created_at))
+  return rows
 }
 
-export async function listClients(client?: any): Promise<DbClient[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("clients")
-    .select(clientSelect)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+export async function listClientOptions(): Promise<
+  Pick<DbClient, "id" | "name">[]
+> {
+  const rows = await db
+    .select({ id: clients.id, name: clients.name })
+    .from(clients)
+    .orderBy(clients.name)
+  return rows
 }
 
-export async function listClientOptions(
-  client?: any,
-): Promise<Pick<DbClient, "id" | "name">[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("clients")
-    .select(clientOptionSelect)
-    .order("name", { ascending: true })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
-}
-
-export async function countClients(client?: any): Promise<number> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("clients")
-    .select("id", { count: "exact" })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data?.length ?? 0
+export async function countClients(): Promise<number> {
+  const rows = await db.select({ id: clients.id }).from(clients)
+  return rows.length
 }
 
 export async function getClientById(
   clientId: string,
-  client?: any,
 ): Promise<DbClient | null> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("clients")
-    .select(clientSelect)
-    .eq("id", clientId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? null
+  const rows = await db
+    .select()
+    .from(clients)
+    .where(eq(clients.id, clientId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function insertClient(
-  payload: Database["public"]["Tables"]["clients"]["Insert"],
-  client?: any,
+  payload: FlexibleInsert<typeof clients.$inferInsert>,
 ): Promise<DbClient> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("clients")
-    .insert(payload)
-    .select(clientSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
+  const insertValues = payload as typeof clients.$inferInsert
+  const rows = await db
+    .insert(clients)
+    .values(insertValues)
+    .returning()
+  return rows[0]
 }
 
 export async function updateClient(
   clientId: string,
-  updates: Database["public"]["Tables"]["clients"]["Update"],
-  client?: any,
+  updates: Partial<FlexibleInsert<typeof clients.$inferInsert>>,
 ): Promise<DbClient> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("clients")
-    .update(updates)
-    .eq("id", clientId)
-    .select(clientSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates valid for DB update.
+  const setValues = updates as Partial<typeof clients.$inferInsert>
+  const rows = await db
+    .update(clients)
+    .set(setValues)
+    .where(eq(clients.id, clientId))
+    .returning()
+  return rows[0]
 }
 
-export async function deleteClient(
-  clientId: string,
-  client?: any,
-): Promise<void> {
-  const supabase = await getClient(client)
-  const { error } = await supabase.from("clients").delete().eq("id", clientId)
-  if (error) {
-    throw new Error(error.message)
-  }
+export async function deleteClient(clientId: string): Promise<void> {
+  await db.delete(clients).where(eq(clients.id, clientId))
 }

@@ -1,11 +1,8 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/types/database"
+import { and, eq } from "drizzle-orm"
+import { db } from "@/db"
+import { contentAssets } from "@/db/schema"
 
-export type DbAsset = Database["public"]["Tables"]["content_assets"]["Row"]
-
-async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient())
-}
+export type DbAsset = typeof contentAssets.$inferSelect
 
 /**
  * Lists published assets for a given client within a date range.
@@ -18,29 +15,23 @@ export async function listClientAssetsForReport(
   clientId: string,
   startDate: Date,
   endDate: Date,
-  client?: any,
 ): Promise<DbAsset[]> {
-  const supabase = await getClient(client)
+  const assets = await db
+    .select()
+    .from(contentAssets)
+    .where(
+      and(
+        eq(contentAssets.client_id, clientId),
+        eq(contentAssets.status, "published"),
+      ),
+    )
 
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select("*")
-    .eq("client_id", clientId)
-    .eq("status", "published")
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  const assets = data ?? []
-
-  return assets.filter((asset: any) => {
+  return assets.filter((asset) => {
     let resolvedDate: Date
 
     if (asset.published_at) {
       resolvedDate = new Date(asset.published_at)
     } else if (asset.publish_date) {
-      // If publish_time exists, combine them to prevent timezone shift issues, otherwise use date
       const timePart = asset.publish_time ?? "00:00:00"
       resolvedDate = new Date(`${asset.publish_date}T${timePart}`)
     } else {

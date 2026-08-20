@@ -1,108 +1,65 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/types/database"
+import { asc, eq } from "drizzle-orm"
+import { db, type FlexibleInsert } from "@/db"
+import { assetComments } from "@/db/schema"
 
-export type DbAssetComment =
-  Database["public"]["Tables"]["asset_comments"]["Row"]
-
-const commentSelect =
-  "id,asset_id,user_id,type,message,revision_status,created_at,updated_at"
-
-async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient())
-}
+export type DbAssetComment = typeof assetComments.$inferSelect
 
 export async function listCommentsByAssetId(
   assetId: string,
-  client?: any,
   options?: { limit?: number; offset?: number },
 ): Promise<DbAssetComment[]> {
-  const supabase = await getClient(client)
-  let query = supabase
-    .from("asset_comments")
-    .select(commentSelect)
-    .eq("asset_id", assetId)
-    .order("created_at", { ascending: true })
+  const query = db
+    .select()
+    .from(assetComments)
+    .where(eq(assetComments.asset_id, assetId))
+    .orderBy(asc(assetComments.created_at))
 
-  if (options?.limit !== undefined) {
-    const offset = options.offset ?? 0
-    query = query.range(offset, offset + Math.max(options.limit, 1) - 1)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+  const limit = options?.limit
+  const offset = options?.offset
+  const result =
+    limit !== undefined
+      ? await query.limit(Math.max(limit, 1)).offset(Math.max(offset ?? 0, 0))
+      : await query
+  return result
 }
 
 export async function getCommentById(
   commentId: string,
-  client?: any,
 ): Promise<DbAssetComment | null> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("asset_comments")
-    .select(commentSelect)
-    .eq("id", commentId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? null
+  const rows = await db
+    .select()
+    .from(assetComments)
+    .where(eq(assetComments.id, commentId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function insertComment(
-  payload: Database["public"]["Tables"]["asset_comments"]["Insert"],
-  client?: any,
+  payload: FlexibleInsert<typeof assetComments.$inferInsert>,
 ): Promise<DbAssetComment> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("asset_comments")
-    .insert(payload)
-    .select(commentSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
+  const insertValues = payload as typeof assetComments.$inferInsert
+  const rows = await db
+    .insert(assetComments)
+    .values(insertValues)
+    .returning()
+  return rows[0]
 }
 
 export async function updateComment(
   commentId: string,
-  updates: Database["public"]["Tables"]["asset_comments"]["Update"],
-  client?: any,
+  updates: Partial<FlexibleInsert<typeof assetComments.$inferInsert>>,
 ): Promise<DbAssetComment> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("asset_comments")
-    .update(updates)
-    .eq("id", commentId)
-    .select(commentSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates valid for DB update.
+  const setValues = updates as Partial<typeof assetComments.$inferInsert>
+  const rows = await db
+    .update(assetComments)
+    .set(setValues)
+    .where(eq(assetComments.id, commentId))
+    .returning()
+  return rows[0]
 }
 
-export async function deleteComment(
-  commentId: string,
-  client?: any,
-): Promise<void> {
-  const supabase = await getClient(client)
-  const { error } = await supabase
-    .from("asset_comments")
-    .delete()
-    .eq("id", commentId)
-  if (error) {
-    throw new Error(error.message)
-  }
+export async function deleteComment(commentId: string): Promise<void> {
+  await db.delete(assetComments).where(eq(assetComments.id, commentId))
 }

@@ -1,20 +1,8 @@
-import { query, queryOne } from "@/lib/db"
+import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm"
+import { db } from "@/db"
+import { auditLogs } from "@/db/schema"
 
-export interface DbAuditLog {
-  id: string
-  user_id: string | null
-  user_email: string | null
-  user_name: string | null
-  action: string
-  entity_type: string
-  entity_id: string | null
-  entity_name: string | null
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type  // dynamic JSONB metadata column
-  metadata: Record<string, unknown>
-  ip_address: string | null
-  user_agent: string | null
-  created_at: string
-}
+export type DbAuditLog = typeof auditLogs.$inferSelect
 
 export interface AuditLogInput {
   userId?: string | null
@@ -44,82 +32,95 @@ export interface AuditLogListOptions {
 export async function insertAuditLog(
   input: AuditLogInput,
 ): Promise<DbAuditLog> {
-  const row = await queryOne<DbAuditLog>(
-    `INSERT INTO audit_logs (user_id, user_email, user_name, action, entity_type, entity_id, entity_name, metadata, ip_address, user_agent)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     RETURNING *`,
-    [
-      input.userId ?? null,
-      input.userEmail ?? null,
-      input.userName ?? null,
-      input.action,
-      input.entityType,
-      input.entityId ?? null,
-      input.entityName ?? null,
-      JSON.stringify(input.metadata ?? {}),
-      input.ipAddress ?? null,
-      input.userAgent ?? null,
-    ],
-  )
+  // SAFETY: JSONB metadata column accepts arbitrary records; runtime validates shape.
+  const metadata = (input.metadata ?? {}) as never
+  const rows = await db
+    .insert(auditLogs)
+    .values({
+      user_id: input.userId ?? null,
+      user_email: input.userEmail ?? null,
+      user_name: input.userName ?? null,
+      action: input.action,
+      entity_type: input.entityType,
+      entity_id: input.entityId ?? null,
+      entity_name: input.entityName ?? null,
+      metadata,
+      ip_address: input.ipAddress ?? null,
+      user_agent: input.userAgent ?? null,
+    })
+    .returning()
+
+  const row = rows[0]
   if (!row) throw new Error("Failed to insert audit log")
   return row
+}
+
+function buildWhere(options: AuditLogListOptions) {
+  const conditions = []
+
+  if (options.action) {
+    conditions.push(eq(auditLogs.action, options.action))
+  }
+  if (options.entityType) {
+    conditions.push(eq(auditLogs.entity_type, options.entityType))
+  }
+  if (options.userId) {
+    conditions.push(eq(auditLogs.user_id, options.userId))
+  }
+  if (options.search) {
+    conditions.push(
+      or(
+        ilike(auditLogs.entity_name, `%${options.search}%`),
+        ilike(auditLogs.user_email, `%${options.search}%`),
+        ilike(auditLogs.user_name, `%${options.search}%`),
+        ilike(auditLogs.action, `%${options.search}%`),
+      ),
+    )
+  }
+  if (options.startDate) {
+    conditions.push(
+      gte(auditLogs.created_at, sql`${options.startDate}::timestamptz`),
+    )
+  }
+  if (options.endDate) {
+    conditions.push(
+      lte(auditLogs.created_at, sql`${options.endDate}::timestamptz`),
+    )
+  }
+
+  return conditions.length > 0 ? and(...conditions) : undefined
 }
 
 export async function listAuditLogs(
   options: AuditLogListOptions = {},
 ): Promise<{ data: DbAuditLog[]; total: number }> {
-  const conditions: string[] = []
-  const params: unknown[] = []
-  let paramIndex = 1
+  const where = buildWhere(options)
 
-  if (options.action) {
-    conditions.push(`action = $${paramIndex++}`)
-    params.push(options.action)
-  }
-  if (options.entityType) {
-    conditions.push(`entity_type = $${paramIndex++}`)
-    params.push(options.entityType)
-  }
-  if (options.userId) {
-    conditions.push(`user_id = $${paramIndex++}`)
-    params.push(options.userId)
-  }
-  if (options.search) {
-    conditions.push(
-      `(entity_name ILIKE $${paramIndex} OR user_email ILIKE $${paramIndex} OR user_name ILIKE $${paramIndex} OR action ILIKE $${paramIndex})`,
-    )
-    params.push(`%${options.search}%`)
-    paramIndex++
-  }
-  if (options.startDate) {
-    conditions.push(`created_at >= $${paramIndex++}`)
-    params.push(options.startDate)
-  }
-  if (options.endDate) {
-    conditions.push(`created_at <= $${paramIndex++}`)
-    params.push(options.endDate)
-  }
-
-  const whereClause =
-    conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""
-
-  const countRow = await queryOne<{ count: string }>(
-    `SELECT COUNT(*) as count FROM audit_logs ${whereClause}`,
-    params,
-  )
-  const total = parseInt(countRow?.count ?? "0", 10)
+  const countRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(auditLogs)
+    .where(where)
+  const total = countRows[0]?.count ?? 0
 
   const limit = Math.min(options.limit ?? 50, 200)
   const offset = options.offset ?? 0
 
-  const { rows: data } = await query<DbAuditLog>(
-    `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`,
-    [...params, limit, offset],
-  )
+  const rows = await db
+    .select()
+    .from(auditLogs)
+    .where(where)
+    .orderBy(desc(auditLogs.created_at))
+    .limit(limit)
+    .offset(offset)
 
-  return { data, total }
+  return { data: rows, total }
 }
 
 export async function getAuditLogById(id: string): Promise<DbAuditLog | null> {
-  return queryOne<DbAuditLog>("SELECT * FROM audit_logs WHERE id = $1", [id])
+  const rows = await db
+    .select()
+    .from(auditLogs)
+    .where(eq(auditLogs.id, id))
+    .limit(1)
+  return rows[0] ?? null
 }

@@ -1,98 +1,59 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/types/database"
+import { desc, eq } from "drizzle-orm"
+import { db, type FlexibleInsert } from "@/db"
+import { clientReferences } from "@/db/schema"
 
-export type DbClientReference =
-  Database["public"]["Tables"]["client_references"]["Row"]
-
-async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient())
-}
+export type DbClientReference = typeof clientReferences.$inferSelect
 
 export async function listClientReferencesByClientId(
   clientId: string,
-  client?: any,
 ): Promise<DbClientReference[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("client_references")
-    .select("id,client_id,title,url,description,type,created_at,updated_at")
-    .eq("client_id", clientId)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+  const rows = await db
+    .select()
+    .from(clientReferences)
+    .where(eq(clientReferences.client_id, clientId))
+    .orderBy(desc(clientReferences.created_at))
+  return rows
 }
 
 export async function getClientReferenceById(
   referenceId: string,
-  client?: any,
 ): Promise<DbClientReference | null> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("client_references")
-    .select("id,client_id,title,url,description,type,created_at,updated_at")
-    .eq("id", referenceId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? null
+  const rows = await db
+    .select()
+    .from(clientReferences)
+    .where(eq(clientReferences.id, referenceId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function insertClientReference(
-  payload: Database["public"]["Tables"]["client_references"]["Insert"],
-  client?: any,
+  payload: FlexibleInsert<typeof clientReferences.$inferInsert>,
 ): Promise<DbClientReference> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("client_references")
-    .insert(payload)
-    .select("id,client_id,title,url,description,type,created_at,updated_at")
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
+  const insertValues = payload as typeof clientReferences.$inferInsert
+  const rows = await db
+    .insert(clientReferences)
+    .values(insertValues)
+    .returning()
+  return rows[0]
 }
 
 export async function updateClientReference(
   referenceId: string,
-  updates: Database["public"]["Tables"]["client_references"]["Update"],
-  client?: any,
+  updates: Partial<FlexibleInsert<typeof clientReferences.$inferInsert>>,
 ): Promise<DbClientReference> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("client_references")
-    .update(updates)
-    .eq("id", referenceId)
-    .select("id,client_id,title,url,description,type,created_at,updated_at")
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates valid for DB update.
+  const setValues = updates as Partial<typeof clientReferences.$inferInsert>
+  const rows = await db
+    .update(clientReferences)
+    .set(setValues)
+    .where(eq(clientReferences.id, referenceId))
+    .returning()
+  return rows[0]
 }
 
 export async function deleteClientReference(
   referenceId: string,
-  client?: any,
 ): Promise<void> {
-  const supabase = await getClient(client)
-  const { error } = await supabase
-    .from("client_references")
-    .delete()
-    .eq("id", referenceId)
-
-  if (error) {
-    throw new Error(error.message)
-  }
+  await db.delete(clientReferences).where(eq(clientReferences.id, referenceId))
 }

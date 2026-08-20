@@ -1,41 +1,30 @@
-import { getPool } from "@/lib/db"
+import { desc, eq, isNull, or } from "drizzle-orm"
+import { db } from "@/db"
+import { notifications } from "@/db/schema"
 import { emitEvent } from "@/lib/event-bus"
 
-export interface NotificationRow {
-  id: string
-  user_id: string | null
-  type: string
-  title: string
-  message: string
-  related_asset_id: string | null
-  read: boolean
-  created_at: string
-}
+export type NotificationRow = typeof notifications.$inferSelect
 
 export async function listNotifications(
   userId: string,
 ): Promise<NotificationRow[]> {
-  const pool = getPool()
-  const { rows } = await pool.query(
-    `SELECT id, user_id, type, title, message, related_asset_id, read, created_at
-     FROM notifications
-     WHERE user_id = $1 OR user_id IS NULL
-     ORDER BY created_at DESC
-     LIMIT 50`,
-    [userId],
-  )
+  const rows = await db
+    .select()
+    .from(notifications)
+    .where(or(eq(notifications.user_id, userId), isNull(notifications.user_id)))
+    .orderBy(desc(notifications.created_at))
+    .limit(50)
   return rows
 }
 
 export async function getNotificationById(
   notificationId: string,
 ): Promise<NotificationRow | null> {
-  const pool = getPool()
-  const { rows } = await pool.query(
-    `SELECT id, user_id, type, title, message, related_asset_id, read, created_at
-     FROM notifications WHERE id = $1`,
-    [notificationId],
-  )
+  const rows = await db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.id, notificationId))
+    .limit(1)
   return rows[0] ?? null
 }
 
@@ -46,21 +35,16 @@ export async function createNotification(input: {
   message: string
   relatedAssetId?: string | null
 }): Promise<NotificationRow> {
-  const pool = getPool()
-  const id = crypto.randomUUID()
-  const { rows } = await pool.query(
-    `INSERT INTO notifications (id, user_id, type, title, message, related_asset_id, read, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, false, NOW())
-     RETURNING id, user_id, type, title, message, related_asset_id, read, created_at`,
-    [
-      id,
-      input.userId,
-      input.type,
-      input.title,
-      input.message,
-      input.relatedAssetId ?? null,
-    ],
-  )
+  const rows = await db
+    .insert(notifications)
+    .values({
+      user_id: input.userId,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      related_asset_id: input.relatedAssetId ?? null,
+    })
+    .returning()
 
   const notification = rows[0]
 
@@ -82,25 +66,23 @@ export async function createNotification(input: {
 export async function markNotificationAsRead(
   notificationId: string,
 ): Promise<void> {
-  const pool = getPool()
-  await pool.query("UPDATE notifications SET read = true WHERE id = $1", [
-    notificationId,
-  ])
+  await db
+    .update(notifications)
+    .set({ read: true })
+    .where(eq(notifications.id, notificationId))
 }
 
 export async function markAllNotificationsAsRead(
   userId: string,
 ): Promise<void> {
-  const pool = getPool()
-  await pool.query(
-    "UPDATE notifications SET read = true WHERE user_id = $1 OR user_id IS NULL",
-    [userId],
-  )
+  await db
+    .update(notifications)
+    .set({ read: true })
+    .where(or(eq(notifications.user_id, userId), isNull(notifications.user_id)))
 }
 
 export async function deleteNotification(
   notificationId: string,
 ): Promise<void> {
-  const pool = getPool()
-  await pool.query("DELETE FROM notifications WHERE id = $1", [notificationId])
+  await db.delete(notifications).where(eq(notifications.id, notificationId))
 }

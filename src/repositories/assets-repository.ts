@@ -1,8 +1,9 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/types/database"
+import { desc, eq, inArray, sql } from "drizzle-orm"
+import { db, type FlexibleInsert } from "@/db"
+import { assetRevisions, contentAssets } from "@/db/schema"
 import type { AssetStatus } from "@/types/index"
 
-export type DbAsset = Database["public"]["Tables"]["content_assets"]["Row"]
+export type DbAsset = typeof contentAssets.$inferSelect
 export type DbAssetSummary = Pick<
   DbAsset,
   | "client_id"
@@ -39,100 +40,81 @@ export type DbKanbanAsset = Pick<
   | "updated_at"
 >
 
-const assetSelect =
-  "id,client_id,title,type,status,mime_type,file_size,file_extension,uploaded_at,uploaded_by,drive_file_id,drive_file_url,thumbnail_url,media_width,media_height,duration_seconds,created_by,created_at,updated_at,scheduled_at,publish_date,publish_time,scheduled_by,published_at,approved_at,approved_by,assigned_to,current_revision_id,latest_revision_id,revision_count"
-
-const dashboardSummarySelect =
-  "status,publish_date,publish_time,published_at,type,client_id,created_at"
-const kanbanAssetSelect =
-  "id,client_id,title,type,status,mime_type,file_extension,thumbnail_url,assigned_to,publish_date,created_at,updated_at"
-
-async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient())
-}
-
-export async function listAssets(client?: any): Promise<DbAsset[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(assetSelect)
-    .order("updated_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+export async function listAssets(): Promise<DbAsset[]> {
+  const rows = await db
+    .select()
+    .from(contentAssets)
+    .orderBy(desc(contentAssets.updated_at))
+  return rows
 }
 
 export async function listAssetsByStatuses(
   statuses: readonly AssetStatus[],
-  client?: any,
 ): Promise<DbAsset[]> {
-  const supabase = await getClient(client)
-  // SAFETY: statuses is already a readonly AssetStatus[]; the .in() builder widens to unknown[].
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(assetSelect)
-    .in("status", statuses as AssetStatus[])
-    .order("updated_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+  const rows = await db
+    .select()
+    .from(contentAssets)
+    .where(inArray(contentAssets.status, [...statuses]))
+    .orderBy(desc(contentAssets.updated_at))
+  return rows
 }
 
-export async function listAssetSummaries(
-  client?: any,
-): Promise<DbAssetSummary[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(
-      "client_id,status,assigned_to,scheduled_at,publish_date,publish_time,published_at,approved_at,uploaded_at,created_at,type",
-    )
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+export async function listAssetSummaries(): Promise<DbAssetSummary[]> {
+  const rows = await db
+    .select({
+      client_id: contentAssets.client_id,
+      status: contentAssets.status,
+      assigned_to: contentAssets.assigned_to,
+      scheduled_at: contentAssets.scheduled_at,
+      publish_date: contentAssets.publish_date,
+      publish_time: contentAssets.publish_time,
+      published_at: contentAssets.published_at,
+      approved_at: contentAssets.approved_at,
+      uploaded_at: contentAssets.uploaded_at,
+      created_at: contentAssets.created_at,
+      type: contentAssets.type,
+    })
+    .from(contentAssets)
+  return rows
 }
 
-export async function listDashboardAssetSummaries(
-  client?: any,
-): Promise<DbDashboardAssetSummary[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(dashboardSummarySelect)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+export async function listDashboardAssetSummaries(): Promise<
+  DbDashboardAssetSummary[]
+> {
+  const rows = await db
+    .select({
+      status: contentAssets.status,
+      publish_date: contentAssets.publish_date,
+      publish_time: contentAssets.publish_time,
+      published_at: contentAssets.published_at,
+    })
+    .from(contentAssets)
+  return rows
 }
 
-export async function listKanbanAssets(client?: any): Promise<DbKanbanAsset[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(kanbanAssetSelect)
-    .order("updated_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+export async function listKanbanAssets(): Promise<DbKanbanAsset[]> {
+  const rows = await db
+    .select({
+      id: contentAssets.id,
+      client_id: contentAssets.client_id,
+      title: contentAssets.title,
+      type: contentAssets.type,
+      status: contentAssets.status,
+      mime_type: contentAssets.mime_type,
+      file_extension: contentAssets.file_extension,
+      thumbnail_url: contentAssets.thumbnail_url,
+      assigned_to: contentAssets.assigned_to,
+      publish_date: contentAssets.publish_date,
+      created_at: contentAssets.created_at,
+      updated_at: contentAssets.updated_at,
+    })
+    .from(contentAssets)
+    .orderBy(desc(contentAssets.updated_at))
+  return rows
 }
 
 export async function listAssetsByIds(
   ids: string[],
-  client?: any,
 ): Promise<
   Pick<
     DbAsset,
@@ -147,150 +129,97 @@ export async function listAssetsByIds(
   >[]
 > {
   if (!ids || ids.length === 0) return []
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(
-      "id,title,type,status,publish_date,publish_time,published_at,thumbnail_url",
-    )
-    .in("id", ids)
-    .order("updated_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+  const rows = await db
+    .select({
+      id: contentAssets.id,
+      title: contentAssets.title,
+      type: contentAssets.type,
+      status: contentAssets.status,
+      publish_date: contentAssets.publish_date,
+      publish_time: contentAssets.publish_time,
+      published_at: contentAssets.published_at,
+      thumbnail_url: contentAssets.thumbnail_url,
+    })
+    .from(contentAssets)
+    .where(inArray(contentAssets.id, ids))
+    .orderBy(desc(contentAssets.updated_at))
+  return rows
 }
 
 export async function getWeeklyCountsGroupedByClient(
   weekStartIso: string,
-  client?: any,
 ): Promise<{ client_id: string; weekly_count: number }[]> {
-  const supabase = await getClient(client)
-  // Call Postgres function created by migration: clients_weekly_counts(week_start timestamptz)
-  const { data, error } = await supabase.rpc("clients_weekly_counts", {
-    week_start: weekStartIso,
-  })
-  if (error) {
-    throw new Error(error.message)
-  }
-
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-  return (data as any) ?? []
+  const rows = await db
+    .select({
+      client_id: sql<string>`client_id`,
+      weekly_count: sql<number>`weekly_count`,
+    })
+    .from(sql`clients_weekly_counts(${weekStartIso}::timestamptz)`)
+  return rows
 }
 
 export async function listAssetsByClientId(
   clientId: string,
-  client?: any,
 ): Promise<DbAsset[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(assetSelect)
-    .eq("client_id", clientId)
-    .order("updated_at", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+  const rows = await db
+    .select()
+    .from(contentAssets)
+    .where(eq(contentAssets.client_id, clientId))
+    .orderBy(desc(contentAssets.updated_at))
+  return rows
 }
 
-export async function getAssetById(
-  assetId: string,
-  client?: any,
-): Promise<DbAsset | null> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .select(assetSelect)
-    .eq("id", assetId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? null
+export async function getAssetById(assetId: string): Promise<DbAsset | null> {
+  const rows = await db
+    .select()
+    .from(contentAssets)
+    .where(eq(contentAssets.id, assetId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function insertAsset(
-  payload: Database["public"]["Tables"]["content_assets"]["Insert"],
-  client?: any,
+  payload: FlexibleInsert<typeof contentAssets.$inferInsert>,
 ): Promise<DbAsset> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .insert(payload)
-    .select(assetSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
+  const insertValues = payload as typeof contentAssets.$inferInsert
+  const rows = await db
+    .insert(contentAssets)
+    .values(insertValues)
+    .returning()
+  return rows[0]
 }
 
 export async function updateAsset(
   assetId: string,
-  updates: Database["public"]["Tables"]["content_assets"]["Update"],
-  client?: any,
+  updates: Partial<FlexibleInsert<typeof contentAssets.$inferInsert>>,
 ): Promise<DbAsset> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("content_assets")
-    .update(updates)
-    .eq("id", assetId)
-    .select(assetSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates are valid for DB update.
+  const setValues = updates as Partial<typeof contentAssets.$inferInsert>
+  const rows = await db
+    .update(contentAssets)
+    .set(setValues)
+    .where(eq(contentAssets.id, assetId))
+    .returning()
+  return rows[0]
 }
 
-export async function deleteAsset(
-  assetId: string,
-  client?: any,
-): Promise<void> {
-  const supabase = await getClient(client)
-
-  // Set current_revision_id and latest_revision_id to null first to avoid circular reference key violations
-  await supabase
-    .from("content_assets")
-    .update({ current_revision_id: null, latest_revision_id: null })
-    .eq("id", assetId)
-
-  const { error } = await supabase
-    .from("content_assets")
-    .delete()
-    .eq("id", assetId)
-  if (error) {
-    throw new Error(error.message)
-  }
+export async function deleteAsset(assetId: string): Promise<void> {
+  // Clear revision pointers first to avoid circular reference key violations
+  await db
+    .update(contentAssets)
+    .set({ current_revision_id: null, latest_revision_id: null })
+    .where(eq(contentAssets.id, assetId))
+  await db.delete(contentAssets).where(eq(contentAssets.id, assetId))
 }
 
 export async function listRevisionsByAssetId(
   assetId: string,
-  client?: any,
-): Promise<Database["public"]["Tables"]["asset_revisions"]["Row"][]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("asset_revisions")
-    .select(
-      "id,asset_id,version_number,uploaded_by,uploaded_at,drive_file_id,drive_file_url,file_size,mime_type,media_width,media_height,duration_seconds,change_note,metadata,created_at",
-    )
-    .eq("asset_id", assetId)
-    .order("version_number", { ascending: false })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+): Promise<(typeof assetRevisions.$inferSelect)[]> {
+  const rows = await db
+    .select()
+    .from(assetRevisions)
+    .where(eq(assetRevisions.asset_id, assetId))
+    .orderBy(desc(assetRevisions.version_number))
+  return rows
 }

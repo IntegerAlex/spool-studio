@@ -1,81 +1,40 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server"
-import type { Database } from "@/types/database"
+import { asc, eq, inArray } from "drizzle-orm"
+import { db, type FlexibleInsert } from "@/db"
+import { users } from "@/db/schema"
 
-export type DbUser = Database["public"]["Tables"]["users"]["Row"]
+export type DbUser = typeof users.$inferSelect
 
-const userSelect = "id,email,full_name,role,avatar_url,created_at,updated_at"
-
-async function getClient(client?: any) {
-  return client ?? (await createServerSupabaseClient())
+export async function listUsers(): Promise<DbUser[]> {
+  const rows = await db.select().from(users).orderBy(asc(users.full_name))
+  return rows
 }
 
-export async function listUsers(client?: any): Promise<DbUser[]> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("users")
-    .select(userSelect)
-    .order("full_name", { ascending: true })
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
-}
-
-export async function listUsersByIds(
-  userIds: string[],
-  client?: any,
-): Promise<DbUser[]> {
+export async function listUsersByIds(userIds: string[]): Promise<DbUser[]> {
   if (userIds.length === 0) {
     return []
   }
 
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("users")
-    .select(userSelect)
-    .in("id", userIds)
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? []
+  const rows = await db.select().from(users).where(inArray(users.id, userIds))
+  return rows
 }
 
-export async function getUserById(
-  userId: string,
-  client?: any,
-): Promise<DbUser | null> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("users")
-    .select(userSelect)
-    .eq("id", userId)
-    .maybeSingle()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data ?? null
+export async function getUserById(userId: string): Promise<DbUser | null> {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function insertUser(
-  payload: Database["public"]["Tables"]["users"]["Insert"],
-  client?: any,
+  payload: FlexibleInsert<typeof users.$inferInsert>,
 ): Promise<DbUser> {
-  const supabase = await getClient(client)
-  const { data, error } = await supabase
-    .from("users")
-    .insert(payload)
-    .select(userSelect)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return data
+  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
+  const insertValues = payload as typeof users.$inferInsert
+  const rows = await db
+    .insert(users)
+    .values(insertValues)
+    .returning()
+  return rows[0]
 }
