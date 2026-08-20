@@ -1,13 +1,14 @@
 "use client"
 
 import { Bell } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 import { useEffect, useState } from "react"
 import { SidebarLayout } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
 import type { AuthUser } from "@/lib/auth"
+import { authApi } from "@/lib/api-client"
 
 interface DashboardShellProps {
   title: string
@@ -31,24 +32,38 @@ function getRouteTitle(pathname: string, fallback: string): string {
 
 export function DashboardShell({ title,children }: DashboardShellProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [authChecked, setAuthChecked] = useState(false)
 
   useEffect(() => {
     let isActive = true
 
     const loadUser = async () => {
       try {
-        const res = await fetch("/api/auth/me")
-        if (isActive) {
-          if (res.ok) {
-            const data = await res.json()
-            setUser(data.user ?? data ?? null)
-          } else {
-            setUser(null)
-          }
+        const currentUser = await authApi.getCurrentUser()
+        if (!isActive) return
+        setUser(
+          currentUser
+            ? {
+                id: currentUser.id,
+                email: currentUser.email,
+                name: currentUser.name,
+                role: currentUser.role,
+                avatarUrl: currentUser.avatar ?? null,
+              }
+            : null,
+        )
+        if (!currentUser) {
+          router.replace("/login")
         }
       } catch {
-        if (isActive) setUser(null)
+        if (isActive) {
+          setUser(null)
+          router.replace("/login")
+        }
+      } finally {
+        if (isActive) setAuthChecked(true)
       }
     }
 
@@ -57,7 +72,15 @@ export function DashboardShell({ title,children }: DashboardShellProps) {
     return () => {
       isActive = false
     }
-  }, [])
+  }, [router])
+
+  if (!authChecked) {
+    return (
+      <div className="flex min-h-svh items-center justify-center bg-[#0f0f0f]">
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
+      </div>
+    )
+  }
 
   const routeTitle = getRouteTitle(pathname, title)
 

@@ -29,6 +29,8 @@ async function freshDB() {
         FOR r IN SELECT p.proname, pg_get_function_identity_arguments(p.oid) as args
           FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid
           WHERE n.nspname = 'public'
+            -- skip functions owned by extensions (e.g. pgcrypto's digest)
+            AND p.oid NOT IN (SELECT d.objid FROM pg_depend d WHERE d.deptype = 'e')
         LOOP
           EXECUTE format('DROP FUNCTION IF EXISTS %I(%s) CASCADE', r.proname, r.args);
         END LOOP;
