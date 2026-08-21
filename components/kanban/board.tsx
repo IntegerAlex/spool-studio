@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import Link from "next/link"
+import { useKanbanStore } from "@/stores/kanban-store"
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StatusBadge } from "@/components/assets/status-badge"
 import { getAssetIcon, getAssetPreviewType } from "@/lib/asset-display"
@@ -352,9 +353,9 @@ function KanbanColumn({
 }
 
 export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
-  const [collapsedColumns, setCollapsedColumns] = useState<
-    Set<KanbanWorkflowColumnId>
-  >(new Set())
+  const collapsedColumnIds = useKanbanStore((state) => state.collapsedColumns)
+  const toggleColumnStore = useKanbanStore((state) => state.toggleColumn)
+  const collapsedColumns = new Set(collapsedColumnIds)
   const [draggedItem, setDraggedItem] = useState<{
     assetId: string
     fromStatus: AssetStatus
@@ -390,17 +391,9 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
 
   const toggleColumnCollapse = useCallback(
     (statusId: KanbanWorkflowColumnId) => {
-      setCollapsedColumns((prev) => {
-        const next = new Set(prev)
-        if (next.has(statusId)) {
-          next.delete(statusId)
-        } else {
-          next.add(statusId)
-        }
-        return next
-      })
+      toggleColumnStore(statusId)
     },
-    [],
+    [toggleColumnStore],
   )
 
   const handleDragStart = (assetId: string, status: AssetStatus) => {

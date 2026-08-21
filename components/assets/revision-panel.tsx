@@ -3,11 +3,11 @@
 import { AlertCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { AssetPreviewModal } from "@/components/assets/asset-preview-modal"
+import { usePreviewStore } from "@/stores/preview-store"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { usersApi } from "@/lib/api-client"
 import {
-  type AssetPreviewDescriptor,
   toAssetPreviewDescriptor,
 } from "@/lib/asset-preview"
 import type { AssetRevision, User } from "@/types/index"
@@ -21,10 +21,10 @@ interface RevisionPanelProps {
 
 export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
   const [users, setUsers] = useState<Map<string, User>>(new Map())
-  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(
-    null,
-  )
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const previewItem = usePreviewStore((state) => state.item)
+  const isPreviewOpen = usePreviewStore((state) => state.open)
+  const closePreview = usePreviewStore((state) => state.closePreview)
+  const openPreview = usePreviewStore((state) => state.openPreview)
 
   useEffect(() => {
     let isActive = true
@@ -119,8 +119,7 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
                   size="sm"
                   variant="outline"
                   onClick={() => {
-                    setPreviewItem(previewDescriptor)
-                    setIsPreviewOpen(true)
+                    openPreview(previewDescriptor)
                   }}
                 >
                   Preview
@@ -146,9 +145,8 @@ export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
         item={previewItem}
         open={isPreviewOpen && Boolean(previewItem)}
         onOpenChange={(open) => {
-          setIsPreviewOpen(open)
           if (!open) {
-            setPreviewItem(null)
+            closePreview()
           }
         }}
         description={`Preview revision history for ${assetTitle}`}

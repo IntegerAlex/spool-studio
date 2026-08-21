@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AssetPreviewModal } from "@/components/assets/asset-preview-modal"
+import { usePreviewStore } from "@/stores/preview-store"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { revisionsApi } from "@/lib/api-client"
 import { formatFileSize } from "@/lib/asset-metadata"
 import {
-  type AssetPreviewDescriptor,
   toAssetPreviewDescriptor,
 } from "@/lib/asset-preview"
 import type { User } from "@/types/index"
@@ -26,10 +26,10 @@ export function AssetRevisionsSection({
 }: AssetRevisionsSectionProps) {
   const queryClient = useQueryClient()
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(
-    null,
-  )
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const previewItem = usePreviewStore((state) => state.item)
+  const isPreviewOpen = usePreviewStore((state) => state.open)
+  const openPreview = usePreviewStore((state) => state.openPreview)
+  const closePreview = usePreviewStore((state) => state.closePreview)
   const [activeOverrideId, setActiveOverrideId] = useState<string | null>(null)
 
   const revisionsQuery = useQuery({
@@ -237,8 +237,7 @@ export function AssetRevisionsSection({
                               variant="outline"
                               className="h-8 border-[rgba(255,255,255,0.1)] bg-transparent px-3 text-[12px] text-white hover:bg-[rgba(255,255,255,0.06)]"
                               onClick={() => {
-                                setPreviewItem(revisionPreviewItem)
-                                setIsPreviewOpen(true)
+                                openPreview(revisionPreviewItem)
                               }}
                             >
                               Preview
@@ -284,8 +283,7 @@ export function AssetRevisionsSection({
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => {
-                                setPreviewItem(revisionPreviewItem)
-                                setIsPreviewOpen(true)
+                                openPreview(revisionPreviewItem)
                               }}
                               className="text-[12px] text-[#71717a] hover:text-[#a1a1aa]"
                             >
@@ -337,9 +335,8 @@ export function AssetRevisionsSection({
         item={previewItem}
         open={isPreviewOpen && Boolean(previewItem)}
         onOpenChange={(open) => {
-          setIsPreviewOpen(open)
           if (!open) {
-            setPreviewItem(null)
+            closePreview()
           }
         }}
       />
