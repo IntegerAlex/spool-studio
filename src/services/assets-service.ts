@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { assetRevisions, contentAssets } from "@/db/schema"
-import { deleteFile, uploadFile } from "@/integrations/r2/r2-service"
+import { deleteFile, uploadFile, getPresignedDownloadUrl } from "@/integrations/r2/r2-service"
 import { extractAssetMetadata } from "@/lib/asset-metadata"
 import {
   canTransitionStatus,
@@ -113,9 +113,9 @@ function toDate(value: string | Date | null | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-function mapAsset(
+async function mapAsset(
   asset: Awaited<ReturnType<typeof getAssetById>>,
-): Asset | null {
+): Promise<Asset | null> {
   if (!asset) {
     return null
   }
@@ -125,6 +125,12 @@ function mapAsset(
     asset.publish_time,
     asset.scheduled_at,
   )
+
+  // SAFETY: drive_file_id is the R2 object key for uploads; presign a
+  // time-limited GET so private objects stay private (no public bucket).
+  const fileUrl = asset.drive_file_id
+    ? await getPresignedDownloadUrl(asset.drive_file_id)
+    : (asset.drive_file_url ?? undefined)
 
   return {
     id: asset.id,
@@ -139,8 +145,8 @@ function mapAsset(
     uploadedAt: asset.uploaded_at ? new Date(asset.uploaded_at) : null,
     uploadedBy: asset.uploaded_by ?? undefined,
     driveFileId: asset.drive_file_id ?? undefined,
-    fileUrl: asset.drive_file_url ?? undefined,
-    driveFileUrl: asset.drive_file_url ?? undefined,
+    fileUrl,
+    driveFileUrl: fileUrl,
     thumbnailUrl: asset.thumbnail_url ?? undefined,
     mediaWidth: asset.media_width ?? undefined,
     mediaHeight: asset.media_height ?? undefined,
@@ -164,17 +170,21 @@ function mapAsset(
   }
 }
 
-function mapAssetRevisions(
+async function mapAssetRevisions(
   revisions: Awaited<ReturnType<typeof listRevisionsByAssetId>>,
-): AssetRevision[] {
-  return revisions.map((rev) => ({
+): Promise<AssetRevision[]> {
+  return Promise.all(
+    revisions.map(async (rev) => ({
     id: rev.id,
     assetId: rev.asset_id,
     versionNumber: rev.version_number,
     uploadedBy: rev.uploaded_by ?? undefined,
     uploadedAt: new Date(rev.uploaded_at),
     driveFileId: rev.drive_file_id,
-    driveFileUrl: rev.drive_file_url ?? undefined,
+    // SAFETY: drive_file_id is the R2 object key; presign a time-limited GET.
+    driveFileUrl: rev.drive_file_id
+      ? await getPresignedDownloadUrl(rev.drive_file_id)
+      : (rev.drive_file_url ?? undefined),
     fileSize: rev.file_size ?? undefined,
     mimeType: rev.mime_type ?? undefined,
     mediaWidth: rev.media_width ?? undefined,
@@ -184,7 +194,8 @@ function mapAssetRevisions(
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     metadata: (rev.metadata as Record<string, Json>) ?? undefined,
     createdAt: new Date(rev.created_at),
-  }))
+    })),
+  )
 }
 
 function logUploadFailure(
@@ -260,9 +271,8 @@ export function getAssetR2Key(
 export async function getAssets(limit = 200): Promise<Asset[]> {
   try {
     const rows = await listAssets(limit)
-    return rows
-      .map((asset) => mapAsset(asset))
-      .filter((asset): asset is Asset => Boolean(asset))
+    const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
+    return mapped.filter((asset): asset is Asset => Boolean(asset))
   } catch (error) {
     logProductionRuntimeError("assets-loader", error)
     return []
@@ -275,9 +285,8 @@ export async function getAssetsByStatuses(
 ): Promise<Asset[]> {
   try {
     const rows = await listAssetsByStatuses(statuses, limit)
-    return rows
-      .map((asset) => mapAsset(asset))
-      .filter((asset): asset is Asset => Boolean(asset))
+    const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
+    return mapped.filter((asset): asset is Asset => Boolean(asset))
   } catch (error) {
     logProductionRuntimeError("assets-by-statuses-loader", error)
     return []
@@ -287,9 +296,8 @@ export async function getAssetsByStatuses(
 export async function getAssetsByClientId(clientId: string, limit = 200): Promise<Asset[]> {
   try {
     const rows = await listAssetsByClientId(clientId, limit)
-    return rows
-      .map((asset) => mapAsset(asset))
-      .filter((asset): asset is Asset => Boolean(asset))
+    const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
+    return mapped.filter((asset): asset is Asset => Boolean(asset))
   } catch (error) {
     logProductionRuntimeError("assets-by-client-loader", error, { clientId })
     return []
@@ -299,11 +307,11 @@ export async function getAssetsByClientId(clientId: string, limit = 200): Promis
 export async function getAssetDetail(assetId: string): Promise<Asset | null> {
   try {
     const row = await getAssetById(assetId)
-    const mapped = mapAsset(row)
+    const mapped = await mapAsset(row)
     if (!mapped) return null
     try {
       const revisions = await listRevisionsByAssetId(assetId)
-      mapped.revisions = mapAssetRevisions(revisions)
+      mapped.revisions = await mapAssetRevisions(revisions)
       // populate revision pointers/count from asset row
       mapped.currentRevisionId = row?.current_revision_id ?? undefined
       mapped.revisionCount = row?.revision_count ?? mapped.revisions.length
@@ -461,7 +469,7 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
 
   const storedRecord = record
 
-  const mapped = mapAsset(storedRecord)
+  const mapped = await mapAsset(storedRecord)
   if (!mapped) {
     throw new Error("Failed to map asset")
   }
@@ -615,7 +623,7 @@ export async function finalizeAssetUpload(
 
   const updated = await updateAssetRow(assetId, updates)
   const persisted = await getAssetById(assetId)
-  const mapped = mapAsset(persisted ?? updated)
+  const mapped = await mapAsset(persisted ?? updated)
 
   if (!mapped) {
     throw new Error("Failed to map asset")
@@ -904,7 +912,7 @@ export async function uploadAssetFile(
 
     const updated = await updateAssetRow(assetId, updates)
     const persisted = await getAssetById(assetId)
-    let mapped = mapAsset(persisted ?? updated)
+    let mapped = await mapAsset(persisted ?? updated)
 
     if (!mapped) {
       throw new Error("Failed to map asset")
@@ -925,7 +933,7 @@ export async function uploadAssetFile(
 
       await updateAssetRow(assetId, metadata.updates)
       const refreshed = await getAssetById(assetId)
-      const refreshedMapped = mapAsset(refreshed)
+      const refreshedMapped = await mapAsset(refreshed)
       if (refreshedMapped) {
         mapped = refreshedMapped
       }
@@ -1226,7 +1234,7 @@ export async function updateAsset(
     record = await updateAssetRow(assetId, updates)
   }
 
-  const mapped = mapAsset(record)
+  const mapped = await mapAsset(record)
   if (!mapped) {
     throw new Error("Failed to map asset")
   }
@@ -1328,7 +1336,7 @@ export async function approveAsset(
   }
 
   if (existing.status === "approved") {
-    const mapped = mapAsset(existing)
+    const mapped = await mapAsset(existing)
     if (!mapped) {
       throw new Error("Failed to map asset")
     }
@@ -1350,7 +1358,7 @@ export async function approveAsset(
     approved_by: userId,
   })
 
-  const mapped = mapAsset(updated)
+  const mapped = await mapAsset(updated)
   if (!mapped) {
     throw new Error("Failed to map asset")
   }
@@ -1391,7 +1399,7 @@ export async function rejectAsset(
   }
 
   if (existing.status === "revision_requested") {
-    const mapped = mapAsset(existing)
+    const mapped = await mapAsset(existing)
     if (!mapped) {
       throw new Error("Failed to map asset")
     }
@@ -1464,7 +1472,7 @@ export async function rejectAsset(
     )
   }
 
-  const mapped = mapAsset(updated)
+  const mapped = await mapAsset(updated)
   if (!mapped) {
     throw new Error("Failed to map asset")
   }
