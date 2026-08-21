@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { hashPassword, verifyToken } from "@/lib/auth"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
+import { rateLimits } from "@/src/lib/rate-limit-config"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { updateUser, getUserById } from "@/repositories/users-repository"
 import {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
 
   try {
   const ip = requestIp(request)
-  const limit = rateLimit(`reset:${ip}`, { limit: 10, windowMs: 60 * 60_000 })
+  const limit = rateLimit(`reset:${ip}`, rateLimits.resetPassword())
   if (!limit.ok) {
     throw ApiError.tooManyRequests(limit.retryAfterSeconds)
   }

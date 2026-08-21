@@ -178,7 +178,7 @@ export default function PortalPage() {
             <Card
               key={asset.id}
               className="overflow-hidden border-border bg-card cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => router.push(`/portal/${token}/assets/${asset.id}`)}
+              onClick={() => router.push(`/${token}/assets/${asset.id}`)}
             >
               <div className="aspect-video bg-muted flex items-center justify-center">
                 {asset.thumbnail_url ? (
@@ -214,7 +214,7 @@ export default function PortalPage() {
                     className="flex-1 h-8 text-xs"
                     onClick={(e) => {
                       e.stopPropagation()
-                      router.push(`/portal/${token}/assets/${asset.id}`)
+                      router.push(`/${token}/assets/${asset.id}`)
                     }}
                   >
                     <Eye className="mr-1 h-3 w-3" />

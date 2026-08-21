@@ -3,6 +3,7 @@ import { verifyPassword } from "@/lib/auth/password"
 import { createSession } from "@/lib/auth/session"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
+import { rateLimits } from "@/src/lib/rate-limit-config"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getUserByEmail } from "@/repositories/users-repository"
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
 
   try {
   const ip = requestIp(request)
-  const limit = rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 })
+  const limit = rateLimit(`login:${ip}`, rateLimits.login())
   if (!limit.ok) {
     throw ApiError.tooManyRequests(limit.retryAfterSeconds)
   }

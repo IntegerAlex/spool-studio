@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
+import { rateLimits } from "@/src/lib/rate-limit-config"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
 import { hashPortalToken } from "@/src/lib/portal-token"
 import { getPortalClientById } from "@/repositories/clients-repository"
@@ -19,10 +20,7 @@ export async function GET(request: Request, context: RouteContext) {
       throw ApiError.badRequest("Token is required")
     }
 
-    const limit = rateLimit(`portal-view:${token}`, {
-      limit: 30,
-      windowMs: 60_000,
-    })
+    const limit = rateLimit(`portal-view:${token}`, rateLimits.portalView())
     if (!limit.ok) {
       throw ApiError.tooManyRequests(limit.retryAfterSeconds)
     }

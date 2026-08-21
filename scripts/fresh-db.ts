@@ -1,5 +1,8 @@
 import { execSync } from "node:child_process"
-import { loadEnvConfig } from "@next/env"
+// @next/env is CJS; under ESM its named export is not detectable, so use
+// the default (module.exports) binding instead.
+import nextEnv from "@next/env"
+const loadEnvConfig = nextEnv.loadEnvConfig
 import { getPool } from "../src/lib/db"
 
 loadEnvConfig(process.cwd())

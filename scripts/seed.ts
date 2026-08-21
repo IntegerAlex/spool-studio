@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto"
 import bcrypt from "bcryptjs"
+// @next/env is CJS; under ESM its named export is not detectable, so use
+// the default (module.exports) binding instead.
+import nextEnv from "@next/env"
 import { getPool } from "../src/lib/db"
+
+nextEnv.loadEnvConfig(process.cwd())
 
 async function query(text: string, params?: unknown[]) {
   const client = await getPool().connect()

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
+import { rateLimits } from "@/src/lib/rate-limit-config"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
 import { hashPortalToken } from "@/src/lib/portal-token"
 import {
@@ -24,10 +25,7 @@ export async function POST(request: Request, context: RouteContext) {
       throw ApiError.badRequest("Token and asset id are required")
     }
 
-    const limit = rateLimit(`portal-act:${token}`, {
-      limit: 30,
-      windowMs: 60_000,
-    })
+    const limit = rateLimit(`portal-act:${token}`, rateLimits.portalAct())
     if (!limit.ok) {
       throw ApiError.tooManyRequests(limit.retryAfterSeconds)
     }

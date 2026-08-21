@@ -1,4 +1,7 @@
-import { loadEnvConfig } from "@next/env"
+// @next/env is CJS; under ESM its named export is not detectable, so use
+// the default (module.exports) binding instead.
+import nextEnv from "@next/env"
+const loadEnvConfig = nextEnv.loadEnvConfig
 import { getPool } from "../src/lib/db"
 import { hashPortalToken } from "../src/lib/portal-token"
 

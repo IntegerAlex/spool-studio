@@ -176,7 +176,7 @@ export default function PortalAssetDetailPage() {
         <XCircle className="h-10 w-10 text-destructive" />
         <p className="text-sm text-muted-foreground">{errorMessage}</p>
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/portal/${token}`}>Back to portal</Link>
+          <Link href={`/${token}`}>Back to portal</Link>
         </Button>
       </div>
     )
@@ -191,7 +191,7 @@ export default function PortalAssetDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href={`/portal/${token}`}>
+          <Link href={`/${token}`}>
             <ArrowLeft className="mr-1 h-4 w-4" />
             Back
           </Link>

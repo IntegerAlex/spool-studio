@@ -9,6 +9,10 @@
  * Keying on client-supplied headers (x-forwarded-for) means attackers can
  * rotate keys to dodge per-IP limits; per-instance storage caps the memory
  * impact of that (swept periodically).
+ *
+ * Limits/window sizes per endpoint are env-configurable via
+ * src/lib/rate-limit-config.ts (e.g. RATE_LIMIT_LOGIN_MAX) so local and e2e
+ * runs can loosen them without touching production defaults.
  */
 
 interface RateLimitOptions {

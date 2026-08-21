@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { signToken } from "@/lib/auth"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
+import { rateLimits } from "@/src/lib/rate-limit-config"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { getUserByEmail } from "@/repositories/users-repository"
 import {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
 
   try {
   const ip = requestIp(request)
-  const limit = rateLimit(`forgot:${ip}`, { limit: 3, windowMs: 10 * 60_000 })
+  const limit = rateLimit(`forgot:${ip}`, rateLimits.forgotPassword())
   if (!limit.ok) {
     throw ApiError.tooManyRequests(limit.retryAfterSeconds)
   }

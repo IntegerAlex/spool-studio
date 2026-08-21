@@ -1,12 +1,11 @@
 import { expect, test } from "@playwright/test"
+import { login } from "./helpers"
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/login")
-  await page.fill("input#email", "admin@libreonix.com")
-  await page.fill("input#password", "password123")
-  await page.click('button[type="submit"]')
-  await expect(page).toHaveURL("/dashboard", { timeout: 10000 })
-  await page.click("nav >> text=Clients")
+  await login(page)
+  // Remote Postgres latency can stall login past default timeouts.
+  await expect(page).toHaveURL("/dashboard", { timeout: 30000 })
+  await page.getByRole("link", { name: "Clients", exact: true }).click()
   await expect(page).toHaveURL("/dashboard/clients", { timeout: 10000 })
 })
 

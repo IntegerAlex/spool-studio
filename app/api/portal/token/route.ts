@@ -4,6 +4,7 @@ import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
 import { requirePermission } from "@/lib/auth"
 import { rateLimit } from "@/src/lib/rate-limit"
+import { rateLimits } from "@/src/lib/rate-limit-config"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   insertPortalToken,
@@ -15,10 +16,10 @@ export async function POST(request: Request) {
   try {
     const user = await requirePermission("portal:manage")
 
-    const userLimit = rateLimit(`portal-token-post:${user.id}`, {
-      limit: 10,
-      windowMs: 60 * 60_000,
-    })
+    const userLimit = rateLimit(
+      `portal-token-post:${user.id}`,
+      rateLimits.portalTokenPost(),
+    )
     if (!userLimit.ok) {
       throw ApiError.tooManyRequests(userLimit.retryAfterSeconds)
     }
