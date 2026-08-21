@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { hashPassword, verifyToken } from "@/lib/auth"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
+import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { updateUser } from "@/repositories/users-repository"
 import {
@@ -9,7 +10,13 @@ import {
 } from "@/repositories/password-resets-repository"
 
 export async function POST(request: Request) {
+
   try {
+  const ip = requestIp(request)
+  const limit = rateLimit(`reset:${ip}`, { limit: 10, windowMs: 60 * 60_000 })
+  if (!limit.ok) {
+    throw ApiError.tooManyRequests(limit.retryAfterSeconds)
+  }
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { token, password } = (await readJsonBody(request)) as {
       token?: string

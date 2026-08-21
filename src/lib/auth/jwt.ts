@@ -1,6 +1,12 @@
 import { decodeJwt, jwtVerify, SignJWT } from "jose"
 import type { TokenPayload } from "./types"
 
+if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET must be set in production - refusing to start with the dev fallback secret",
+  )
+}
+
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? "dev-secret-change-in-production",
 )

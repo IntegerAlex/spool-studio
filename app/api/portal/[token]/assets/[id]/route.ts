@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
 import {
@@ -20,44 +21,29 @@ export async function GET(_request: Request, context: RouteContext) {
     const assetId = params?.id
 
     if (!token || !assetId) {
-      return NextResponse.json(
-        { error: "Token and asset id are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Token and asset id are required")
     }
 
     const portalToken = await getPortalTokenByToken(token)
     if (!portalToken) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 },
-      )
+      throw ApiError.unauthorized("Invalid or expired token")
     }
 
     if (
       portalToken.expires_at &&
       new Date(portalToken.expires_at) < new Date()
     ) {
-      return NextResponse.json(
-        { error: "Token has expired" },
-        { status: 401 },
-      )
+      throw ApiError.unauthorized("Token has expired")
     }
 
     const asset = await getAssetById(assetId)
     if (!asset || asset.client_id !== portalToken.client_id) {
-      return NextResponse.json(
-        { error: "Asset not found" },
-        { status: 404 },
-      )
+      throw ApiError.notFound("Asset not found")
     }
 
     const client = await getClientById(portalToken.client_id)
     if (!client) {
-      return NextResponse.json(
-        { error: "Client not found" },
-        { status: 404 },
-      )
+      throw ApiError.notFound("Client not found")
     }
 
     const comments = await listCommentsByAssetId(assetId, { limit: 50 })
@@ -93,9 +79,6 @@ export async function GET(_request: Request, context: RouteContext) {
     })
   } catch (error) {
     logProductionRuntimeError("api-portal-asset-detail", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

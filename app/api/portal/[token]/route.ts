@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
 import { getPortalClientById } from "@/repositories/clients-repository"
 import { listPortalAssetsByClientId } from "@/repositories/assets-repository"
@@ -8,13 +10,22 @@ interface RouteContext {
   params: Promise<{ token: string }>
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   try {
     const params = await context.params
     const token = params?.token
     if (!token) {
-      return NextResponse.json({ error: "Token is required" }, { status: 400 })
+      throw ApiError.badRequest("Token is required")
     }
+
+    const limit = rateLimit(`portal-view:${token}`, {
+      limit: 30,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      throw ApiError.tooManyRequests(limit.retryAfterSeconds)
+    }
+    void requestIp // per-token keying; IP helper documented for per-IP limits
 
     const portalToken = await getPortalTokenByToken(token)
     if (!portalToken) {
@@ -28,14 +39,14 @@ export async function GET(_request: Request, context: RouteContext) {
       portalToken.expires_at &&
       new Date(portalToken.expires_at) < new Date()
     ) {
-      return NextResponse.json({ error: "Token has expired" }, { status: 401 })
+      throw ApiError.unauthorized("Token has expired")
     }
 
     const clientId = portalToken.client_id
 
     const client = await getPortalClientById(clientId)
     if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 })
+      throw ApiError.notFound("Client not found")
     }
 
     const assets = await listPortalAssetsByClientId(clientId)
@@ -48,9 +59,6 @@ export async function GET(_request: Request, context: RouteContext) {
     })
   } catch (error) {
     logProductionRuntimeError("api-portal-token-get", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

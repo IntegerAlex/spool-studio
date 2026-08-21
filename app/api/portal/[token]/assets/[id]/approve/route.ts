@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
+import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
 import {
   getAssetById,
@@ -18,37 +20,37 @@ export async function POST(request: Request, context: RouteContext) {
     const assetId = params?.id
 
     if (!token || !assetId) {
-      return NextResponse.json(
-        { error: "Token and asset id are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Token and asset id are required")
     }
+
+    const limit = rateLimit(`portal-act:${token}`, {
+      limit: 30,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      throw ApiError.tooManyRequests(limit.retryAfterSeconds)
+    }
+    void requestIp // per-token keying; IP helper documented for per-IP limits
 
     const portalToken = await getPortalTokenByToken(token)
     if (!portalToken) {
-      return NextResponse.json(
-        { error: "Invalid or expired token" },
-        { status: 401 },
-      )
+      throw ApiError.unauthorized("Invalid or expired token")
     }
 
     if (
       portalToken.expires_at &&
       new Date(portalToken.expires_at) < new Date()
     ) {
-      return NextResponse.json({ error: "Token has expired" }, { status: 401 })
+      throw ApiError.unauthorized("Token has expired")
     }
 
     const asset = await getAssetById(assetId)
     if (!asset) {
-      return NextResponse.json({ error: "Asset not found" }, { status: 404 })
+      throw ApiError.notFound("Asset not found")
     }
 
     if (asset.client_id !== portalToken.client_id) {
-      return NextResponse.json(
-        { error: "Asset does not belong to this client" },
-        { status: 403 },
-      )
+      throw ApiError.forbidden("Asset does not belong to this client")
     }
 
     const body = await request.json()
@@ -58,9 +60,8 @@ export async function POST(request: Request, context: RouteContext) {
     const comment = body.comment as string | undefined
 
     if (decision !== "approved" && decision !== "revision_requested") {
-      return NextResponse.json(
-        { error: 'Decision must be "approved" or "revision_requested"' },
-        { status: 400 },
+      throw ApiError.badRequest(
+        'Decision must be "approved" or "revision_requested"',
       )
     }
 
@@ -87,8 +88,6 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ data: { success: true, decision } })
   } catch (error) {
     logProductionRuntimeError("api-portal-asset-approve", error)
-    const message =
-      error instanceof Error ? error.message : "Failed to process decision"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

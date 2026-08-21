@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
+import { rateLimit } from "@/src/lib/rate-limit"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   insertPortalToken,
@@ -10,6 +11,14 @@ import {
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
+
+    const userLimit = rateLimit(`portal-token-post:${user.id}`, {
+      limit: 10,
+      windowMs: 60 * 60_000,
+    })
+    if (!userLimit.ok) {
+      throw ApiError.tooManyRequests(userLimit.retryAfterSeconds)
+    }
 
     if (user.role !== "admin" && user.role !== "approver") {
       throw ApiError.forbidden(

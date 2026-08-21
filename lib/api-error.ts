@@ -8,16 +8,19 @@ export interface ApiIssue {
 export class ApiError extends Error {
   status: number
   issues?: ApiIssue[]
+  headers?: Record<string, string>
 
   constructor(
     message: string,
     status: number,
     issues?: ApiIssue[],
+    headers?: Record<string, string>,
   ) {
     super(message)
     this.name = "ApiError"
     this.status = status
     this.issues = issues
+    this.headers = headers
   }
 
   static unauthorized(message = "Unauthorized") {
@@ -34,6 +37,12 @@ export class ApiError extends Error {
 
   static notFound(message = "Not found") {
     return new ApiError(message, 404)
+  }
+
+  static tooManyRequests(retryAfterSeconds: number) {
+    return new ApiError("Too many requests", 429, undefined, {
+      "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))),
+    })
   }
 }
 
@@ -63,7 +72,10 @@ export function jsonError(error: unknown): NextResponse {
       error: error.message,
       issues: error.issues ?? [],
     }
-    return NextResponse.json(body, { status: error.status })
+    return NextResponse.json(body, {
+      status: error.status,
+      headers: error.headers,
+    })
   }
   return NextResponse.json(
     { success: false as const, error: "Internal server error" },

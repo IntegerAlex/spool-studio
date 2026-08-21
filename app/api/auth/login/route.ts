@@ -2,12 +2,19 @@ import { NextResponse } from "next/server"
 import { verifyPassword } from "@/lib/auth/password"
 import { createSession } from "@/lib/auth/session"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
+import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getUserByEmail } from "@/repositories/users-repository"
 
 export async function POST(request: Request) {
+
   try {
+  const ip = requestIp(request)
+  const limit = rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 })
+  if (!limit.ok) {
+    throw ApiError.tooManyRequests(limit.retryAfterSeconds)
+  }
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const body = (await readJsonBody(request)) as {
       email?: string
