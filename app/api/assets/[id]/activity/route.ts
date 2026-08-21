@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   getAssetActivity,
@@ -14,10 +15,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const params = await context.params
     const assetId = params?.id
     if (!assetId) {
-      return NextResponse.json(
-        { error: "Asset id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Asset id is required")
     }
 
     const { searchParams } = new URL(_request.url)
@@ -34,6 +32,6 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ data: activity })
   } catch (error) {
     logProductionRuntimeError("api-assets-activity-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }

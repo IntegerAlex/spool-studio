@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { ApiError, jsonError } from "@/lib/api-error"
+import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   createClientReference,
@@ -9,7 +12,7 @@ interface RouteContext {
   params: Promise<{ id: string }>
 }
 
-const allowedTypes = [
+const referenceTypeSchema = z.enum([
   "instagram",
   "website",
   "youtube",
@@ -20,24 +23,21 @@ const allowedTypes = [
   "reel_reference",
   "ad_reference",
   "other",
-]
+])
 
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const params = await context.params
     const clientId = params?.id
     if (!clientId) {
-      return NextResponse.json(
-        { error: "Client id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Client id is required")
     }
 
     const references = await getClientReferences(clientId)
     return NextResponse.json({ data: references })
   } catch (error) {
     logProductionRuntimeError("api-clients-references-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }
 
@@ -46,26 +46,21 @@ export async function POST(request: Request, context: RouteContext) {
     const params = await context.params
     const clientId = params?.id
     if (!clientId) {
-      return NextResponse.json(
-        { error: "Client id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Client id is required")
     }
 
-    const body = await request.json()
-    if (!body?.title || !body?.url) {
-      return NextResponse.json(
-        { error: "Title and URL are required" },
-        { status: 400 },
-      )
+    const raw = await request.json()
+    const referenceCreateSchema = z.object({
+      title: z.string().min(1, "Title is required"),
+      url: z.string().url("URL must be valid"),
+      description: z.string().nullish(),
+      type: referenceTypeSchema.optional(),
+    })
+    const parsed = parseBody(referenceCreateSchema, raw)
+    if (!parsed.ok) {
+      return parsed.response
     }
-
-    if (body.type && !allowedTypes.includes(body.type)) {
-      return NextResponse.json(
-        { error: "Invalid reference type" },
-        { status: 400 },
-      )
-    }
+    const body = parsed.data
 
     const reference = await createClientReference({
       clientId,
@@ -77,9 +72,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({ data: reference }, { status: 201 })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create reference"
     logProductionRuntimeError("api-clients-references-post", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

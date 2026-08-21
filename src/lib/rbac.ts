@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/api-error"
 import type { AuthUser } from "@/lib/auth"
 import { requireUser } from "@/lib/auth"
 
@@ -105,11 +106,8 @@ export async function requirePermission(
   permission: Permission,
 ): Promise<AuthUser> {
   const user = await requireUser()
-  if (!user) {
-    throw new Error("Unauthorized")
-  }
   if (!hasPermission(user.role, permission)) {
-    throw new Error(
+    throw ApiError.forbidden(
       `Permission denied: ${permission} requires a role with sufficient privileges`,
     )
   }

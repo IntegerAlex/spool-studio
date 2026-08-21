@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { signToken } from "@/lib/auth"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { getUserByEmail } from "@/repositories/users-repository"
 import {
@@ -9,10 +10,11 @@ import {
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const { email } = (await readJsonBody(request)) as { email?: string }
 
     if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 })
+      throw ApiError.badRequest("Email is required")
     }
 
     const user = await getUserByEmail(email)
@@ -78,9 +80,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     logProductionRuntimeError("api-auth-forgot-password", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

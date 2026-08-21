@@ -1,30 +1,35 @@
 import { NextResponse } from "next/server"
 import { createSession, hashPassword } from "@/lib/auth"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { insertUser } from "@/repositories/users-repository"
+import type { UserRole } from "@/types"
 
 export async function POST(request: Request) {
   try {
-    const { email, password, fullName, role } = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const { email, password, fullName, role } = (await readJsonBody(request)) as {
+      email?: string
+      password?: string
+      fullName?: string
+      role?: string
+    }
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Email and password are required")
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Password must be at least 8 characters")
     }
 
     const passwordHash = await hashPassword(password)
     const validRoles = ["admin", "designer", "approver"]
-    const userRole = validRoles.includes(role) ? role : "designer"
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const userRole = (
+      validRoles.includes(role ?? "") ? role : "designer"
+    ) as UserRole
 
     let userId: string
     try {
@@ -38,10 +43,7 @@ export async function POST(request: Request) {
     } catch (err) {
       // SAFETY: Postgres unique-violation error carries a `code` field; narrowed for the 23505 check.
       if ((err as { code?: string } | null)?.code === "23505") {
-        return NextResponse.json(
-          { error: "A user with this email already exists" },
-          { status: 409 },
-        )
+        throw new ApiError("A user with this email already exists", 409)
       }
       throw err
     }
@@ -56,11 +58,13 @@ export async function POST(request: Request) {
 
     const response = NextResponse.json(
       {
-        user: {
-          id: userId,
-          email,
-          name: fullName || email.split("@")[0],
-          role: userRole,
+        data: {
+          user: {
+            id: userId,
+            email,
+            name: fullName || email.split("@")[0],
+            role: userRole,
+          },
         },
       },
       { status: 201 },
@@ -91,9 +95,6 @@ export async function POST(request: Request) {
     return response
   } catch (error) {
     logProductionRuntimeError("api-auth-register", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

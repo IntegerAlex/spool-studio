@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
+import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   cancelCycleService,
@@ -9,7 +11,6 @@ import {
   getCycleByIdService,
   updateCycleDeliverables,
 } from "@/services/service-cycles-service"
-import { getOrCreateCurrentUserProfile } from "@/services/users-service"
 
 interface RouteContext {
   params: Promise<{ cycleId: string }>
@@ -20,39 +21,33 @@ export async function GET(_request: Request, context: RouteContext) {
     const params = await context.params
     const cycleId = params?.cycleId
     if (!cycleId) {
-      return NextResponse.json(
-        { error: "Cycle id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Cycle id is required")
     }
     const cycle = await getCycleByIdService(cycleId)
     if (!cycle) {
-      return NextResponse.json({ error: "Cycle not found" }, { status: 404 })
+      throw ApiError.notFound("Cycle not found")
     }
     return NextResponse.json({ data: cycle })
   } catch (error) {
     logProductionRuntimeError("api-cycles-id-get", error)
-    return NextResponse.json({ data: null })
+    return jsonError(error)
   }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const user = await getOrCreateCurrentUserProfile()
+    const user = await requireUser()
     if (user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      throw ApiError.forbidden()
     }
 
     const params = await context.params
     const cycleId = params?.cycleId
     if (!cycleId) {
-      return NextResponse.json(
-        { error: "Cycle id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Cycle id is required")
     }
 
-    const body = await request.json()
+    const body = await readJsonBody(request)
     const cycleActionSchema = z.object({
       action: z.string(),
       startDate: z.coerce.date().optional(),
@@ -92,37 +87,30 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ data: updated })
     }
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    throw ApiError.badRequest("Invalid action")
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update cycle"
     logProductionRuntimeError("api-cycles-id-patch", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const user = await getOrCreateCurrentUserProfile()
+    const user = await requireUser()
     if (user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      throw ApiError.forbidden()
     }
 
     const params = await context.params
     const cycleId = params?.cycleId
     if (!cycleId) {
-      return NextResponse.json(
-        { error: "Cycle id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Cycle id is required")
     }
 
     await deleteCycleService(cycleId)
     return NextResponse.json({ data: true })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to delete cycle"
     logProductionRuntimeError("api-cycles-id-delete", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

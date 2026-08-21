@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -9,24 +10,21 @@ import {
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
 
     if (user.role !== "admin" && user.role !== "approver") {
-      return NextResponse.json(
-        { error: "Only admins and approvers can create portal tokens" },
-        { status: 403 },
+      throw ApiError.forbidden(
+        "Only admins and approvers can create portal tokens",
       )
     }
 
-    const body = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const body = (await readJsonBody(request)) as {
+      clientId?: string
+      expiresInDays?: number
+    }
     const clientId = body.clientId?.trim()
     if (!clientId) {
-      return NextResponse.json(
-        { error: "clientId is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("clientId is required")
     }
 
     const expiresInDays = body.expiresInDays ?? 30
@@ -54,24 +52,19 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     logProductionRuntimeError("api-portal-token-post", error)
-    const message =
-      error instanceof Error ? error.message : "Failed to create portal token"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }
 
 export async function GET() {
   try {
-    const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    await requireUser()
 
     const rows = await listActivePortalTokensWithClientName()
 
     return NextResponse.json({ data: rows })
   } catch (error) {
     logProductionRuntimeError("api-portal-token-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }

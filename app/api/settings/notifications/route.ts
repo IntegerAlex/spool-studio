@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonError, readJsonBody } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -25,37 +26,39 @@ const DEFAULT_PREFS: NotificationPrefs = {
 export async function GET() {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const prefs = await getUserNotificationPrefs(user.id)
     if (!prefs) {
-      return NextResponse.json(DEFAULT_PREFS)
+      return NextResponse.json({ data: DEFAULT_PREFS })
     }
 
     return NextResponse.json({
-      emailOnAssetUploaded: prefs.email_on_asset_uploaded,
-      emailOnRevisionRequested: prefs.email_on_revision_requested,
-      emailOnCommentAdded: prefs.email_on_comment_added,
-      emailOnApprovalDecision: prefs.email_on_approval_decision,
-      pushEnabled: prefs.push_enabled,
+      data: {
+        emailOnAssetUploaded: prefs.email_on_asset_uploaded,
+        emailOnRevisionRequested: prefs.email_on_revision_requested,
+        emailOnCommentAdded: prefs.email_on_comment_added,
+        emailOnApprovalDecision: prefs.email_on_approval_decision,
+        pushEnabled: prefs.push_enabled,
+      },
     })
   } catch (error) {
     logProductionRuntimeError("api-settings-notifications-get", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }
 
 export async function PUT(request: Request) {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const body = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const body = (await readJsonBody(request)) as {
+      emailOnAssetUploaded?: boolean
+      emailOnRevisionRequested?: boolean
+      emailOnCommentAdded?: boolean
+      emailOnApprovalDecision?: boolean
+      pushEnabled?: boolean
+    }
     const prefs: NotificationPrefs = {
       emailOnAssetUploaded: Boolean(body.emailOnAssetUploaded),
       emailOnRevisionRequested: Boolean(body.emailOnRevisionRequested),
@@ -74,14 +77,13 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json({
-      message: "Notification preferences updated",
-      prefs,
+      data: {
+        message: "Notification preferences updated",
+        prefs,
+      },
     })
   } catch (error) {
     logProductionRuntimeError("api-settings-notifications-put", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

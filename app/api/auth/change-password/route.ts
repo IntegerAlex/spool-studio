@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server"
+import {
+  ApiError,
+  jsonError,
+  readJsonBody,
+} from "@/lib/api-error"
 import { hashPassword, requireUser, verifyPassword } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
@@ -7,44 +12,37 @@ import { getUserById, updateUser } from "@/repositories/users-repository"
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { currentPassword, newPassword } = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const body = (await readJsonBody(request)) as {
+      currentPassword?: string
+      newPassword?: string
+    }
+    const { currentPassword, newPassword } = body
 
     if (!currentPassword || !newPassword) {
-      return NextResponse.json(
-        { error: "Current password and new password are required" },
-        { status: 400 },
+      throw ApiError.badRequest(
+        "Current password and new password are required",
       )
     }
 
     if (newPassword.length < 8) {
-      return NextResponse.json(
-        { error: "New password must be at least 8 characters" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("New password must be at least 8 characters")
     }
 
     const existing = await getUserById(user.id)
     if (!existing) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
+      throw ApiError.notFound("User not found")
     }
 
     const passwordHash = existing.password_hash
     if (!passwordHash) {
-      return NextResponse.json(
-        { error: "No password set for this account" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("No password set for this account")
     }
 
     const valid = await verifyPassword(currentPassword, passwordHash)
     if (!valid) {
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 401 },
-      )
+      throw ApiError.badRequest("Current password is incorrect")
     }
 
     const newHash = await hashPassword(newPassword)
@@ -64,9 +62,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Password updated successfully" })
   } catch (error) {
     logProductionRuntimeError("api-auth-change-password", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

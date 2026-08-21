@@ -1,9 +1,11 @@
 import { subscribe } from "@/lib/event-bus"
-import { getCurrentUser } from "@/lib/auth"
+import { requireUser } from "@/lib/auth"
 
 export async function GET(request: Request) {
-  const currentUser = await getCurrentUser()
-  if (!currentUser) {
+  let currentUser
+  try {
+    currentUser = await requireUser()
+  } catch {
     return new Response("Unauthorized", { status: 401 })
   }
 

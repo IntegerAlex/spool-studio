@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { hashPassword, verifyToken } from "@/lib/auth"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { updateUser } from "@/repositories/users-repository"
 import {
@@ -9,28 +10,23 @@ import {
 
 export async function POST(request: Request) {
   try {
-    const { token, password } = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const { token, password } = (await readJsonBody(request)) as {
+      token?: string
+      password?: string
+    }
 
     if (!token || !password) {
-      return NextResponse.json(
-        { error: "Token and password are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Token and password are required")
     }
 
     if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Password must be at least 8 characters")
     }
 
     const decoded = await verifyToken(token)
     if (!decoded?.sub) {
-      return NextResponse.json(
-        { error: "Invalid or expired reset token" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Invalid or expired reset token")
     }
 
     const reset = await getPasswordResetByTokenHash(token)
@@ -40,10 +36,7 @@ export async function POST(request: Request) {
       reset.user_id !== decoded.sub ||
       reset.expires_at <= new Date()
     ) {
-      return NextResponse.json(
-        { error: "Invalid or expired reset token" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Invalid or expired reset token")
     }
 
     const passwordHash = await hashPassword(password)
@@ -56,9 +49,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     logProductionRuntimeError("api-auth-reset-password", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

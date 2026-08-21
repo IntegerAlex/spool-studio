@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireUser } from "@/lib/auth"
 import { expandRecurrence } from "@/lib/calendar-recurrence"
+import { jsonError } from "@/lib/api-error"
 import { formatDateKey } from "@/lib/calendar-utils"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -54,9 +55,6 @@ function mapRow(row: CalendarEventRow): CalendarEvent {
 export async function GET(request: Request) {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
     const url = new URL(request.url)
     const { start, end } = defaultMonthRange()
     const rangeStart = url.searchParams.get("start") ?? start
@@ -84,9 +82,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: expanded })
   } catch (error) {
     logProductionRuntimeError("api-calendar-get", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

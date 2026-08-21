@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -9,18 +10,17 @@ import {
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
 
-    const body = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const body = (await readJsonBody(request)) as {
+      endpoint?: string
+      p256dh?: string
+      auth?: string
+    }
     const { endpoint, p256dh, auth } = body
 
     if (!endpoint || !p256dh || !auth) {
-      return NextResponse.json(
-        { error: "endpoint, p256dh, and auth are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("endpoint, p256dh, and auth are required")
     }
 
     const existing = await getPushSubscriptionByUserAndEndpoint(
@@ -54,8 +54,6 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     logProductionRuntimeError("api-push-subscribe", error)
-    const message =
-      error instanceof Error ? error.message : "Failed to save subscription"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonError(error)
   }
 }

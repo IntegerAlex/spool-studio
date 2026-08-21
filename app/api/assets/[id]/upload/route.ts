@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getFileMetadata } from "@/integrations/r2/r2-service"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { finalizeAssetUpload, uploadAssetFile } from "@/services/assets-service"
 
@@ -65,10 +66,7 @@ export async function POST(request: Request, context: RouteContext) {
     const params = await context.params
     assetId = params?.id ?? "unknown"
     if (!assetId) {
-      return NextResponse.json(
-        { success: false, error: "Asset id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Asset id is required")
     }
 
     const contentType = request.headers.get("content-type")
@@ -89,7 +87,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (contentType?.toLowerCase().includes("application/json")) {
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
-      const body = (await request.json()) as {
+      const body = (await readJsonBody(request)) as {
         r2Key?: string
         key?: string
         fileName?: string
@@ -97,17 +95,11 @@ export async function POST(request: Request, context: RouteContext) {
 
       const fileKey = body.r2Key ?? body.key
       if (!fileKey) {
-        return NextResponse.json(
-          { success: false, error: "r2Key is required" },
-          { status: 400 },
-        )
+        throw ApiError.badRequest("r2Key is required")
       }
 
       if (!body.fileName) {
-        return NextResponse.json(
-          { success: false, error: "fileName is required" },
-          { status: 400 },
-        )
+        throw ApiError.badRequest("fileName is required")
       }
 
       const r2Metadata = await getFileMetadata(fileKey)
@@ -126,33 +118,18 @@ export async function POST(request: Request, context: RouteContext) {
         },
       })
 
-      return NextResponse.json({ success: true, data: result }, { status: 201 })
+      return NextResponse.json({ data: result }, { status: 201 })
     }
 
     if (
       Number.isFinite(contentLength) &&
       (contentLength ?? 0) > MAX_UPLOAD_BYTES
     ) {
-      const error = new Error(`Request body exceeded ${MAX_UPLOAD_LABEL}`)
-      logUploadFailure("body-size-check", error, assetId, {
-        requestContentLength: contentLength,
-        configuredLimitBytes: MAX_UPLOAD_BYTES,
-        configuredLimit: MAX_UPLOAD_LABEL,
-      })
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 413 },
-      )
+      throw new ApiError(`Request body exceeded ${MAX_UPLOAD_LABEL}`, 413)
     }
 
     if (!contentType?.toLowerCase().includes("multipart/form-data")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Content-Type must be multipart/form-data",
-        },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Content-Type must be multipart/form-data")
     }
 
     let formData: FormData
@@ -164,10 +141,7 @@ export async function POST(request: Request, context: RouteContext) {
           ? error.message
           : "Failed to parse body as FormData"
       logUploadFailure("formdata-parse", error, assetId, { error: message })
-      return NextResponse.json(
-        { success: false, error: message },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Failed to parse body as FormData")
     }
 
     const fileValue = formData.get("file")
@@ -187,49 +161,15 @@ export async function POST(request: Request, context: RouteContext) {
     })
 
     if (isFile && fileValue.size > MAX_UPLOAD_BYTES) {
-      const error = new Error(`File exceeds ${MAX_UPLOAD_LABEL}`)
-      logUploadFailure("file-size-check", error, assetId, {
-        configuredLimitBytes: MAX_UPLOAD_BYTES,
-        configuredLimit: MAX_UPLOAD_LABEL,
-        fileName: fileValue.name,
-        fileSize: fileValue.size,
-        mimeType: fileValue.type || "application/octet-stream",
-      })
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 413 },
-      )
+      throw new ApiError(`File exceeds ${MAX_UPLOAD_LABEL}`, 413)
     }
 
     if (fileValue === null) {
-      const error = new Error("File is required")
-      logUploadFailure("file-extraction", error, assetId, {
-        expectedFieldName: "file",
-        keys: Array.from(formData.keys()),
-        fileExists: false,
-        typeofFile: "object",
-        instanceofFile: false,
-      })
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("File is required")
     }
 
     if (!isFile) {
-      const error = new Error('Upload field "file" must be a File')
-      logUploadFailure("file-extraction", error, assetId, {
-        expectedFieldName: "file",
-        keys: Array.from(formData.keys()),
-        fileExists: true,
-// oxlint-disable-next-line anti-slop/no-runtime-typeof  // diagnostics logging of value kind
-        typeofFile: typeof fileValue,
-        instanceofFile: false,
-      })
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 400 },
-      )
+      throw ApiError.badRequest('Upload field "file" must be a File')
     }
 
     const file = fileValue
@@ -243,21 +183,21 @@ export async function POST(request: Request, context: RouteContext) {
 
     const result = await uploadAssetFile(assetId, file)
 
-    return NextResponse.json({ success: true, data: result }, { status: 201 })
+    return NextResponse.json({ data: result }, { status: 201 })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to upload asset file"
     logProductionRuntimeError("api-assets-upload", error, { assetId })
     console.error("[upload][route-crash]", {
       assetId,
-      message,
+      message: error instanceof Error ? error.message : "Unknown error",
       stack: error instanceof Error ? (error.stack ?? null) : null,
     })
-    logUploadFailure("route-crash", error, assetId, { error: message })
-    return NextResponse.json(
-      { success: false, error: message },
-      { status: 400 },
+    logUploadFailure(
+      "route-crash",
+      error,
+      assetId,
+      { error: error instanceof Error ? error.message : "Unknown error" },
     )
+    return jsonError(error)
   }
 }
 

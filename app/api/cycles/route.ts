@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -13,23 +14,20 @@ export async function GET(request: Request) {
     const clientId = searchParams.get("clientId")
 
     if (!clientId) {
-      return NextResponse.json(
-        { error: "clientId is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("clientId is required")
     }
 
     const cycles = await getCyclesByClientId(clientId)
     return NextResponse.json({ data: cycles })
   } catch (error) {
     logProductionRuntimeError("api-cycles-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await readJsonBody(request)
     const cycleCreateSchema = z.object({
       clientId: z.string().uuid("clientId must be a valid id"),
       startDate: z.coerce.date(),
@@ -53,9 +51,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: cycle }, { status: 201 })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create cycle"
     logProductionRuntimeError("api-cycles-post", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

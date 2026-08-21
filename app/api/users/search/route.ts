@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server"
+import { jsonError } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { searchUsers } from "@/repositories/users-repository"
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    await requireUser()
 
     const { searchParams } = new URL(request.url)
     const q = searchParams.get("q")
@@ -30,6 +28,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: result })
   } catch (error) {
     logProductionRuntimeError("api-users-search-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }

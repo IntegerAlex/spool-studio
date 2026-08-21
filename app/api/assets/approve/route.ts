@@ -1,23 +1,18 @@
 import { NextResponse } from "next/server"
-import { getCurrentUser } from "@/lib/auth"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
+import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { approveAsset } from "@/services/assets-service"
 
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const user = await requireUser()
 
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const body = (await request.json()) as { assetId?: string }
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const body = (await readJsonBody(request)) as { assetId?: string }
     const assetId = body.assetId?.trim()
     if (!assetId) {
-      return NextResponse.json(
-        { error: "assetId is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("assetId is required")
     }
 
     const updated = await approveAsset(assetId, user.id)
@@ -25,7 +20,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: updated })
   } catch (error) {
     logProductionRuntimeError("api-assets-approve", error)
-    const message = error instanceof Error ? error.message : "Approval failed"
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
+import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { renewCycle } from "@/services/service-cycles-service"
-import { getOrCreateCurrentUserProfile } from "@/services/users-service"
 
 interface RouteContext {
   params: Promise<{ cycleId: string }>
@@ -9,26 +10,26 @@ interface RouteContext {
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    const user = await getOrCreateCurrentUserProfile()
+    const user = await requireUser()
     if (user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      throw ApiError.forbidden()
     }
 
     const params = await context.params
     const cycleId = params?.cycleId
     if (!cycleId) {
-      return NextResponse.json(
-        { error: "Cycle id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Cycle id is required")
     }
 
-    const body = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const body = (await readJsonBody(request)) as {
+      startDate?: string
+      endDate?: string
+      reelsTarget?: number
+      postersTarget?: number
+    }
     if (!body?.startDate || !body?.endDate) {
-      return NextResponse.json(
-        { error: "startDate and endDate are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("startDate and endDate are required")
     }
 
     const newCycle = await renewCycle(cycleId, {
@@ -40,9 +41,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({ data: newCycle }, { status: 201 })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to renew cycle"
     logProductionRuntimeError("api-cycles-renew", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

@@ -1,47 +1,38 @@
 import { NextResponse } from "next/server"
 import { verifyPassword } from "@/lib/auth/password"
 import { createSession } from "@/lib/auth/session"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getUserByEmail } from "@/repositories/users-repository"
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const email = (body.email as string)?.trim()
-    // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const password = (body.password as string)?.trim()
+    const body = (await readJsonBody(request)) as {
+      email?: string
+      password?: string
+    }
+    const email = body.email?.trim()
+    const password = body.password?.trim()
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Email and password are required")
     }
 
     const user = await getUserByEmail(email)
 
     if (!user) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 },
-      )
+      throw ApiError.unauthorized("Invalid credentials")
     }
 
     if (!user.password_hash) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 },
-      )
+      throw ApiError.unauthorized("Invalid credentials")
     }
 
     const valid = await verifyPassword(password, user.password_hash)
     if (!valid) {
-      return NextResponse.json(
-        { error: "Invalid credentials" },
-        { status: 401 },
-      )
+      throw ApiError.unauthorized("Invalid credentials")
     }
 
     const session = await createSession({
@@ -53,11 +44,13 @@ export async function POST(request: Request) {
     })
 
     const response = NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.full_name,
-        role: user.role,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.full_name,
+          role: user.role,
+        },
       },
     })
 
@@ -90,9 +83,6 @@ export async function POST(request: Request) {
     return response
   } catch (error) {
     logProductionRuntimeError("api-auth-login", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

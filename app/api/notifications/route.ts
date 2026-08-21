@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
 import { requireUser } from "@/lib/auth"
+import { jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { listNotifications } from "@/repositories/notifications-repository"
 
 export async function GET() {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const rows = await listNotifications(user.id)
 
@@ -25,9 +24,6 @@ export async function GET() {
     })
   } catch (error) {
     logProductionRuntimeError("api-notifications-get", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

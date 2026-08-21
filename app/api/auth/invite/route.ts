@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server"
 import { hashPassword, requireUser } from "@/lib/auth"
 import { signToken } from "@/lib/auth/jwt"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getUserByEmail, insertUser } from "@/repositories/users-repository"
+import type { UserRole } from "@/types"
 
 function generateRandomPassword(): string {
   const chars =
@@ -20,32 +22,31 @@ function generateRandomPassword(): string {
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     if (user.role !== "admin") {
-      return NextResponse.json(
-        { error: "Only admins can invite users" },
-        { status: 403 },
-      )
+      throw ApiError.forbidden("Only admins can invite users")
     }
 
-    const { email, role } = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const { email, role } = (await readJsonBody(request)) as {
+      email?: string
+      role?: string
+    }
 
     if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 })
+      throw ApiError.badRequest("Email is required")
     }
 
     const validRoles = ["admin", "designer", "approver"]
-    const userRole = validRoles.includes(role) ? role : "designer"
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const userRole = (
+      validRoles.includes(role ?? "") ? role : "designer"
+    ) as UserRole
 
     const existing = await getUserByEmail(email)
 
     if (existing) {
-      return NextResponse.json(
-        { error: "A user with this email already exists" },
-        { status: 409 },
-      )
+      throw new ApiError("A user with this email already exists", 409)
     }
 
     const randomPassword = generateRandomPassword()
@@ -116,9 +117,6 @@ export async function POST(request: Request) {
     )
   } catch (error) {
     logProductionRuntimeError("api-auth-invite", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

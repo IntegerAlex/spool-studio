@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonError, readJsonBody } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
@@ -16,9 +17,7 @@ type WorkspaceUpdateFields = {
 
 export async function GET() {
   try {
-    const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireUser()
 
     const ws = await getFirstWorkspace()
 
@@ -53,20 +52,19 @@ export async function GET() {
     })
   } catch (error) {
     logProductionRuntimeError("api-workspace-get", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }
 
 export async function PUT(request: Request) {
   try {
-    const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireUser()
 
-    const { name, logo } = await request.json()
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const { name, logo } = (await readJsonBody(request)) as {
+      name?: string
+      logo?: string | null
+    }
 
     const existing = await getFirstWorkspace()
     let wsId: string
@@ -112,9 +110,6 @@ export async function PUT(request: Request) {
     })
   } catch (error) {
     logProductionRuntimeError("api-workspace-update", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

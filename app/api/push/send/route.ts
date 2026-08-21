@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -49,20 +50,15 @@ async function sendPushToSubscription(
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    await requireUser()
 
-    const body = await request.json()
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const { userId, title, body: notifBody, url } = body as PushPayload
+    const { userId, title, body: notifBody, url } = (await readJsonBody(
+      request,
+    )) as PushPayload
 
     if (!userId || !title || !notifBody) {
-      return NextResponse.json(
-        { error: "userId, title, and body are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("userId, title, and body are required")
     }
 
     const subscriptions = await listPushSubscriptionsByUserId(userId)
@@ -103,10 +99,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     logProductionRuntimeError("api-push-send", error)
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to send push notification"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return jsonError(error)
   }
 }

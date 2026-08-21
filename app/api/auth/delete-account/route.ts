@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { requireUser } from "@/lib/auth"
 import { destroySession } from "@/lib/auth/session"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { deleteUserAccount } from "@/repositories/users-repository"
@@ -8,22 +9,14 @@ import { deleteUserAccount } from "@/repositories/users-repository"
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
 
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const { password } = (await request
-      .json()
-      .catch(() => ({ password: "" }))) as { password?: string }
+    const { password } = (await readJsonBody(request)) as { password?: string }
 
     const result = await deleteUserAccount(user.id, password ?? "")
 
     if (result?.error === "password_incorrect") {
-      return NextResponse.json(
-        { error: "Current password is incorrect" },
-        { status: 401 },
-      )
+      throw ApiError.badRequest("Current password is incorrect")
     }
 
     try {
@@ -48,9 +41,6 @@ export async function POST(request: Request) {
     return response
   } catch (error) {
     logProductionRuntimeError("api-auth-delete-account", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

@@ -1,18 +1,22 @@
-import { redirect } from "next/navigation"
+import { ApiError } from "@/lib/api-error"
+import { cache } from "react"
 import { verifyToken } from "./jwt"
 import { SESSION_COOKIE_NAME, validateSession } from "./session"
 import type { AuthUser } from "./types"
-
-import { cache } from "react"
 
 export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
   return validateSession()
 })
 
+/**
+ * API-boundary auth: throws 401 instead of returning null so route handlers
+ * never need an `if (!user)` guard. Server components should use
+ * getCurrentUser() + redirect() themselves.
+ */
 export async function requireUser(): Promise<AuthUser> {
   const user = await getCurrentUser()
   if (!user) {
-    redirect("/login")
+    throw ApiError.unauthorized()
   }
   return user
 }

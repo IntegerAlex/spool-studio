@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { ApiError } from "@/lib/api-error"
 
 const { executeMock, requireUserMock, logErrorMock } = vi.hoisted(() => ({
   executeMock: vi.fn(),
@@ -50,7 +51,7 @@ describe("GET /api/calendar", () => {
   })
 
   it("returns 401 when the user is not authenticated", async () => {
-    requireUserMock.mockResolvedValue(null)
+    requireUserMock.mockRejectedValue(new ApiError("Unauthorized", 401))
     const res = await GET(new Request("http://localhost/api/calendar"))
     expect(res.status).toBe(401)
     expect(executeMock).not.toHaveBeenCalled()

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { requireUser } from "@/lib/auth"
+import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   deleteNotificationForUser,
@@ -12,17 +13,12 @@ export async function PATCH(
 ) {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
     const row = await markNotificationAsReadForUser(id, user.id)
 
     if (!row) {
-      return NextResponse.json(
-        { error: "Notification not found" },
-        { status: 404 },
-      )
+      throw ApiError.notFound("Notification not found")
     }
 
     return NextResponse.json({
@@ -37,10 +33,7 @@ export async function PATCH(
     })
   } catch (error) {
     logProductionRuntimeError("api-notifications-patch", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }
 
@@ -50,25 +43,17 @@ export async function DELETE(
 ) {
   try {
     const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
     const deleted = await deleteNotificationForUser(id, user.id)
 
     if (!deleted) {
-      return NextResponse.json(
-        { error: "Notification not found" },
-        { status: 404 },
-      )
+      throw ApiError.notFound("Notification not found")
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
     logProductionRuntimeError("api-notifications-delete", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

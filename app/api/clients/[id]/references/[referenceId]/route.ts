@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { ApiError, jsonError } from "@/lib/api-error"
+import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   removeClientReference,
@@ -9,7 +12,7 @@ interface RouteContext {
   params: Promise<{ id: string; referenceId: string }>
 }
 
-const allowedTypes = [
+const referenceTypeSchema = z.enum([
   "instagram",
   "website",
   "youtube",
@@ -20,26 +23,28 @@ const allowedTypes = [
   "reel_reference",
   "ad_reference",
   "other",
-]
+])
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const params = await context.params
     const referenceId = params?.referenceId
     if (!referenceId) {
-      return NextResponse.json(
-        { error: "Reference id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Reference id is required")
     }
 
-    const body = await request.json()
-    if (body.type && !allowedTypes.includes(body.type)) {
-      return NextResponse.json(
-        { error: "Invalid reference type" },
-        { status: 400 },
-      )
+    const raw = await request.json()
+    const referenceUpdateSchema = z.object({
+      title: z.string().optional(),
+      url: z.string().url().optional(),
+      description: z.string().nullish(),
+      type: referenceTypeSchema.optional(),
+    })
+    const parsed = parseBody(referenceUpdateSchema, raw)
+    if (!parsed.ok) {
+      return parsed.response
     }
+    const body = parsed.data
 
     const reference = await updateClientReference(referenceId, {
       title: body.title,
@@ -50,10 +55,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ data: reference })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update reference"
     logProductionRuntimeError("api-clients-references-patch", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }
 
@@ -62,18 +65,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const params = await context.params
     const referenceId = params?.referenceId
     if (!referenceId) {
-      return NextResponse.json(
-        { error: "Reference id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Reference id is required")
     }
 
     await removeClientReference(referenceId)
     return NextResponse.json({ data: true })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to delete reference"
     logProductionRuntimeError("api-clients-references-delete", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
+import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   getClientDetail,
   removeClient,
   updateClient,
 } from "@/services/clients-service"
-import { getOrCreateCurrentUserProfile } from "@/services/users-service"
 
 interface RouteContext {
   params: Promise<{ id: string }>
@@ -16,37 +17,29 @@ interface RouteContext {
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const params = await context.params
-    console.info("[api/clients/[id]] params", params)
     const clientId = params?.id
     if (!clientId) {
-      return NextResponse.json(
-        { error: "Client id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Client id is required")
     }
     const client = await getClientDetail(clientId)
     if (!client) {
-      return NextResponse.json({ error: "Client not found" }, { status: 404 })
+      throw ApiError.notFound("Client not found")
     }
     return NextResponse.json({ data: client })
   } catch (error) {
     logProductionRuntimeError("api-clients-id-get", error)
-    return NextResponse.json({ data: null })
+    return jsonError(error)
   }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const params = await context.params
-    console.info("[api/clients/[id]] params", params)
     const clientId = params?.id
     if (!clientId) {
-      return NextResponse.json(
-        { error: "Client id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Client id is required")
     }
-    const body = await request.json()
+    const body = await readJsonBody(request)
     const clientUpdateSchema = z.object({
       name: z.string().min(1).optional(),
       slug: z.string().min(1).optional(),
@@ -87,35 +80,27 @@ export async function PATCH(request: Request, context: RouteContext) {
     })
     return NextResponse.json({ data: client })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update client"
     logProductionRuntimeError("api-clients-id-patch", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const user = await getOrCreateCurrentUserProfile()
+    const user = await requireUser()
     if (user.role !== "admin") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      throw ApiError.forbidden()
     }
 
     const params = await context.params
-    console.info("[api/clients/[id]] params", params)
     const clientId = params?.id
     if (!clientId) {
-      return NextResponse.json(
-        { error: "Client id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Client id is required")
     }
     await removeClient(clientId)
     return NextResponse.json({ data: true })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to delete client"
     logProductionRuntimeError("api-clients-id-delete", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

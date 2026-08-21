@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { jsonError } from "@/lib/api-error"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { searchAssetsByTitle } from "@/repositories/assets-repository"
@@ -6,9 +7,7 @@ import { searchClients } from "@/repositories/clients-repository"
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requireUser()
 
     const { searchParams } = new URL(request.url)
     const q = (searchParams.get("q") ?? "").trim()
@@ -38,9 +37,6 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     logProductionRuntimeError("api-search-get", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

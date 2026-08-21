@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { NextResponse } from "next/server"
+import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { getPresignedUploadUrl } from "@/integrations/r2/r2-service"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
@@ -8,17 +9,19 @@ import { insertUploadSession } from "@/repositories/upload-sessions-repository"
 export async function POST(request: Request) {
   try {
     const user = await requireUser()
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    // SAFETY: this cast is safe because the value already conforms to the asserted type.
+    const { assetId, fileName, mimeType, fileSize } = (await readJsonBody(
+      request,
+    )) as {
+      assetId?: string
+      fileName?: string
+      mimeType?: string
+      fileSize?: number
     }
 
-    const { assetId, fileName, mimeType, fileSize } = await request.json()
-
     if (!assetId || !fileName) {
-      return NextResponse.json(
-        { error: "assetId and fileName are required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("assetId and fileName are required")
     }
 
     const ext = fileName.split(".").pop() || "bin"
@@ -43,9 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ data: { uploadUrl, key: r2Key } })
   } catch (error) {
     logProductionRuntimeError("api-uploads-r2-session", error)
-    return NextResponse.json(
-      { error: "Failed to create upload session" },
-      { status: 500 },
-    )
+    return jsonError(error)
   }
 }

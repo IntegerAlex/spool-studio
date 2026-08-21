@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { ApiError, jsonError } from "@/lib/api-error"
+import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAssetActivity } from "@/services/activity-service"
 import {
@@ -11,17 +14,12 @@ interface RouteContext {
   params: Promise<{ id: string }>
 }
 
-const allowedTypes = ["comment", "revision", "approval_note", "internal_note"]
-
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const params = await context.params
     const assetId = params?.id
     if (!assetId) {
-      return NextResponse.json(
-        { error: "Asset id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Asset id is required")
     }
 
     const { searchParams } = new URL(_request.url)
@@ -40,7 +38,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ data: comments })
   } catch (error) {
     logProductionRuntimeError("api-assets-comments-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }
 
@@ -49,26 +47,19 @@ export async function POST(request: Request, context: RouteContext) {
     const params = await context.params
     const assetId = params?.id
     if (!assetId) {
-      return NextResponse.json(
-        { error: "Asset id is required" },
-        { status: 400 },
-      )
+      throw ApiError.badRequest("Asset id is required")
     }
 
-    const body = await request.json()
-    if (!body?.message) {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 },
-      )
+    const raw = await request.json()
+    const commentCreateSchema = z.object({
+      message: z.string().min(1, "Message is required"),
+      type: z.enum(["comment", "revision", "approval_note", "internal_note"]).optional(),
+    })
+    const parsed = parseBody(commentCreateSchema, raw)
+    if (!parsed.ok) {
+      return parsed.response
     }
-
-    if (body.type && !allowedTypes.includes(body.type)) {
-      return NextResponse.json(
-        { error: "Invalid comment type" },
-        { status: 400 },
-      )
-    }
+    const body = parsed.data
 
     const comment = await createComment({
       assetId,
@@ -101,9 +92,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({ data: comment }, { status: 201 })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create comment"
     logProductionRuntimeError("api-assets-comments-post", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }

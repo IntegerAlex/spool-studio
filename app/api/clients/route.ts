@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { jsonError, readJsonBody } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { createClient, getClients } from "@/services/clients-service"
@@ -15,13 +16,13 @@ export async function GET() {
     return response
   } catch (error) {
     logProductionRuntimeError("api-clients-get", error)
-    return NextResponse.json({ data: [] })
+    return jsonError(error)
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = await readJsonBody(request)
     const clientCreateSchema = z.object({
       name: z.string().min(1),
       slug: z.string().min(1),
@@ -62,9 +63,7 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ data: client }, { status: 201 })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create client"
     logProductionRuntimeError("api-clients-post", error)
-    return NextResponse.json({ error: message }, { status: 400 })
+    return jsonError(error)
   }
 }
