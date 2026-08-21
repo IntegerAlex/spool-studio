@@ -99,14 +99,15 @@ describe("R2 Service", () => {
   })
 
   describe("uploadFile", () => {
-    it("should upload a file and return key and url", async () => {
+    it("should upload a file and return key without a public url", async () => {
       const result = await uploadFile({
         key: testKey,
         body: testContent,
         contentType: "text/plain",
       })
       expect(result.key).toBe(testKey)
-      expect(result.url).toContain(testKey)
+      // Private bucket: no stable public URL; access is via presigned GETs.
+      expect(result.url).toBeNull()
       expect(result.etag).toBe('"etag-123"')
     })
   })
