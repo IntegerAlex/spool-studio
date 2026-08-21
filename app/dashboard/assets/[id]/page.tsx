@@ -2,8 +2,8 @@
 
 import { Copy, MoreHorizontal, Upload } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useMemo, useRef, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AssetActivitySection } from "@/components/assets/asset-activity-section"
 import { AssetCommentsSection } from "@/components/assets/asset-comments-section"
 import { AssetFormDialog } from "@/components/assets/asset-form-dialog"
@@ -47,7 +47,7 @@ import {
   getRevisionEligibilityReason,
   getUploadEligibilityReason,
 } from "@/lib/asset-workflow"
-import type { Asset, Client, User } from "@/types/index"
+import type { Asset, User } from "@/types/index"
 
 export default function AssetDetailPage() {
   const params = useParams()
@@ -57,11 +57,6 @@ export default function AssetDetailPage() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
 
-  const [asset, setAsset] = useState<Asset | null>(null)
-  const [client, setClient] = useState<Client | null>(null)
-  const [userMap, setUserMap] = useState<Map<string, User>>(new Map())
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [showDelete, setShowDelete] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isUploadingRevision, setIsUploadingRevision] = useState(false)
@@ -74,8 +69,43 @@ export default function AssetDetailPage() {
     "process" | "move_to_draft" | null
   >(null)
   const [revisionRefreshKey, setRevisionRefreshKey] = useState(0)
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const revisionInputRef = useRef<HTMLInputElement | null>(null)
+
+  const assetQuery = useQuery({
+    queryKey: ["asset", assetId],
+    queryFn: () => assetsApi.getSummaryById(assetId!),
+    enabled: Boolean(assetId),
+  })
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: () => authApi.getCurrentUser(),
+    staleTime: 5 * 60_000,
+  })
+
+  const asset = assetQuery.data ?? null
+  const currentUser = meQuery.data ?? null
+  const isLoading = Boolean(assetId) && assetQuery.isLoading
+  const error =
+    assetId && !assetQuery.isLoading ? (assetQuery.error?.message ?? null) : null
+
+  const clientId = asset?.clientId
+  const clientQuery = useQuery({
+    queryKey: ["clients", clientId],
+    queryFn: () => clientsApi.getById(clientId!),
+    enabled: Boolean(clientId),
+  })
+  const client = clientQuery.data ?? null
+
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(),
+    staleTime: 5 * 60_000,
+  })
+  const userMap = useMemo(() => {
+    const map = new Map<string, User>()
+    ;(usersQuery.data ?? []).forEach((user) => map.set(user.id, user))
+    return map
+  }, [usersQuery.data])
 
   const storageLabel = "Cloud Storage"
 
@@ -85,74 +115,9 @@ export default function AssetDetailPage() {
   const canProcessUpload = asset?.status === "uploaded"
   const canMoveToDraft = asset?.status === "uploaded"
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        if (!assetId) {
-          setError("Asset id is required")
-          setIsLoading(false)
-          return
-        }
-        setError(null)
-        const [assetData, loggedUser] = await Promise.all([
-          assetsApi.getSummaryById(assetId),
-          authApi.getCurrentUser(),
-        ])
-        setCurrentUser(loggedUser)
-        if (assetData) {
-          setAsset(assetData)
-          const clientData = await clientsApi.getById(assetData.clientId)
-          setClient(clientData)
-        }
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "Failed to load asset"
-        setError(message)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadData()
-  }, [assetId])
-
-  useEffect(() => {
-    if (!asset?.assignedTo?.length) {
-      return
-    }
-
-    const missing = asset.assignedTo.filter((userId) => !userMap.has(userId))
-    if (missing.length === 0) {
-      return
-    }
-
-    let isActive = true
-
-    const loadUsers = async () => {
-      const fetched = await Promise.all(
-        missing.map((userId) => usersApi.getById(userId)),
-      )
-      if (!isActive) {
-        return
-      }
-
-      setUserMap((prev) => {
-        const next = new Map(prev)
-        fetched.forEach((user) => {
-          if (user) {
-            next.set(user.id, user)
-          }
-        })
-        return next
-      })
-    }
-
-    void loadUsers()
-
-    return () => {
-      isActive = false
-    }
-  }, [userMap.has, asset?.assignedTo?.length, asset?.assignedTo?.filter])
+  const invalidateAsset = () => {
+    queryClient.invalidateQueries({ queryKey: ["asset", assetId] })
+  }
 
   function refreshRevisions() {
     setRevisionRefreshKey((prev) => prev + 1)
@@ -190,7 +155,8 @@ export default function AssetDetailPage() {
       refreshRevisions()
       // also update local asset state from result if returned
       if (result) {
-        setAsset(result)
+        queryClient.setQueryData(["asset", assetId], result)
+      invalidateAsset()
       }
       clearApiClientCache()
       router.refresh()
@@ -228,7 +194,8 @@ export default function AssetDetailPage() {
 
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
       const updated = payload.data as Asset
-      setAsset(updated)
+      queryClient.setQueryData(["asset", assetId], updated)
+      invalidateAsset()
       toast({
         title: action === "approve" ? "Asset approved" : "Revision requested",
       })
@@ -258,7 +225,8 @@ export default function AssetDetailPage() {
       setIsSaving(true)
       setWorkflowAction(action)
       const updated = await assetsApi.update(asset.id, { status: nextStatus })
-      setAsset(updated)
+      queryClient.setQueryData(["asset", assetId], updated)
+      invalidateAsset()
       clearApiClientCache()
       router.refresh()
     } catch (err) {
@@ -371,12 +339,12 @@ export default function AssetDetailPage() {
                     mode="edit"
                     asset={asset}
                     onSaved={(updated) => {
-                      setAsset(updated)
+                      queryClient.setQueryData(["asset", assetId], updated)
+                      invalidateAsset()
                       queryClient.invalidateQueries({ queryKey: ["assets"] })
-                      clientsApi
-                        .getById(updated.clientId)
-                        .then(setClient)
-                        .catch(() => undefined)
+                      queryClient.invalidateQueries({
+                        queryKey: ["clients", updated.clientId],
+                      })
                     }}
                     trigger={
                       <Button className="h-10 w-full bg-[var(--primary)] px-3 text-[13px] text-white shadow-none hover:bg-[#4f46e5] sm:h-9 sm:w-auto">
@@ -405,12 +373,12 @@ export default function AssetDetailPage() {
                       mode="edit"
                       asset={asset}
                       onSaved={(updated) => {
-                        setAsset(updated)
+                        queryClient.setQueryData(["asset", assetId], updated)
+                        invalidateAsset()
                         queryClient.invalidateQueries({ queryKey: ["assets"] })
-                        clientsApi
-                          .getById(updated.clientId)
-                          .then(setClient)
-                          .catch(() => undefined)
+                        queryClient.invalidateQueries({
+                          queryKey: ["clients", updated.clientId],
+                        })
                       }}
                       trigger={
                         <DropdownMenuItem

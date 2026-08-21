@@ -9,7 +9,8 @@ import {
   XCircle,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
@@ -53,33 +54,33 @@ interface ClientWithCycles {
 }
 
 export default function PlannerPage() {
-  const [clientCycles, setClientCycles] = useState<ClientWithCycles[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<
     "all" | "active" | "upcoming" | "completed"
   >("all")
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const clients = await clientsApi.getAll()
-        const results: ClientWithCycles[] = []
+  const clientsQuery = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.getAll(),
+  })
 
-        for (const client of clients) {
-          const cycles = await cyclesApi.list(client.id)
-          if (cycles.length > 0) {
-            results.push({ client, cycles })
-          }
+  const clientCyclesQuery = useQuery({
+    queryKey: ["planner"],
+    queryFn: async () => {
+      const clients = await clientsQuery.data ?? []
+      const results: ClientWithCycles[] = []
+      for (const client of clients) {
+        const cycles = await cyclesApi.list(client.id)
+        if (cycles.length > 0) {
+          results.push({ client, cycles })
         }
-
-        setClientCycles(results)
-      } finally {
-        setIsLoading(false)
       }
-    }
+      return results
+    },
+    enabled: clientsQuery.isSuccess,
+  })
 
-    loadData()
-  }, [])
+  const clientCycles = clientCyclesQuery.data ?? []
+  const isLoading = clientsQuery.isLoading || clientCyclesQuery.isLoading
 
   const filteredClients = clientCycles
     .map(({ client, cycles }) => ({

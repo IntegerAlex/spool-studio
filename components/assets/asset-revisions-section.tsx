@@ -1,6 +1,7 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AssetPreviewModal } from "@/components/assets/asset-preview-modal"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -10,7 +11,7 @@ import {
   type AssetPreviewDescriptor,
   toAssetPreviewDescriptor,
 } from "@/lib/asset-preview"
-import type { AssetRevision, User } from "@/types/index"
+import type { User } from "@/types/index"
 
 interface AssetRevisionsSectionProps {
   assetId: string
@@ -23,42 +24,47 @@ export function AssetRevisionsSection({
   currentRevisionId,
   refreshKey,
 }: AssetRevisionsSectionProps) {
-  const [revisions, setRevisions] = useState<AssetRevision[]>([])
-  const [users, setUsers] = useState<Map<string, User>>(new Map())
-  const [isLoading, setIsLoading] = useState(false)
+  const queryClient = useQueryClient()
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [previewItem, setPreviewItem] = useState<AssetPreviewDescriptor | null>(
     null,
   )
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  const [hasLoaded, setHasLoaded] = useState(false)
-  const [activeRevisionId, setActiveRevisionId] = useState<string | null>(
-    currentRevisionId ?? null,
+  const [activeOverrideId, setActiveOverrideId] = useState<string | null>(null)
+
+  const revisionsQuery = useQuery({
+    queryKey: ["revisions", assetId],
+    queryFn: () => revisionsApi.getByAssetId(assetId),
+    enabled: !isCollapsed,
+  })
+
+  const revisions = useMemo(
+    () => revisionsQuery.data?.revisions ?? [],
+    [revisionsQuery.data],
   )
 
-  const loadRevisions = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const payload = await revisionsApi.getByAssetId(assetId)
-      setRevisions(payload.revisions)
-      setUsers(new Map(payload.users.map((user) => [user.id, user])))
-      setHasLoaded(true)
-      if (currentRevisionId !== undefined) {
-        setActiveRevisionId(currentRevisionId ?? null)
-      }
-    } finally {
-      setIsLoading(false)
+  const userMap = useMemo(() => {
+    const map = new Map<string, User>()
+    revisionsQuery.data?.users.forEach((user) => map.set(user.id, user))
+    return map
+  }, [revisionsQuery.data])
+
+  const lastRefreshKey = useRef(refreshKey)
+
+  useEffect(() => {
+    if (
+      refreshKey === undefined ||
+      refreshKey === lastRefreshKey.current ||
+      isCollapsed
+    ) {
+      return
     }
-  }, [assetId, currentRevisionId])
+    lastRefreshKey.current = refreshKey
+    void revisionsQuery.refetch()
+  }, [refreshKey, isCollapsed, revisionsQuery])
 
   const handleToggle = () => {
-    setIsCollapsed((prev) => {
-      const next = !prev
-      if (!next && !hasLoaded) {
-        void loadRevisions()
-      }
-      return next
-    })
+    setIsCollapsed((prev) => !prev)
   }
 
   const handleSetActive = async (revisionId: string) => {
@@ -67,20 +73,13 @@ export function AssetRevisionsSection({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ currentRevisionId: revisionId }),
     })
-    setActiveRevisionId(revisionId)
-    await loadRevisions()
+    setActiveOverrideId(revisionId)
+    await queryClient.invalidateQueries({ queryKey: ["revisions", assetId] })
   }
 
-  useEffect(() => {
-    if (!hasLoaded || isCollapsed || refreshKey === undefined) {
-      return
-    }
-    void loadRevisions()
-  }, [refreshKey, hasLoaded, isCollapsed, loadRevisions])
+  const activeRevisionId = activeOverrideId ?? currentRevisionId ?? null
 
   const revisionCount = revisions.length
-
-  const userMap = useMemo(() => users, [users])
 
   return (
     <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5 border-t border-t-[rgba(255,255,255,0.07)]">
@@ -120,7 +119,7 @@ export function AssetRevisionsSection({
           transition: "max-height 200ms ease",
         }}
       >
-        {isLoading ? (
+        {revisionsQuery.isLoading ? (
           <div className="py-6 text-[12px] text-[#71717a]">
             Loading revisions...
           </div>

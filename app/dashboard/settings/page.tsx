@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import zxcvbn from "zxcvbn"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -23,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "@/hooks/use-toast"
 import { authApi, notificationPrefsApi, usersApi, workspaceApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import type { NotificationPrefs, User, Workspace } from "@/types/index"
+import type { NotificationPrefs } from "@/types/index"
 
 const sections = [
   {
@@ -92,10 +93,30 @@ function PasswordStrengthMeter({
 }
 
 export default function SettingsPage() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(null)
-  const [teamMembers, setTeamMembers] = useState<User[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const workspaceQuery = useQuery({
+    queryKey: ["workspace"],
+    queryFn: () => workspaceApi.get(),
+  })
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(),
+    staleTime: 5 * 60_000,
+  })
+  const prefsQuery = useQuery({
+    queryKey: ["notification-prefs"],
+    queryFn: () => notificationPrefsApi.getAll(),
+  })
+
+  const workspace = workspaceQuery.data ?? null
+  const teamMembers = usersQuery.data ?? []
+  const isLoading = workspaceQuery.isLoading
   const [workspaceName, setWorkspaceName] = useState("")
+  useEffect(() => {
+    if (workspace && !workspaceName) {
+      setWorkspaceName(workspace.name)
+    }
+  }, [workspace, workspaceName])
   const [activeSection, setActiveSection] =
     useState<(typeof sections)[number]["id"]>("workspace")
 
@@ -120,7 +141,7 @@ export default function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  const [prefs, setPrefs] = useState<NotificationPrefs | null>(null)
+  const prefs = prefsQuery.data ?? null
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteRole, setInviteRole] = useState<
     "admin" | "designer" | "approver"
@@ -145,43 +166,10 @@ export default function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [workspaceData, usersData] = await Promise.all([
-          workspaceApi.get(),
-          usersApi.getAll(),
-        ])
-        setWorkspace(workspaceData)
-        setWorkspaceName(workspaceData.name)
-        setTeamMembers(usersData)
-      } catch (err) {
-        console.error("[settings] failed to load data", err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadData()
-  }, [])
-
-  useEffect(() => {
-    const loadPrefs = async () => {
-      try {
-        const data = await notificationPrefsApi.getAll()
-        setPrefs(data)
-      } catch (err) {
-        console.error("[settings] failed to load notification prefs", err)
-      }
-    }
-
-    loadPrefs()
-  }, [])
-
   const handleSaveWorkspace = async () => {
     if (workspace) {
       const updated = await workspaceApi.update({ name: workspaceName })
-      setWorkspace(updated)
+      queryClient.setQueryData(["workspace"], updated)
       setWorkspaceName(updated.name)
     }
   }
@@ -630,7 +618,7 @@ export default function SettingsPage() {
                       if (!prefs) return
                       try {
                         const updated = await notificationPrefsApi.update(prefs)
-                        setPrefs(updated)
+                        queryClient.setQueryData(["notification-prefs"], updated)
                         toast({
                           title: "Preferences saved",
                           description:
@@ -827,10 +815,12 @@ export default function SettingsPage() {
                           disabled={!prefs}
                           checked={prefs ? Boolean(prefs[pref.field]) : false}
                           onChange={(e) =>
-                            setPrefs((prev) =>
-                              prev
-                                ? { ...prev, [pref.field]: e.target.checked }
-                                : prev,
+                            queryClient.setQueryData<NotificationPrefs>(
+                              ["notification-prefs"],
+                              (prev) =>
+                                prev
+                                  ? { ...prev, [pref.field]: e.target.checked }
+                                  : prev,
                             )
                           }
                         />

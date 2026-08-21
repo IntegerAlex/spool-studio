@@ -3,7 +3,8 @@
 import { Bell } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import type { ReactNode } from "react"
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { SidebarLayout } from "@/components/layout/sidebar"
 import { Button } from "@/components/ui/button"
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
@@ -33,54 +34,36 @@ function getRouteTitle(pathname: string, fallback: string): string {
 export function DashboardShell({ title,children }: DashboardShellProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [authChecked, setAuthChecked] = useState(false)
+
+  const { data: currentUser, isLoading } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => authApi.getCurrentUser(),
+    staleTime: 5 * 60_000,
+  })
 
   useEffect(() => {
-    let isActive = true
-
-    const loadUser = async () => {
-      try {
-        const currentUser = await authApi.getCurrentUser()
-        if (!isActive) return
-        setUser(
-          currentUser
-            ? {
-                id: currentUser.id,
-                email: currentUser.email,
-                name: currentUser.name,
-                role: currentUser.role,
-                avatarUrl: currentUser.avatar ?? null,
-              }
-            : null,
-        )
-        if (!currentUser) {
-          router.replace("/login")
-        }
-      } catch {
-        if (isActive) {
-          setUser(null)
-          router.replace("/login")
-        }
-      } finally {
-        if (isActive) setAuthChecked(true)
-      }
+    if (!isLoading && !currentUser) {
+      router.replace("/login")
     }
+  }, [isLoading, currentUser, router])
 
-    void loadUser()
-
-    return () => {
-      isActive = false
-    }
-  }, [router])
-
-  if (!authChecked) {
+  if (isLoading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-[#0f0f0f]">
         <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white/70" />
       </div>
     )
   }
+
+  const user: AuthUser | null = currentUser
+    ? {
+        id: currentUser.id,
+        email: currentUser.email,
+        name: currentUser.name,
+        role: currentUser.role,
+        avatarUrl: currentUser.avatar ?? null,
+      }
+    : null
 
   const routeTitle = getRouteTitle(pathname, title)
 

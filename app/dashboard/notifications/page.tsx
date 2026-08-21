@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect } from "react"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { NotificationCenter } from "@/components/notifications/notification-center"
 import { authApi, notificationsApi } from "@/lib/api-client"
@@ -12,101 +13,70 @@ const EVENT_TYPES = [
   "asset.activity",
 ] as const
 
+function sortNotifications(list: Notification[]): Notification[] {
+  return [...list].sort(
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
+}
+
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: () => authApi.getCurrentUser(),
+    staleTime: 5 * 60_000,
+  })
+  const userId = meQuery.data?.id
+
+  const notificationsQuery = useQuery({
+    queryKey: ["notifications", userId],
+    queryFn: () => notificationsApi.getAll(userId!),
+    enabled: Boolean(userId),
+  })
 
   useEffect(() => {
-    let cancelled = false
-    let eventSource: EventSource | null = null
-
-    const sortNotifications = (list: Notification[]) =>
-      list.sort(
-        (a, b) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      )
-
-    const refetch = async (userId: string) => {
-      try {
-        const notifs = await notificationsApi.getAll(userId)
-        if (!cancelled) setNotifications(sortNotifications(notifs))
-      } catch {
-        // ignore refetch errors; EventSource will retry the stream
-      }
+    if (!userId) {
+      return
     }
 
-    const loadData = async () => {
-      try {
-        const user = await authApi.getCurrentUser()
-        if (cancelled) return
+    const eventSource = new EventSource("/api/events/stream")
 
-        if (!user) return
-
-        const notifs = await notificationsApi.getAll(user.id)
-        if (cancelled) return
-        setNotifications(sortNotifications(notifs))
-
-        eventSource = new EventSource("/api/events/stream")
-
-        eventSource.onopen = () => {
-          void refetch(user.id)
-        }
-
-        eventSource.addEventListener("notification:created", (e) => {
-          try {
-            const data = JSON.parse(
-              // SAFETY: EventSource 'message' events always carry MessageEvent data payloads.
-              (e as MessageEvent).data,
-            )
-            if (data.userId !== user.id) return
-
-            const incoming: Notification = {
-              id: data.id,
-              userId: data.userId,
-              type: data.type,
-              title: data.title,
-              message: data.message,
-              relatedAssetId: data.relatedAssetId ?? null,
-              read: false,
-              createdAt: new Date().toISOString(),
-            }
-
-            setNotifications((prev) =>
-              sortNotifications([incoming, ...prev]),
-            )
-          } catch {
-            // ignore malformed events
-          }
-        })
-
-        for (const type of EVENT_TYPES) {
-          eventSource.addEventListener(type, () => void refetch(user.id))
-        }
-
-        eventSource.onerror = () => {
-          void refetch(user.id)
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false)
-      }
+    const refetch = () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["notifications", userId],
+      })
     }
 
-    loadData()
+    eventSource.onopen = refetch
+    for (const type of EVENT_TYPES) {
+      eventSource.addEventListener(type, refetch)
+    }
+    eventSource.onerror = refetch
 
     return () => {
-      cancelled = true
-      eventSource?.close()
+      eventSource.close()
     }
-  }, [])
+  }, [userId, queryClient])
+
+  const isLoading = meQuery.isLoading || notificationsQuery.isLoading
+  const notifications = sortNotifications(notificationsQuery.data ?? [])
 
   const handleMarkAsRead = async (id: string) => {
     const updated = await notificationsApi.markAsRead(id)
-    setNotifications(notifications.map((n) => (n.id === id ? updated : n)))
+    queryClient.setQueryData<Notification[]>(
+      ["notifications", userId],
+      (prev) => (prev ?? []).map((n) => (n.id === id ? updated : n)),
+    )
   }
 
   const handleDelete = async (id: string) => {
     await notificationsApi.delete(id)
-    setNotifications(notifications.filter((n) => n.id !== id))
+    queryClient.setQueryData<Notification[]>(
+      ["notifications", userId],
+      (prev) => (prev ?? []).filter((n) => n.id !== id),
+    )
   }
 
   if (isLoading) {

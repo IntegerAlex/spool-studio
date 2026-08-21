@@ -1,9 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { Card } from "@/components/ui/card"
 import { activityApi } from "@/lib/api-client"
-import type { AssetActivityLog, User } from "@/types/index"
+import type { User } from "@/types/index"
 
 interface AssetActivitySectionProps {
   assetId: string
@@ -12,37 +13,28 @@ interface AssetActivitySectionProps {
 const ACTIVITY_LIMIT = 12
 
 export function AssetActivitySection({ assetId }: AssetActivitySectionProps) {
-  const [activity, setActivity] = useState<AssetActivityLog[]>([])
-  const [users, setUsers] = useState<Map<string, User>>(new Map())
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [isLoading, setIsLoading] = useState(false)
-  const [hasLoaded, setHasLoaded] = useState(false)
 
-  const loadActivity = async () => {
-    setIsLoading(true)
-    try {
-      const payload = await activityApi.getByAssetId(assetId, {
-        limit: ACTIVITY_LIMIT,
-      })
-      setActivity(payload.activity)
-      setUsers(new Map(payload.users.map((user) => [user.id, user])))
-      setHasLoaded(true)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const activityQuery = useQuery({
+    queryKey: ["activity", assetId],
+    queryFn: () => activityApi.getByAssetId(assetId, { limit: ACTIVITY_LIMIT }),
+    enabled: !isCollapsed,
+  })
+
+  const activity = useMemo(
+    () => activityQuery.data?.activity ?? [],
+    [activityQuery.data],
+  )
+
+  const userMap = useMemo(() => {
+    const map = new Map<string, User>()
+    activityQuery.data?.users.forEach((user) => map.set(user.id, user))
+    return map
+  }, [activityQuery.data])
 
   const toggle = () => {
-    setIsCollapsed((prev) => {
-      const next = !prev
-      if (!next && !hasLoaded) {
-        void loadActivity()
-      }
-      return next
-    })
+    setIsCollapsed((prev) => !prev)
   }
-
-  const userMap = useMemo(() => users, [users])
 
   return (
     <Card className="border border-[rgba(255,255,255,0.08)] bg-[#161616] p-5">
@@ -77,7 +69,7 @@ export function AssetActivitySection({ assetId }: AssetActivitySectionProps) {
           transition: "max-height 200ms ease",
         }}
       >
-        {isLoading ? (
+        {activityQuery.isLoading ? (
           <div className="py-4 text-[12px] text-[#71717a]">
             Loading activity...
           </div>
