@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { ApiError, jsonError } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
+import { requirePermission } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   removeClientReference,
@@ -27,6 +28,7 @@ const referenceTypeSchema = z.enum([
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
+    await requirePermission("clients:update")
     const params = await context.params
     const referenceId = params?.referenceId
     if (!referenceId) {
@@ -62,6 +64,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
+    await requirePermission("clients:update")
     const params = await context.params
     const referenceId = params?.referenceId
     if (!referenceId) {

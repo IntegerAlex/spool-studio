@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { parseBody } from "@/lib/api-validation"
-import { requireUser } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   cancelCycleService,
@@ -36,10 +36,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const user = await requireUser()
-    if (user.role !== "admin") {
-      throw ApiError.forbidden()
-    }
+    await requirePermission("clients:update")
 
     const params = await context.params
     const cycleId = params?.cycleId
@@ -96,10 +93,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    const user = await requireUser()
-    if (user.role !== "admin") {
-      throw ApiError.forbidden()
-    }
+    await requirePermission("clients:update")
 
     const params = await context.params
     const cycleId = params?.cycleId

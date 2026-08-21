@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { parseBody } from "@/lib/api-validation"
-import { requireUser } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   deleteUploadQueueItem,
@@ -14,9 +14,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    await requirePermission("queue:manage")
 
     const { id } = await params
     const body = await request.json()
@@ -88,9 +86,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUser()
-    if (!user)
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const user = await requirePermission("queue:manage")
 
     const { id } = await params
 

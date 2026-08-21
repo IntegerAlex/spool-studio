@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { jsonError, readJsonBody } from "@/lib/api-error"
-import { requireUser } from "@/lib/auth"
+import {
+  requireUser,
+} from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   getUserNotificationPrefs,
@@ -49,6 +51,8 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    // Per-user preferences: any authenticated user updates their OWN prefs
+    // (repo scopes by user id). settings:update would lock this to admins.
     const user = await requireUser()
 
     // SAFETY: this cast is safe because the value already conforms to the asserted type.

@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
-import { requireUser } from "@/lib/auth"
+import { requirePermission } from "@/lib/auth"
 import { rateLimit } from "@/src/lib/rate-limit"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   insertPortalToken,
   listActivePortalTokensWithClientName,
 } from "@/repositories/portal-tokens-repository"
+import { generatePortalToken } from "@/src/lib/portal-token"
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser()
+    const user = await requirePermission("portal:manage")
 
     const userLimit = rateLimit(`portal-token-post:${user.id}`, {
       limit: 10,
@@ -18,12 +19,6 @@ export async function POST(request: Request) {
     })
     if (!userLimit.ok) {
       throw ApiError.tooManyRequests(userLimit.retryAfterSeconds)
-    }
-
-    if (user.role !== "admin" && user.role !== "approver") {
-      throw ApiError.forbidden(
-        "Only admins and approvers can create portal tokens",
-      )
     }
 
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
@@ -40,9 +35,11 @@ export async function POST(request: Request) {
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + expiresInDays)
 
+    const { raw, hashed } = generatePortalToken()
+
     const created = await insertPortalToken({
       client_id: clientId,
-      token: crypto.randomUUID(),
+      token: hashed,
       expires_at: expiresAt,
       created_by: user.id,
     })
@@ -52,7 +49,7 @@ export async function POST(request: Request) {
         data: {
           id: created.id,
           client_id: created.client_id,
-          token: created.token,
+          token: raw,
           expires_at: created.expires_at,
           created_at: created.created_at,
         },
@@ -67,11 +64,20 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    await requireUser()
+    await requirePermission("portal:manage")
 
     const rows = await listActivePortalTokensWithClientName()
 
-    return NextResponse.json({ data: rows })
+    return NextResponse.json({
+      data: rows.map((row) => ({
+        id: row.id,
+        client_id: row.client_id,
+        client_name: row.client_name,
+        expires_at: row.expires_at,
+        created_at: row.created_at,
+        tokenPrefix: row.token.slice(0, 8),
+      })),
+    })
   } catch (error) {
     logProductionRuntimeError("api-portal-token-get", error)
     return jsonError(error)

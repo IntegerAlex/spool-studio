@@ -3,6 +3,7 @@ import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
+import { hashPortalToken } from "@/src/lib/portal-token"
 import { getPortalClientById } from "@/repositories/clients-repository"
 import { listPortalAssetsByClientId } from "@/repositories/assets-repository"
 
@@ -27,7 +28,7 @@ export async function GET(request: Request, context: RouteContext) {
     }
     void requestIp // per-token keying; IP helper documented for per-IP limits
 
-    const portalToken = await getPortalTokenByToken(token)
+    const portalToken = await getPortalTokenByToken(hashPortalToken(token))
     if (!portalToken) {
       return NextResponse.json(
         { error: "Invalid or expired token" },

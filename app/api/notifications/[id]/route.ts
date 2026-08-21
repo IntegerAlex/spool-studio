@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { requireUser } from "@/lib/auth"
+import { requirePermission, requireUser } from "@/lib/auth"
 import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -12,6 +12,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    // Users may mark their OWN notifications read (repo scopes by user id);
+    // admin-level management is only required for deletion below.
     const user = await requireUser()
 
     const { id } = await params
@@ -42,7 +44,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireUser()
+    const user = await requirePermission("notifications:manage")
 
     const { id } = await params
     const deleted = await deleteNotificationForUser(id, user.id)

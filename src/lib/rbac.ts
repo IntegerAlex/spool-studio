@@ -1,6 +1,6 @@
 import { ApiError } from "@/lib/api-error"
-import type { AuthUser } from "@/lib/auth"
-import { requireUser } from "@/lib/auth"
+import type { AuthUser } from "@/lib/auth/types"
+import { requireUser } from "@/lib/auth/get-user"
 
 export type Permission =
   | "assets:create"
@@ -27,6 +27,7 @@ export type Permission =
   | "logs:read"
   | "reports:read"
   | "reports:create"
+  | "portal:manage"
 
 const ALL_PERMISSIONS: Permission[] = [
   "assets:create",
@@ -53,6 +54,7 @@ const ALL_PERMISSIONS: Permission[] = [
   "logs:read",
   "reports:read",
   "reports:create",
+  "portal:manage",
 ]
 
 // oxlint-disable-next-line anti-slop/no-known-value-widening  // role map is intentionally string-keyed by role name
@@ -81,6 +83,7 @@ const rolePermissions: Record<string, Permission[]> = {
     "logs:read",
     "reports:read",
     "reports:create",
+    "portal:manage",
   ],
   uploader: [
     "assets:create",

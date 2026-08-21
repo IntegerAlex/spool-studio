@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
+import { hashPortalToken } from "@/src/lib/portal-token"
 import {
   getAssetById,
   listRevisionsByAssetId,
@@ -24,7 +25,7 @@ export async function GET(_request: Request, context: RouteContext) {
       throw ApiError.badRequest("Token and asset id are required")
     }
 
-    const portalToken = await getPortalTokenByToken(token)
+    const portalToken = await getPortalTokenByToken(hashPortalToken(token))
     if (!portalToken) {
       throw ApiError.unauthorized("Invalid or expired token")
     }

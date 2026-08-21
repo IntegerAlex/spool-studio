@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { hashPassword, requireUser } from "@/lib/auth"
+import { hashPassword, requirePermission } from "@/lib/auth"
 import { signToken } from "@/lib/auth/jwt"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
@@ -21,11 +21,7 @@ function generateRandomPassword(): string {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser()
-
-    if (user.role !== "admin") {
-      throw ApiError.forbidden("Only admins can invite users")
-    }
+    const user = await requirePermission("team:invite")
 
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { email, role } = (await readJsonBody(request)) as {

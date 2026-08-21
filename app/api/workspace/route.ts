@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server"
 import { jsonError, readJsonBody } from "@/lib/api-error"
-import { requireUser } from "@/lib/auth"
+import {
+  requirePermission,
+  requireUser,
+} from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
 import {
@@ -58,7 +61,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    await requireUser()
+    await requirePermission("settings:update")
 
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { name, logo } = (await readJsonBody(request)) as {
