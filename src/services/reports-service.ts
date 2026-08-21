@@ -134,6 +134,8 @@ export async function generateReport(
     return {
       id: asset.asset_id,
       title: asset.title,
+      // SAFETY: publication records are written from content_assets whose
+      // type column is the asset_type enum ('reel' | 'poster').
       type: asset.type as "reel" | "poster",
       status: "published",
       uploadedAt: asset.uploaded_at

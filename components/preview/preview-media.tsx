@@ -19,7 +19,7 @@ interface PreviewMediaProps {
 
 export function PreviewMedia({ descriptor, compact }: PreviewMediaProps) {
   const [errored, setErrored] = useState(false)
-  const { setVideoRef, setAudioRef, setIframeRef, cleanup } = useMediaCleanup()
+  const { setVideoRef, setAudioRef, setIframeRef } = useMediaCleanup()
 
   const previewType = getAssetPreviewType(descriptor)
   const urls = getAssetPreviewUrls(descriptor)

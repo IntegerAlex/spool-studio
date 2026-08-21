@@ -8,6 +8,7 @@ import {
   listPlansByCycleId,
 } from "@/repositories/plans-repository"
 import {
+  type DbNewServiceCycle,
   type DbServiceCycle,
   deleteCycle,
   getActiveCycleForClient,
@@ -66,7 +67,7 @@ function mapCycle(row: DbServiceCycle): ServiceCycle {
     endDate: row.end_date,
     reelsTarget: row.reels_target,
     postersTarget: row.posters_target,
-    status: row.status as CycleStatus,
+    status: row.status,
     createdBy: row.created_by ?? undefined,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -260,7 +261,7 @@ export async function updateCycleDeliverables(
     throw new Error("Cycle not found")
   }
 
-  const updates: Record<string, unknown> = {}
+  const updates: Partial<DbNewServiceCycle> = {}
   if (input.startDate !== undefined) updates.start_date = input.startDate
   if (input.endDate !== undefined) updates.end_date = input.endDate
   if (input.reelsTarget !== undefined) updates.reels_target = input.reelsTarget

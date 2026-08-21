@@ -2,7 +2,6 @@
 
 import {
   CheckCircle2,
-  Clock3,
   FileWarning,
   FolderPlus,
   KanbanSquare,
@@ -25,27 +24,10 @@ import ErrorBoundary from "@/components/ui/error-boundary"
 import { Skeleton } from "@/components/ui/skeleton"
 import { dashboardApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
-import type { Client } from "@/types/index"
 
 type TrendDirection = "up" | "down" | "neutral"
-type DashboardSummary = Awaited<ReturnType<typeof dashboardApi.getSummary>>
 type DashboardStatCard = { title: string; value: string; trendLabel: string; trendDirection: TrendDirection; icon: React.ReactNode; iconBgClassName: string }
-type ActivityRow = { id: string; kind: DashboardSummary["recentActivity"][number]["kind"]; href: string; title: string; detail: string; timestamp: Date; iconKind: DashboardSummary["recentActivity"][number]["iconKind"]; icon: React.ReactNode; iconBgClassName: string }
 
-function getActivityIcon(entry: DashboardSummary["recentActivity"][number]): React.ReactNode {
-  if (entry.iconKind === "client") return <Users className="h-4 w-4 text-emerald-400" />
-  if (entry.iconKind === "revision") return <FileWarning className="h-4 w-4 text-amber-400" />
-  if (entry.iconKind === "approval") return <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-  if (entry.iconKind === "upload") return <Upload className="h-4 w-4 text-emerald-400" />
-  return <Clock3 className="h-4 w-4 text-amber-400" />
-}
-function getActivityBg(entry: DashboardSummary["recentActivity"][number]): string {
-  if (entry.iconKind === "client") return "bg-emerald-500/15"
-  if (entry.iconKind === "revision") return "bg-amber-500/15"
-  if (entry.iconKind === "approval") return "bg-emerald-500/15"
-  if (entry.iconKind === "upload") return "bg-emerald-500/15"
-  return "bg-amber-500/15"
-}
 function getStatIcon(title: string): React.ReactNode {
   switch (title) {
     case "Total Assets": return <LayoutGrid className="h-5 w-5 text-emerald-400" />
@@ -73,11 +55,6 @@ export default function DashboardPage() {
   const pendingApprovals = summary?.pendingApprovals ?? 0
   const totalClients = summary?.totalClients || clients.length || 0
   const totalAssets = summary?.totalAssets ?? 0
-
-  const recentActivity = useMemo<ActivityRow[]>(() => {
-    const source = summary?.recentActivity ?? []
-    return source.map((entry) => ({ id: entry.id, kind: entry.kind, href: entry.href, title: entry.title, detail: entry.detail, timestamp: entry.timestamp, iconKind: entry.iconKind, icon: getActivityIcon(entry), iconBgClassName: getActivityBg(entry) }))
-  }, [summary])
 
   const activitySummary = useMemo(() => {
     const source = summary?.recentActivity ?? []
@@ -129,7 +106,7 @@ export default function DashboardPage() {
   }
   if (error) {
     return (
-      <div className="space-y-4 p-6"><div><h1 className="text-lg font-medium text-white">Dashboard</h1><p className="text-xs text-zinc-500 mt-0.5">Overview</p></div><div className="text-center py-16"><p className="text-sm text-zinc-400">{(error as Error).message}</p></div></div>
+      <div className="space-y-4 p-6"><div><h1 className="text-lg font-medium text-white">Dashboard</h1><p className="text-xs text-zinc-500 mt-0.5">Overview</p></div><div className="text-center py-16"><p className="text-sm text-zinc-400">{error instanceof Error ? error.message : "Failed to load dashboard"}</p></div></div>
     )
   }
 

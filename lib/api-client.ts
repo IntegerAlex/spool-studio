@@ -192,11 +192,17 @@ async function fetchJson<T>(
   }
 
   if (!response.ok) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // SSR guard: window only exists in the browser
     if (response.status === 401 && typeof window !== "undefined" && !requestUrl.includes("/api/auth/")) {
       window.location.href = "/login"
     }
     let msg = "Request failed"
-    try { const j = (await response.clone().json()) as ApiEnvelope<T>; msg = j.error ?? msg } catch {}
+    try {
+      // SAFETY: error responses are ApiEnvelope JSON produced by our API routes.
+      const j = (await response.clone().json()) as ApiEnvelope<T>
+      msg = j.error ?? msg
+    } catch {}
+    // SAFETY: attaching the HTTP status lets callers branch on auth failures.
     const err = new Error(msg) as Error & { status?: number }
     err.status = response.status
     throw err
@@ -263,6 +269,7 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
   }
 
   if (response.status === 401) {
+    // oxlint-disable-next-line anti-slop/no-runtime-typeof  // SSR guard: window only exists in the browser
     if (typeof window !== "undefined" && !requestUrl.includes("/api/auth/")) {
       window.location.href = "/login"
     }
@@ -270,8 +277,9 @@ async function fetchJsonNullable<T>(input: RequestInfo): Promise<T | null> {
   }
 
   if (!response.ok) {
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
+    // SAFETY: error responses are ApiEnvelope JSON produced by our API routes.
     const payload = (await response.json()) as ApiEnvelope<T>
+    // SAFETY: attaching the HTTP status lets callers branch on auth failures.
     const err = new Error(payload.error ?? "Request failed") as Error & { status?: number }
     err.status = response.status
     throw err
@@ -408,6 +416,8 @@ function hydrateServiceCycle(
     | ServiceCycle
     | ServiceCycleWithPlan,
 ): ServiceCycle {
+  // SAFETY: the spread preserves every ServiceCycle field; createdAt/updatedAt
+  // are rehydrated to Date when present.
   return {
     ...cycle,
     createdAt: cycle.createdAt

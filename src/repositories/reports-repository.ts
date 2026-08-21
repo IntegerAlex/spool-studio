@@ -35,7 +35,7 @@ function toDateString(value: Date | string | null | undefined): string | null {
 
 function toTimeString(value: Date | string | null | undefined): string | null {
   if (!value) return null
-  if (typeof value === "string") return value
+  if (!(value instanceof Date)) return value
   const h = String(value.getUTCHours()).padStart(2, "0")
   const m = String(value.getUTCMinutes()).padStart(2, "0")
   const s = String(value.getUTCSeconds()).padStart(2, "0")

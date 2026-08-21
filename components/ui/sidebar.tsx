@@ -44,6 +44,12 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
+function isPrimitiveTooltip(
+  value: string | React.ComponentProps<typeof TooltipContent>,
+): value is string {
+  return Object.prototype.toString.call(value) === "[object String]"
+}
+
 function useSidebar() {
   const context = React.useContext(SidebarContext)
   if (!context) {
@@ -75,7 +81,7 @@ function SidebarProvider({
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
-      const openState = typeof value === "function" ? value(open) : value
+      const openState = value instanceof Function ? value(open) : value
       if (setOpenProp) {
         setOpenProp(openState)
       } else {
@@ -132,6 +138,7 @@ function SidebarProvider({
         <div
           data-slot="sidebar-wrapper"
           style={
+            // SAFETY: CSS custom properties are valid inline styles but CSSProperties has no index signature for them.
             {
               "--sidebar-width": SIDEBAR_WIDTH,
               "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
@@ -189,6 +196,7 @@ function Sidebar({
           data-mobile="true"
           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
           style={
+            // SAFETY: CSS custom properties are valid inline styles but CSSProperties has no index signature for them.
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
             } as React.CSSProperties
@@ -526,11 +534,9 @@ function SidebarMenuButton({
     return button
   }
 
-  if (typeof tooltip === "string") {
-    tooltip = {
-      children: tooltip,
-    }
-  }
+  const tooltipContent = isPrimitiveTooltip(tooltip)
+    ? { children: tooltip }
+    : tooltip
 
   return (
     <Tooltip>
@@ -539,7 +545,7 @@ function SidebarMenuButton({
         side="right"
         align="center"
         hidden={state !== "collapsed" || isMobile}
-        {...tooltip}
+        {...tooltipContent}
       />
     </Tooltip>
   )
@@ -628,6 +634,7 @@ function SidebarMenuSkeleton({
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
         style={
+          // SAFETY: CSS custom properties are valid inline styles but CSSProperties has no index signature for them.
           {
             "--skeleton-width": width,
           } as React.CSSProperties

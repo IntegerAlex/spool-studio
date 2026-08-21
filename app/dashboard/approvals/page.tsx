@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { assetsApi, clientsApi } from "@/lib/api-client"
 import { getAssetIcon } from "@/lib/asset-display"
-import type { Asset, Client } from "@/types/index"
+import type { Asset } from "@/types/index"
 
 const APPROVAL_STATUSES: string[] = ["draft", "ready_for_review", "revision_requested"]
 
@@ -43,8 +43,9 @@ export default function ApprovalsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ assetId }),
       })
-      const payload = await response.json()
+      const payload: { data?: Asset; error?: string } = await response.json()
       if (!response.ok) throw new Error(payload.error ?? "Request failed")
+      // SAFETY: a successful response always carries the updated asset in `data`.
       return payload.data as Asset
     },
     onSuccess: (_updated, { action }) => {
@@ -159,7 +160,7 @@ export default function ApprovalsPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-muted-foreground">{(error as Error).message}</p>
+          <p className="text-muted-foreground">{error.message}</p>
         </div>
       </div>
     )

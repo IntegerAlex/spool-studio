@@ -1,7 +1,7 @@
 "use client"
 
 import { X } from "lucide-react"
-import { useCallback, useEffect } from "react"
+import { useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { getAssetPreviewType } from "@/lib/asset-display"
 import {

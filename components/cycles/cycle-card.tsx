@@ -7,10 +7,7 @@ import { Card } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { ServiceCycle } from "@/types/index"
 
-const statusConfig: Record<
-  ServiceCycle["status"],
-  { label: string; color: string; icon: typeof CheckCircle2 }
-> = {
+const statusConfig = {
   upcoming: {
     label: "Upcoming",
     color: "text-blue-400 bg-blue-400/10",
@@ -31,7 +28,10 @@ const statusConfig: Record<
     color: "text-red-400 bg-red-400/10",
     icon: XCircle,
   },
-}
+} satisfies Record<
+  ServiceCycle["status"],
+  { label: string; color: string; icon: typeof CheckCircle2 }
+>
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString(undefined, {

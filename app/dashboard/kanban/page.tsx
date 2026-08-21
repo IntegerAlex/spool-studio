@@ -84,7 +84,7 @@ export default function KanbanPage() {
       await queryClient.cancelQueries({ queryKey: ["board"] })
       const previous = queryClient.getQueryData<BoardData>(["board"])
       queryClient.setQueryData<BoardData>(["board"], (old) => {
-        if (!old) return old as unknown as BoardData
+        if (!old) return old
         return {
           ...old,
           assets: old.assets.map((item) =>
@@ -108,7 +108,7 @@ export default function KanbanPage() {
     },
     onSuccess: (updated) => {
       queryClient.setQueryData<BoardData>(["board"], (old) => {
-        if (!old) return old as unknown as BoardData
+        if (!old) return old
         return {
           ...old,
           assets: old.assets.map((item) =>
@@ -257,7 +257,7 @@ export default function KanbanPage() {
               mode="create"
               onSaved={(asset) => {
                 queryClient.setQueryData<BoardData>(["board"], (old) => {
-                  if (!old) return old as unknown as BoardData
+                  if (!old) return old
                   return { ...old, assets: [asset, ...old.assets] }
                 })
                 queryClient.invalidateQueries({ queryKey: ["board"] })

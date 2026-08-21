@@ -47,11 +47,11 @@ export function distributeDeliverables(
   numWeeks: number,
 ): number[] {
   if (numWeeks <= 0) return []
-  if (total <= 0) return new Array(numWeeks).fill(0)
+  if (total <= 0) return Array.from({ length: numWeeks }, () => 0)
 
   const base = Math.floor(total / numWeeks)
   const remainder = total - base * numWeeks
-  const result = new Array(numWeeks).fill(base)
+  const result = Array.from({ length: numWeeks }, () => base)
 
   if (remainder > 0) {
     const spacing = Math.max(1, Math.floor(numWeeks / (remainder + 1)))

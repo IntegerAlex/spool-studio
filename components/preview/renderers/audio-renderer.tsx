@@ -16,7 +16,6 @@ interface AudioRendererProps {
 }
 
 export function AudioRenderer({
-  descriptor,
   urls,
   compact,
   onError,

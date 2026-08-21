@@ -2,10 +2,10 @@ import { sql } from "drizzle-orm"
 import { db } from "@/db"
 import type { AssetType } from "@/types/index"
 
-const TYPE_PREFIX: Record<AssetType, string> = {
+const TYPE_PREFIX = {
   reel: "R",
   poster: "P",
-}
+} satisfies Record<AssetType, string>
 
 const MONTH_ABBREV = [
   "Jan",
@@ -34,6 +34,8 @@ export async function getNextAssetNumber(
   const { rows } = await db.execute(
     sql`select public.assign_asset_number(${cycleId}::uuid, ${assetType}::public.asset_type) as next_number`,
   )
+  // SAFETY: assign_asset_number() always returns one row whose
+  // next_number column holds the assigned number.
   const row = rows[0] as { next_number: number } | undefined
   if (!row) {
     throw new Error("Failed to assign asset number")

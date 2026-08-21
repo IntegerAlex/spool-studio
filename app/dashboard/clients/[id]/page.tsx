@@ -8,6 +8,7 @@ import { assetsApi, clientsApi } from "@/lib/api-client"
 
 export default function ClientDetailPage() {
   const params = useParams()
+  // SAFETY: route param [id] is always a single string segment for this page.
   const clientId = params.id as string | undefined
 
   const clientQuery = useQuery({
@@ -70,7 +71,7 @@ export default function ClientDetailPage() {
           ]}
         />
         <div className="text-center py-12">
-          <p className="text-[#71717a]">{(error as Error).message}</p>
+          <p className="text-[#71717a]">{error instanceof Error ? error.message : "Failed to load client"}</p>
         </div>
       </div>
     )

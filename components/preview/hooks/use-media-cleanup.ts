@@ -25,7 +25,7 @@ export function useMediaCleanup() {
         videoRef.current.pause()
         videoRef.current.removeAttribute("src")
         videoRef.current.load()
-      } catch (_) {
+      } catch {
         // ignore cleanup errors
       }
     }
@@ -35,7 +35,7 @@ export function useMediaCleanup() {
         audioRef.current.pause()
         audioRef.current.removeAttribute("src")
         audioRef.current.load()
-      } catch (_) {
+      } catch {
         // ignore cleanup errors
       }
     }
@@ -43,7 +43,7 @@ export function useMediaCleanup() {
     if (iframeRef.current) {
       try {
         iframeRef.current.src = "about:blank"
-      } catch (_) {
+      } catch {
         // ignore cleanup errors
       }
     }

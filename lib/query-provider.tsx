@@ -11,8 +11,11 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 60_000,
             gcTime: 10 * 60_000,
-            retry: (count, error: unknown) => {
-              const status = (error as { status?: number })?.status
+            retry: (count, error) => {
+              const status =
+                error instanceof Error && "status" in error
+                  ? error.status
+                  : undefined
               if (status === 401 || status === 403) return false
               return count < 2
             },

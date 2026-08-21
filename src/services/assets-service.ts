@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm"
-import { db } from "@/db"
-import { assetRevisions } from "@/db/schema"
+import { db, type FlexibleInsert } from "@/db"
+import { assetRevisions, contentAssets } from "@/db/schema"
 import { deleteFile, uploadFile } from "@/integrations/r2/r2-service"
 import { extractAssetMetadata } from "@/lib/asset-metadata"
 import {
@@ -1164,7 +1164,7 @@ export async function updateAsset(
     }
   }
 
-  const updates: Record<string, unknown> = {}
+  const updates: Partial<FlexibleInsert<typeof contentAssets.$inferInsert>> = {}
   if (input.clientId !== undefined) updates.client_id = input.clientId
   if (input.title !== undefined) updates.title = input.title
   if (input.type !== undefined) updates.type = input.type
@@ -1209,7 +1209,7 @@ export async function updateAsset(
     const publishedAt =
       updates.published_at instanceof Date
         ? updates.published_at.toISOString()
-        : ((updates.published_at as string) ?? new Date().toISOString())
+        : (updates.published_at ?? new Date().toISOString())
     await db.execute(sql`
       select public.publish_asset_with_record(
         ${assetId}::uuid,
@@ -1223,11 +1223,7 @@ export async function updateAsset(
     }
     record = refreshed
   } else {
-    record = await updateAssetRow(
-      assetId,
-      // SAFETY: this cast is safe because the value already conforms to the asserted type.
-      updates as Parameters<typeof updateAssetRow>[1],
-    )
+    record = await updateAssetRow(assetId, updates)
   }
 
   const mapped = mapAsset(record)

@@ -321,7 +321,7 @@ export default function LogsPage() {
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm text-red-400">{error ? (error as Error).message : ""}</p>
+            <p className="text-sm text-red-400">{error instanceof Error ? error.message : ""}</p>
           </div>
         ) : logs.length > 0 ? (
           <AnimatePresence>

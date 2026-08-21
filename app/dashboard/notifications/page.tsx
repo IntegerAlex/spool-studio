@@ -54,7 +54,10 @@ export default function NotificationsPage() {
 
         eventSource.addEventListener("notification:created", (e) => {
           try {
-            const data = JSON.parse((e as MessageEvent).data)
+            const data = JSON.parse(
+              // SAFETY: EventSource 'message' events always carry MessageEvent data payloads.
+              (e as MessageEvent).data,
+            )
             if (data.userId !== user.id) return
 
             const incoming: Notification = {

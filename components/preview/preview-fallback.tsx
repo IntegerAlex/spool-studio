@@ -19,18 +19,17 @@ interface PreviewFallbackProps {
   title: string
 }
 
-const iconMap: Record<AssetPreviewType, typeof FileText> = {
+const iconMap = {
   image: ImageIcon,
   video: Video,
   audio: FileAudio,
   document: FileUp,
   file: FileText,
-}
+} satisfies Record<AssetPreviewType, typeof FileText>
 
 export function PreviewFallback({
   previewType,
   urls,
-  title,
 }: PreviewFallbackProps) {
   const Icon = iconMap[previewType]
 
