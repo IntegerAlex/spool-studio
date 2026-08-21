@@ -1,8 +1,5 @@
-import {
-  generatePreviewUrl,
-  generatePublicUrl,
-} from "@/integrations/r2/r2-service"
 import { getAssetPreviewType } from "@/lib/asset-display"
+import { sanitizeFileUrl } from "@/lib/file-url"
 import type { Asset, AssetRevision } from "@/types/index"
 
 export interface AssetPreviewDescriptor {
@@ -24,47 +21,25 @@ export interface AssetPreviewUrls {
   directMediaUrl: string | null
 }
 
-function resolveR2Key(
-  input: Pick<AssetPreviewDescriptor, "driveFileId" | "driveFileUrl">,
-): string | null {
-  if (input.driveFileId) {
-    return input.driveFileId
-  }
-  return null
-}
-
 export function getAssetPreviewUrls(
   input: AssetPreviewDescriptor,
 ): AssetPreviewUrls {
   const previewType = getAssetPreviewType(input)
-  const r2Key = resolveR2Key(input)
 
-  const openUrl = r2Key
-    ? generatePublicUrl(r2Key)
-    : (input.driveFileUrl ?? null)
-  const previewUrl = r2Key
-    ? generatePreviewUrl(r2Key)
-    : (input.driveFileUrl ?? null)
-  const viewUrl = r2Key
-    ? generatePublicUrl(r2Key)
-    : (input.driveFileUrl ?? null)
-  const downloadUrl = r2Key
-    ? generatePublicUrl(r2Key)
-    : (input.driveFileUrl ?? null)
+  // Private bucket: no public URL exists. The server presigns
+  // drive_file_id per request and ships it as driveFileUrl - use it.
+  // Never reconstruct a public URL from the R2 key here.
+  const url = input.driveFileUrl ?? null
 
   return {
-    openUrl,
-    previewUrl,
-    viewUrl,
-    downloadUrl,
+    openUrl: url,
+    previewUrl: url,
+    viewUrl: url,
+    downloadUrl: url,
     directMediaUrl:
       previewType === "image"
-        ? (input.thumbnailUrl ?? viewUrl ?? openUrl)
-        : previewType === "video" || previewType === "audio"
-          ? (downloadUrl ?? openUrl)
-          : previewType === "document"
-            ? (previewUrl ?? openUrl)
-            : openUrl,
+        ? (sanitizeFileUrl(input.thumbnailUrl) ?? url)
+        : url,
   }
 }
 
