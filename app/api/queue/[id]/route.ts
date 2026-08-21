@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseBody } from "@/lib/api-validation"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -17,29 +19,41 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    const updates = await request.json()
+    const body = await request.json()
+
+    const queueUpdateSchema = z.object({
+      status: z.string().optional(),
+      scheduledDate: z.coerce.date().optional(),
+      caption: z.string().nullish(),
+      hashtags: z.string().nullish(),
+      platform: z.string().nullish(),
+      recurrence: z.unknown().optional(),
+    })
+    const parsed = parseBody(queueUpdateSchema, body)
+    if (!parsed.ok) {
+      return parsed.response
+    }
+    const input = parsed.data
 
     const set: Parameters<typeof updateUploadQueueItem>[1] = {}
 
-    if (updates.status !== undefined) {
-      set.status = updates.status
+    if (input.status !== undefined) {
+      set.status = input.status
     }
-    if (updates.scheduledDate !== undefined) {
-      set.scheduled_date = updates.scheduledDate
+    if (input.scheduledDate !== undefined) {
+      set.scheduled_date = input.scheduledDate
     }
-    if (updates.caption !== undefined) {
-      set.caption = updates.caption
+    if (input.caption !== undefined) {
+      set.caption = input.caption
     }
-    if (updates.hashtags !== undefined) {
-      // SAFETY: hashtags arrive from a parsed JSON payload; runtime shape matches the DB column.
-      set.hashtags = updates.hashtags as never
+    if (input.hashtags !== undefined) {
+      set.hashtags = input.hashtags
     }
-    if (updates.platform !== undefined) {
-      set.platform = updates.platform
+    if (input.platform !== undefined) {
+      set.platform = input.platform
     }
-    if (updates.recurrence !== undefined) {
-      // SAFETY: recurrence arrives from a parsed JSON payload; runtime shape matches the DB column.
-      set.recurrence = (updates.recurrence ? updates.recurrence : null) as never
+    if (input.recurrence !== undefined) {
+      set.recurrence = input.recurrence ? input.recurrence : null
     }
 
     if (Object.keys(set).length === 0) {

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseBody } from "@/lib/api-validation"
 import { requireUser } from "@/lib/auth"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import type { UploadQueueStatus } from "@/types/index"
@@ -45,25 +47,29 @@ export async function POST(request: Request) {
     if (!user)
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { assetId, scheduledDate, platform, caption, hashtags, recurrence } =
-      await request.json()
-
-    if (!assetId || !scheduledDate || !platform) {
-      return NextResponse.json(
-        { error: "assetId, scheduledDate, and platform are required" },
-        { status: 400 },
-      )
+    const body = await request.json()
+    const queueCreateSchema = z.object({
+      assetId: z.string().uuid("assetId must be a valid id"),
+      scheduledDate: z.coerce.date(),
+      platform: z.string().min(1),
+      caption: z.string().nullish(),
+      hashtags: z.string().nullish(),
+      recurrence: z.unknown().optional(),
+    })
+    const parsed = parseBody(queueCreateSchema, body)
+    if (!parsed.ok) {
+      return parsed.response
     }
+    const input = parsed.data
 
-    // SAFETY: hashtags/recurrence arrive from a parsed JSON payload; runtime shape matches the DB column.
     const r = await insertUploadQueueItem({
-      asset_id: assetId,
-      scheduled_date: scheduledDate,
-      platform,
+      asset_id: input.assetId,
+      scheduled_date: input.scheduledDate,
+      platform: input.platform,
       status: "scheduled",
-      caption: caption || null,
-      hashtags: (hashtags as never) || null,
-      recurrence: (recurrence as never) || null,
+      caption: input.caption || null,
+      hashtags: input.hashtags || null,
+      recurrence: input.recurrence || null,
     })
 
     return NextResponse.json(

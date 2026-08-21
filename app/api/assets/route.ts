@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseBody } from "@/lib/api-validation"
 import { assetStatusValues } from "@/lib/asset-workflow"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
@@ -45,42 +47,53 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    console.info("[api/assets] create payload", body)
-    if (!body?.clientId || !body?.type) {
-      const error = "Client and type are required"
-      console.warn("[api/assets] validation error", { error, body })
-      return NextResponse.json({ success: false, error }, { status: 400 })
+    const assetCreateSchema = z.object({
+      clientId: z.string().uuid("Client must be a valid id"),
+      title: z.string().optional(),
+      type: z.enum(["reel", "poster"]),
+      // SAFETY: assetStatusValues is the exhaustive readonly AssetStatus tuple; spread satisfies z.enum's mutable tuple requirement.
+      status: z.enum([...assetStatusValues] as [AssetStatus, ...AssetStatus[]]).optional(),
+      driveFileUrl: z.string().url().nullish(),
+      thumbnailUrl: z.string().url().nullish(),
+      assignedTo: z.string().uuid().nullish(),
+      scheduledAt: z.coerce.date().nullish(),
+      publishDate: z.coerce.date().nullish(),
+      publishTime: z
+        .string()
+        .regex(/^\d{2}:\d{2}(:\d{2})?$/, "publishTime must be HH:MM or HH:MM:SS")
+        .nullish(),
+      scheduledBy: z.string().uuid().nullish(),
+      publishedAt: z.coerce.date().nullish(),
+      approvedAt: z.coerce.date().nullish(),
+      approvedBy: z.string().uuid().nullish(),
+    })
+    const parsed = parseBody(assetCreateSchema, body)
+    if (!parsed.ok) {
+      console.warn("[api/assets] validation error", {
+        issues: parsed.response,
+      })
+      return parsed.response
     }
-    const allowedTypes = ["reel", "poster"]
-    const allowedStatuses = [...assetStatusValues]
-    if (!allowedTypes.includes(body.type)) {
-      const error = `Invalid asset type: ${body.type}`
-      console.warn("[api/assets] enum mismatch", { error, type: body.type })
-      return NextResponse.json({ success: false, error }, { status: 400 })
-    }
-    if (body.status && !allowedStatuses.includes(body.status)) {
-      const error = `Invalid status: ${body.status}`
-      console.warn("[api/assets] enum mismatch", { error, status: body.status })
-      return NextResponse.json({ success: false, error }, { status: 400 })
-    }
+    const input = parsed.data
 
     const payload = {
-      clientId: body.clientId,
-      title: body.title,
-      type: body.type,
-      status: body.status,
-      driveFileUrl: body.driveFileUrl,
-      thumbnailUrl: body.thumbnailUrl,
-      assignedTo: body.assignedTo ?? null,
-      scheduledAt: body.scheduledAt ?? null,
-      publishDate: body.publishDate ?? null,
-      publishTime: body.publishTime ?? null,
-      scheduledBy: body.scheduledBy ?? null,
-      publishedAt: body.publishedAt ?? null,
-      approvedAt: body.approvedAt ?? null,
-      approvedBy: body.approvedBy ?? null,
+      clientId: input.clientId,
+      title: input.title,
+      type: input.type,
+      status: input.status,
+      driveFileUrl: input.driveFileUrl ?? undefined,
+      thumbnailUrl: input.thumbnailUrl ?? undefined,
+      assignedTo: input.assignedTo ?? null,
+      scheduledAt: input.scheduledAt?.toISOString() ?? null,
+      publishDate: input.publishDate
+        ? input.publishDate.toISOString().slice(0, 10)
+        : null,
+      publishTime: input.publishTime ?? null,
+      scheduledBy: input.scheduledBy ?? null,
+      publishedAt: input.publishedAt?.toISOString() ?? null,
+      approvedAt: input.approvedAt?.toISOString() ?? null,
+      approvedBy: input.approvedBy ?? null,
     }
-    console.info("[api/assets] parsed payload", payload)
     const asset = await createAsset({
       clientId: payload.clientId,
       title: payload.title || "",
@@ -97,7 +110,6 @@ export async function POST(request: Request) {
       approvedAt: payload.approvedAt,
       approvedBy: payload.approvedBy,
     })
-    console.info("[api/assets] insert result", asset)
     return NextResponse.json({ success: true, data: asset }, { status: 201 })
   } catch (error) {
     const message =

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   createCycle,
@@ -28,19 +30,25 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    if (!body?.clientId || !body?.startDate || !body?.endDate) {
-      return NextResponse.json(
-        { error: "clientId, startDate, and endDate are required" },
-        { status: 400 },
-      )
+    const cycleCreateSchema = z.object({
+      clientId: z.string().uuid("clientId must be a valid id"),
+      startDate: z.coerce.date(),
+      endDate: z.coerce.date(),
+      reelsTarget: z.number().int().nonnegative().optional(),
+      postersTarget: z.number().int().nonnegative().optional(),
+    })
+    const parsed = parseBody(cycleCreateSchema, body)
+    if (!parsed.ok) {
+      return parsed.response
     }
+    const input = parsed.data
 
     const cycle = await createCycle({
-      clientId: body.clientId,
-      startDate: body.startDate,
-      endDate: body.endDate,
-      reelsTarget: body.reelsTarget ?? 0,
-      postersTarget: body.postersTarget ?? 0,
+      clientId: input.clientId,
+      startDate: input.startDate.toISOString().slice(0, 10),
+      endDate: input.endDate.toISOString().slice(0, 10),
+      reelsTarget: input.reelsTarget ?? 0,
+      postersTarget: input.postersTarget ?? 0,
     })
 
     return NextResponse.json({ data: cycle }, { status: 201 })

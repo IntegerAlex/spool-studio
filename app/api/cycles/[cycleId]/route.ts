@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
+import { parseBody } from "@/lib/api-validation"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import {
   cancelCycleService,
@@ -51,7 +53,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const body = await request.json()
-    const action = body?.action
+    const cycleActionSchema = z.object({
+      action: z.string(),
+      startDate: z.coerce.date().optional(),
+      endDate: z.coerce.date().optional(),
+      reelsTarget: z.number().int().nonnegative().optional(),
+      postersTarget: z.number().int().nonnegative().optional(),
+    })
+    const parsed = parseBody(cycleActionSchema, body)
+    if (!parsed.ok) {
+      return parsed.response
+    }
+    const input = parsed.data
+
+    const action = input.action
 
     if (action === "complete") {
       await completeCycleService(cycleId)
@@ -65,10 +80,14 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (action === "update") {
       const updated = await updateCycleDeliverables(cycleId, {
-        startDate: body.startDate,
-        endDate: body.endDate,
-        reelsTarget: body.reelsTarget,
-        postersTarget: body.postersTarget,
+        startDate: input.startDate
+          ? input.startDate.toISOString().slice(0, 10)
+          : undefined,
+        endDate: input.endDate
+          ? input.endDate.toISOString().slice(0, 10)
+          : undefined,
+        reelsTarget: input.reelsTarget,
+        postersTarget: input.postersTarget,
       })
       return NextResponse.json({ data: updated })
     }
