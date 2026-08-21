@@ -24,3 +24,7 @@ coverage/
 
 # agent scratch dir
 .kilo/
+
+# runtime artifacts
+*.log
+.queue_recent.json
