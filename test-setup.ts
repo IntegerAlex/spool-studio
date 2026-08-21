@@ -7,3 +7,32 @@ if (typeof globalThis.crypto === "undefined") {
     configurable: true,
   })
 }
+
+// Minimal localStorage shim: node test env has no storage; zustand/persist
+// (kanban-store) logs a warning on every write without it.
+const localStorageShim = (() => {
+  const store = new Map<string, string>()
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value)
+    },
+    removeItem: (key: string) => {
+      store.delete(key)
+    },
+    clear: () => {
+      store.clear()
+    },
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size
+    },
+  }
+})()
+
+if (globalThis.localStorage === undefined) {
+  Object.defineProperty(globalThis, "localStorage", {
+    value: localStorageShim,
+    configurable: true,
+  })
+}
