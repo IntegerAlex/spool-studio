@@ -114,7 +114,7 @@ export async function getCommentsByAssetId(
       .filter((comment): comment is AssetComment => Boolean(comment))
   } catch (error) {
     logProductionRuntimeError("comments-loader", error, { assetId })
-    return []
+    throw error
   }
 }
 

@@ -439,9 +439,9 @@ export const authApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     })
-    const data = await res.json()
-    if (data.error) throw new Error(data.error)
-    return { user: data.user, token: "cookie-based" }
+    const payload = await res.json()
+    if (payload.error) throw new Error(payload.error)
+    return { user: payload.data.user, token: "cookie-based" }
   },
 
   logout: async (): Promise<void> => {

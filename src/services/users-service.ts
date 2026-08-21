@@ -71,15 +71,10 @@ export const getOrCreateCurrentUserProfile = cache(async (): Promise<User> => {
 })
 
 export async function getUsers(): Promise<User[]> {
-  try {
-    const rows = await listUsers()
-    return rows
-      .map((user) => mapUser(user))
-      .filter((user): user is User => Boolean(user))
-  } catch (error) {
-    logProductionRuntimeError("users-loader", error)
-    return []
-  }
+  const rows = await listUsers()
+  return rows
+    .map((user) => mapUser(user))
+    .filter((user): user is User => Boolean(user))
 }
 
 export async function getUserDetail(userId: string): Promise<User | null> {
@@ -88,7 +83,7 @@ export async function getUserDetail(userId: string): Promise<User | null> {
     return mapUser(row)
   } catch (error) {
     logProductionRuntimeError("user-detail-loader", error, { userId })
-    return null
+    throw error
   }
 }
 
@@ -102,6 +97,6 @@ export async function getUsersByIds(userIds: string[]): Promise<User[]> {
     logProductionRuntimeError("users-by-ids-loader", error, {
       count: userIds.length,
     })
-    return []
+    throw error
   }
 }

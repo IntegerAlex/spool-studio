@@ -1,7 +1,8 @@
 "use client"
 
 import { AlertCircle } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { AssetPreviewModal } from "@/components/assets/asset-preview-modal"
 import { usePreviewStore } from "@/stores/preview-store"
 import { Button } from "@/components/ui/button"
@@ -10,7 +11,7 @@ import { usersApi } from "@/lib/api-client"
 import {
   toAssetPreviewDescriptor,
 } from "@/lib/asset-preview"
-import type { AssetRevision, User } from "@/types/index"
+import type { AssetRevision } from "@/types/index"
 
 type RevisionRecord = AssetRevision
 
@@ -20,35 +21,19 @@ interface RevisionPanelProps {
 }
 
 export function RevisionPanel({ revisions, assetTitle }: RevisionPanelProps) {
-  const [users, setUsers] = useState<Map<string, User>>(new Map())
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(),
+    staleTime: 5 * 60_000,
+  })
+  const users = useMemo(
+    () => new Map((usersQuery.data ?? []).map((u) => [u.id, u])),
+    [usersQuery.data],
+  )
   const previewItem = usePreviewStore((state) => state.item)
   const isPreviewOpen = usePreviewStore((state) => state.open)
   const closePreview = usePreviewStore((state) => state.closePreview)
   const openPreview = usePreviewStore((state) => state.openPreview)
-
-  useEffect(() => {
-    let isActive = true
-
-    const loadUsers = async () => {
-      try {
-        const allUsers = await usersApi.getAll()
-        const userMap = new Map(allUsers.map((u) => [u.id, u]))
-        if (isActive) {
-          setUsers(userMap)
-        }
-      } catch {
-        if (isActive) {
-          setUsers(new Map())
-        }
-      }
-    }
-
-    void loadUsers()
-
-    return () => {
-      isActive = false
-    }
-  }, [])
 
   if (revisions.length === 0) {
     return (

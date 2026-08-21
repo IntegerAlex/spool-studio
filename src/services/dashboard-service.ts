@@ -1,4 +1,3 @@
-import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { listRecentActivity } from "@/repositories/asset-activity-repository"
 import {
   type DbAssetSummary,
@@ -216,249 +215,215 @@ function getWeekStart(date: Date) {
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  try {
-    const [assetSummaries, assetLogs, serviceClients] = await Promise.all([
-      listAssetSummaries(),
-      listRecentActivity({ limit: 50 }),
-      getClients(),
-    ])
-    const repositoryClients = serviceClients
-    const rawSupabaseCount = serviceClients.length
+  const [assetSummaries, assetLogs, serviceClients] = await Promise.all([
+    listAssetSummaries(),
+    listRecentActivity({ limit: 50 }),
+    getClients(),
+  ])
+  const repositoryClients = serviceClients
+  const rawSupabaseCount = serviceClients.length
 
-    const now = new Date()
-    const weekStart = getWeekStart(now)
-    const monthStart = getMonthStart(now)
-    const nextWeek = new Date(now)
-    nextWeek.setDate(now.getDate() + 7)
+  const now = new Date()
+  const weekStart = getWeekStart(now)
+  const monthStart = getMonthStart(now)
+  const nextWeek = new Date(now)
+  nextWeek.setDate(now.getDate() + 7)
 
-    // Use pre-fetched asset summaries for aggregate computations
-    const activeAssets = assetSummaries.filter(
-      (asset) => asset.status !== "archived" && asset.status !== "failed",
-    )
+  // Use pre-fetched asset summaries for aggregate computations
+  const activeAssets = assetSummaries.filter(
+    (asset) => asset.status !== "archived" && asset.status !== "failed",
+  )
 
-    // Pre-group assets by client_id for O(1) lookups in the client loop
-    const assetsByClientId = new Map<string, DbAssetSummary[]>()
-    for (const asset of activeAssets) {
-      const cid = asset.client_id
-      if (!cid) continue
-      const list = assetsByClientId.get(cid)
-      if (list) {
-        list.push(asset)
-      } else {
-        assetsByClientId.set(cid, [asset])
+  // Pre-group assets by client_id for O(1) lookups in the client loop
+  const assetsByClientId = new Map<string, DbAssetSummary[]>()
+  for (const asset of activeAssets) {
+    const cid = asset.client_id
+    if (!cid) continue
+    const list = assetsByClientId.get(cid)
+    if (list) {
+      list.push(asset)
+    } else {
+      assetsByClientId.set(cid, [asset])
+    }
+  }
+
+  let pendingApprovals = 0
+  let upcomingUploads = 0
+  let uploadedThisMonth = 0
+  let approvedAssets = 0
+  let _totalReelsPublished = 0 // weekly
+  let _totalPostersPublished = 0 // weekly
+  let publishedContentCount = 0 // all time
+
+  const bucketCounts = new Map<
+    "Draft" | "Revision" | "Approved" | "Published",
+    number
+  >([
+    ["Draft", 0],
+    ["Revision", 0],
+    ["Approved", 0],
+    ["Published", 0],
+  ])
+
+  for (const asset of activeAssets) {
+    const bucket = getStatusBucket(asset.status)
+    if (bucket) {
+      bucketCounts.set(bucket, (bucketCounts.get(bucket) ?? 0) + 1)
+    }
+
+    if (
+      asset.status === "draft" ||
+      asset.status === "in_design" ||
+      asset.status === "ready_for_review" ||
+      asset.status === "revision_requested"
+    ) {
+      pendingApprovals += 1
+    }
+
+    if (asset.status === "approved" && asset.publish_date) {
+      const timePart = asset.publish_time ?? "00:00:00"
+      const publishAt = new Date(`${asset.publish_date}T${timePart}`)
+      if (publishAt >= now && publishAt <= nextWeek) {
+        upcomingUploads += 1
       }
     }
 
-    let pendingApprovals = 0
-    let upcomingUploads = 0
-    let uploadedThisMonth = 0
-    let approvedAssets = 0
-    let _totalReelsPublished = 0 // weekly
-    let _totalPostersPublished = 0 // weekly
-    let publishedContentCount = 0 // all time
-
-    const bucketCounts = new Map<
-      "Draft" | "Revision" | "Approved" | "Published",
-      number
-    >([
-      ["Draft", 0],
-      ["Revision", 0],
-      ["Approved", 0],
-      ["Published", 0],
-    ])
-
-    for (const asset of activeAssets) {
-      const bucket = getStatusBucket(asset.status)
-      if (bucket) {
-        bucketCounts.set(bucket, (bucketCounts.get(bucket) ?? 0) + 1)
-      }
-
-      if (
-        asset.status === "draft" ||
-        asset.status === "in_design" ||
-        asset.status === "ready_for_review" ||
-        asset.status === "revision_requested"
-      ) {
-        pendingApprovals += 1
-      }
-
-      if (asset.status === "approved" && asset.publish_date) {
-        const timePart = asset.publish_time ?? "00:00:00"
-        const publishAt = new Date(`${asset.publish_date}T${timePart}`)
-        if (publishAt >= now && publishAt <= nextWeek) {
-          upcomingUploads += 1
-        }
-      }
-
-      if (asset.status === "published" && asset.published_at) {
-        if (new Date(asset.published_at) >= monthStart) {
-          uploadedThisMonth += 1
-        }
-      }
-
-      if (asset.status === "approved") {
-        approvedAssets += 1
-      }
-
-      if (asset.status === "published") {
-        publishedContentCount += 1 // all time
-      }
-
-      // Weekly published counts for Reels & Posters
-      if (asset.status === "published" && asset.created_at) {
-        const created = new Date(asset.created_at)
-        if (created >= weekStart && created <= now) {
-          if (asset.type === "reel") {
-            _totalReelsPublished += 1
-          } else if (asset.type === "poster") {
-            _totalPostersPublished += 1
-          }
-        }
+    if (asset.status === "published" && asset.published_at) {
+      if (new Date(asset.published_at) >= monthStart) {
+        uploadedThisMonth += 1
       }
     }
 
-    // Aggregates over all clients using getClients() data as source of truth
-    let totalPostersPlanned = 0
-    let totalReelsPlanned = 0
-    let totalPostersCompleted = 0
-    let totalReelsCompleted = 0
-    let totalDeliverables = 0
-    let totalCompleted = 0
+    if (asset.status === "approved") {
+      approvedAssets += 1
+    }
 
-    const clientPerformance: ClientPerformanceItem[] = []
+    if (asset.status === "published") {
+      publishedContentCount += 1 // all time
+    }
 
-    // Diagnostics / Trace logging for clients-source
-    for (const client of serviceClients) {
-      const pPosters = client.weeklyPosterGoal ?? 0
-      const pReels = client.weeklyReelGoal ?? 0
-      const cPosters = client.weeklyCompletedPosters ?? 0
-      const cReels = client.weeklyCompletedReels ?? 0
-      const planned = pPosters + pReels
-      const completed = cPosters + cReels
+    // Weekly published counts for Reels & Posters
+    if (asset.status === "published" && asset.created_at) {
+      const created = new Date(asset.created_at)
+      if (created >= weekStart && created <= now) {
+        if (asset.type === "reel") {
+          _totalReelsPublished += 1
+        } else if (asset.type === "poster") {
+          _totalPostersPublished += 1
+        }
+      }
+    }
+  }
 
-      totalPostersPlanned += pPosters
-      totalReelsPlanned += pReels
-      totalPostersCompleted += cPosters
-      totalReelsCompleted += cReels
-      totalDeliverables += planned
-      totalCompleted += completed
+  // Aggregates over all clients using getClients() data as source of truth
+  let totalPostersPlanned = 0
+  let totalReelsPlanned = 0
+  let totalPostersCompleted = 0
+  let totalReelsCompleted = 0
+  let totalDeliverables = 0
+  let totalCompleted = 0
 
-      // Get next publish date (earliest approved/scheduled asset publish date in the future)
-      const clientAssets = assetsByClientId.get(client.id) ?? []
-      const futureDates = clientAssets
-        .map((asset) => {
-          if (asset.publish_date) {
-            const timePart = asset.publish_time ?? "00:00:00"
-            return new Date(`${asset.publish_date}T${timePart}`)
-          }
-          return null
-        })
-        .filter((d): d is Date => d !== null && d.getTime() >= now.getTime())
+  const clientPerformance: ClientPerformanceItem[] = []
 
-      const nextPublishDate =
-        futureDates.length > 0
-          ? new Date(
-              Math.min(...futureDates.map((d) => d.getTime())),
-            ).toISOString()
-          : null
+  // Diagnostics / Trace logging for clients-source
+  for (const client of serviceClients) {
+    const pPosters = client.weeklyPosterGoal ?? 0
+    const pReels = client.weeklyReelGoal ?? 0
+    const cPosters = client.weeklyCompletedPosters ?? 0
+    const cReels = client.weeklyCompletedReels ?? 0
+    const planned = pPosters + pReels
+    const completed = cPosters + cReels
 
-      clientPerformance.push({
-        id: client.id,
-        name: client.name,
-        plannedDeliverables: planned,
-        completedDeliverables: completed,
-        completionRate:
-          planned > 0 ? Math.round((completed / planned) * 100) : 0,
-        nextPublishDate,
+    totalPostersPlanned += pPosters
+    totalReelsPlanned += pReels
+    totalPostersCompleted += cPosters
+    totalReelsCompleted += cReels
+    totalDeliverables += planned
+    totalCompleted += completed
+
+    // Get next publish date (earliest approved/scheduled asset publish date in the future)
+    const clientAssets = assetsByClientId.get(client.id) ?? []
+    const futureDates = clientAssets
+      .map((asset) => {
+        if (asset.publish_date) {
+          const timePart = asset.publish_time ?? "00:00:00"
+          return new Date(`${asset.publish_date}T${timePart}`)
+        }
+        return null
       })
-    }
+      .filter((d): d is Date => d !== null && d.getTime() >= now.getTime())
 
-    // Sort clientPerformance by nearest deadline
-    clientPerformance.sort((a, b) => {
-      if (!a.nextPublishDate && !b.nextPublishDate) return 0
-      if (!a.nextPublishDate) return 1
-      if (!b.nextPublishDate) return -1
-      return (
-        new Date(a.nextPublishDate).getTime() -
-        new Date(b.nextPublishDate).getTime()
-      )
+    const nextPublishDate =
+      futureDates.length > 0
+        ? new Date(
+            Math.min(...futureDates.map((d) => d.getTime())),
+          ).toISOString()
+        : null
+
+    clientPerformance.push({
+      id: client.id,
+      name: client.name,
+      plannedDeliverables: planned,
+      completedDeliverables: completed,
+      completionRate:
+        planned > 0 ? Math.round((completed / planned) * 100) : 0,
+      nextPublishDate,
     })
+  }
 
-    const completionPercentage =
-      totalDeliverables > 0
-        ? Math.round((totalCompleted / totalDeliverables) * 100)
-        : 0
-
-    // Build enriched recentActivity by fetching only the small set of assets referenced in activity
-    const activityAssetIds = Array.from(
-      new Set(assetLogs.map((a) => a.asset_id).filter(Boolean)),
+  // Sort clientPerformance by nearest deadline
+  clientPerformance.sort((a, b) => {
+    if (!a.nextPublishDate && !b.nextPublishDate) return 0
+    if (!a.nextPublishDate) return 1
+    if (!b.nextPublishDate) return -1
+    return (
+      new Date(a.nextPublishDate).getTime() -
+      new Date(b.nextPublishDate).getTime()
     )
-    let activityAssets: Awaited<ReturnType<typeof listAssetsByIds>> = []
-    try {
-      activityAssets = await listAssetsByIds(activityAssetIds)
-    } catch {
-      // fallback to empty
-      activityAssets = []
-    }
+  })
 
-    return {
-      totalAssets: activeAssets.length,
-      pendingApprovals,
-      approvedAssets,
-      upcomingUploads,
-      totalClients: Math.max(
-        rawSupabaseCount,
-        repositoryClients.length,
-        serviceClients.length,
-      ),
-      uploadedThisMonth,
-      assetStatusBreakdown: [
-        { label: "Draft", count: bucketCounts.get("Draft") ?? 0 },
-        { label: "Revision", count: bucketCounts.get("Revision") ?? 0 },
-        { label: "Approved", count: bucketCounts.get("Approved") ?? 0 },
-        { label: "Published", count: bucketCounts.get("Published") ?? 0 },
-      ],
-      recentActivity: buildRecentActivity(
-        assetLogs,
-        activityAssets,
-        // SAFETY: this cast is safe because the value already conforms to the asserted type.
-        repositoryClients,
-      ).slice(0, 50),
-      totalDeliverables,
-      totalReelsPlanned,
-      totalReelsPublished: totalReelsCompleted,
-      totalPostersPlanned,
-      totalPostersPublished: totalPostersCompleted,
-      publishedContentCount,
-      completionPercentage,
-      clientPerformance,
-      clients: serviceClients,
-    }
-  } catch (error) {
-    logProductionRuntimeError("dashboard-summary", error)
-    return {
-      totalAssets: 0,
-      pendingApprovals: 0,
-      approvedAssets: 0,
-      upcomingUploads: 0,
-      totalClients: 0,
-      uploadedThisMonth: 0,
-      assetStatusBreakdown: [
-        { label: "Draft", count: 0 },
-        { label: "Revision", count: 0 },
-        { label: "Approved", count: 0 },
-        { label: "Published", count: 0 },
-      ],
-      recentActivity: [],
-      totalDeliverables: 0,
-      totalReelsPlanned: 0,
-      totalReelsPublished: 0,
-      totalPostersPlanned: 0,
-      totalPostersPublished: 0,
-      publishedContentCount: 0,
-      completionPercentage: 0,
-      clientPerformance: [],
-      clients: [],
-    }
+  const completionPercentage =
+    totalDeliverables > 0
+      ? Math.round((totalCompleted / totalDeliverables) * 100)
+      : 0
+
+  // Build enriched recentActivity by fetching only the small set of assets referenced in activity
+  const activityAssetIds = Array.from(
+    new Set(assetLogs.map((a) => a.asset_id).filter(Boolean)),
+  )
+  const activityAssets = await listAssetsByIds(activityAssetIds)
+
+  return {
+    totalAssets: activeAssets.length,
+    pendingApprovals,
+    approvedAssets,
+    upcomingUploads,
+    totalClients: Math.max(
+      rawSupabaseCount,
+      repositoryClients.length,
+      serviceClients.length,
+    ),
+    uploadedThisMonth,
+    assetStatusBreakdown: [
+      { label: "Draft", count: bucketCounts.get("Draft") ?? 0 },
+      { label: "Revision", count: bucketCounts.get("Revision") ?? 0 },
+      { label: "Approved", count: bucketCounts.get("Approved") ?? 0 },
+      { label: "Published", count: bucketCounts.get("Published") ?? 0 },
+    ],
+    recentActivity: buildRecentActivity(
+      assetLogs,
+      activityAssets,
+      // SAFETY: this cast is safe because the value already conforms to the asserted type.
+      repositoryClients,
+    ).slice(0, 50),
+    totalDeliverables,
+    totalReelsPlanned,
+    totalReelsPublished: totalReelsCompleted,
+    totalPostersPlanned,
+    totalPostersPublished: totalPostersCompleted,
+    publishedContentCount,
+    completionPercentage,
+    clientPerformance,
+    clients: serviceClients,
   }
 }

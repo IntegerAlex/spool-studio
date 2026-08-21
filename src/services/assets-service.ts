@@ -15,7 +15,6 @@ import {
   sendDesignerNotification,
   sendRevisionUploadNotification,
 } from "@/lib/notifications/mailgun"
-import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
 import {
   deleteAsset as deleteAssetRow,
@@ -273,107 +272,72 @@ export function getAssetR2Key(
 }
 
 export async function getAssets(limit = 200): Promise<Asset[]> {
-  try {
-    const rows = await listAssets(limit)
-    const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
-    return mapped.filter((asset): asset is Asset => Boolean(asset))
-  } catch (error) {
-    logProductionRuntimeError("assets-loader", error)
-    return []
-  }
+  const rows = await listAssets(limit)
+  const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
+  return mapped.filter((asset): asset is Asset => Boolean(asset))
 }
 
 export async function getAssetsByStatuses(
   statuses: readonly AssetStatus[],
   limit = 200,
 ): Promise<Asset[]> {
-  try {
-    const rows = await listAssetsByStatuses(statuses, limit)
-    const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
-    return mapped.filter((asset): asset is Asset => Boolean(asset))
-  } catch (error) {
-    logProductionRuntimeError("assets-by-statuses-loader", error)
-    return []
-  }
+  const rows = await listAssetsByStatuses(statuses, limit)
+  const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
+  return mapped.filter((asset): asset is Asset => Boolean(asset))
 }
 
 export async function getAssetsByClientId(clientId: string, limit = 200): Promise<Asset[]> {
-  try {
-    const rows = await listAssetsByClientId(clientId, limit)
-    const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
-    return mapped.filter((asset): asset is Asset => Boolean(asset))
-  } catch (error) {
-    logProductionRuntimeError("assets-by-client-loader", error, { clientId })
-    return []
-  }
+  const rows = await listAssetsByClientId(clientId, limit)
+  const mapped = await Promise.all(rows.map((asset) => mapAsset(asset)))
+  return mapped.filter((asset): asset is Asset => Boolean(asset))
 }
 
 export async function getAssetDetail(assetId: string): Promise<Asset | null> {
-  try {
-    const row = await getAssetById(assetId)
-    const mapped = await mapAsset(row)
-    if (!mapped) return null
-    try {
-      const revisions = await listRevisionsByAssetId(assetId)
-      mapped.revisions = await mapAssetRevisions(revisions)
-      // populate revision pointers/count from asset row
-      mapped.currentRevisionId = row?.current_revision_id ?? undefined
-      mapped.revisionCount = row?.revision_count ?? mapped.revisions.length
-      if (row?.latest_revision_id) {
-        const latest = revisions.find((r) => r.id === row.latest_revision_id)
-        if (latest) {
-          mapped.latestRevision = {
-            id: latest.id,
-            assetId: latest.asset_id,
-            versionNumber: latest.version_number,
-            uploadedBy: latest.uploaded_by ?? undefined,
-            uploadedAt: new Date(latest.uploaded_at),
-            driveFileId: latest.drive_file_id,
-            driveFileUrl: latest.drive_file_url ?? undefined,
-            fileSize: latest.file_size ?? undefined,
-            mimeType: latest.mime_type ?? undefined,
-            mediaWidth: latest.media_width ?? undefined,
-            mediaHeight: latest.media_height ?? undefined,
-            durationSeconds: latest.duration_seconds ?? undefined,
-            changeNote: latest.change_note ?? undefined,
-            // SAFETY: this cast is safe because the value already conforms to the asserted type.
-            metadata: (latest.metadata as Record<string, Json>) ?? undefined,
-            createdAt: new Date(latest.created_at),
-          }
-        }
+  const row = await getAssetById(assetId)
+  const mapped = await mapAsset(row)
+  if (!mapped) return null
+  const revisions = await listRevisionsByAssetId(assetId)
+  mapped.revisions = await mapAssetRevisions(revisions)
+  // populate revision pointers/count from asset row
+  mapped.currentRevisionId = row?.current_revision_id ?? undefined
+  mapped.revisionCount = row?.revision_count ?? mapped.revisions.length
+  if (row?.latest_revision_id) {
+    const latest = revisions.find((r) => r.id === row.latest_revision_id)
+    if (latest) {
+      mapped.latestRevision = {
+        id: latest.id,
+        assetId: latest.asset_id,
+        versionNumber: latest.version_number,
+        uploadedBy: latest.uploaded_by ?? undefined,
+        uploadedAt: new Date(latest.uploaded_at),
+        driveFileId: latest.drive_file_id,
+        driveFileUrl: latest.drive_file_url ?? undefined,
+        fileSize: latest.file_size ?? undefined,
+        mimeType: latest.mime_type ?? undefined,
+        mediaWidth: latest.media_width ?? undefined,
+        mediaHeight: latest.media_height ?? undefined,
+        durationSeconds: latest.duration_seconds ?? undefined,
+        changeNote: latest.change_note ?? undefined,
+        // SAFETY: this cast is safe because the value already conforms to the asserted type.
+        metadata: (latest.metadata as Record<string, Json>) ?? undefined,
+        createdAt: new Date(latest.created_at),
       }
-    } catch (error) {
-      logProductionRuntimeError("asset-revisions-loader", error, { assetId })
-      mapped.revisions = []
     }
-
-    return mapped
-  } catch (error) {
-    logProductionRuntimeError("asset-detail-loader", error, { assetId })
-    return null
   }
+
+  return mapped
 }
 
 export async function getAssetSummary(assetId: string): Promise<Asset | null> {
-  try {
-    const row = await getAssetById(assetId)
-    return mapAsset(row)
-  } catch (error) {
-    logProductionRuntimeError("asset-summary-loader", error, { assetId })
-    return null
-  }
+  const row = await getAssetById(assetId)
+  return mapAsset(row)
 }
 
 export async function getAssetRevisions(
   assetId: string,
 ): Promise<AssetRevision[]> {
-  try {
-    const revisions = await listRevisionsByAssetId(assetId)
-    return mapAssetRevisions(revisions)
-  } catch (error) {
-    logProductionRuntimeError("asset-revisions-loader", error, { assetId })
-    return []
-  }
+  const revisions = await listRevisionsByAssetId(assetId)
+  return mapAssetRevisions(revisions)
 }
 
 export async function setAssetCurrentRevision(

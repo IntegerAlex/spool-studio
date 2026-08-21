@@ -24,6 +24,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AssetCard } from "@/components/assets/asset-card"
 import { ClientFormDialog } from "@/components/clients/client-form-dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -63,9 +64,7 @@ import type {
   ClientReference,
   ClientReferenceType,
   ServiceCycle,
-  ServiceCycleWithPlan,
   CreateCycleInput,
-  User,
 } from "@/types/index"
 import { ClientReport } from "./client-report"
 import { CycleCard } from "@/components/cycles/cycle-card"
@@ -413,43 +412,57 @@ export function ClientDetail({
   const [activeTab, setActiveTab] = useState<"overview" | "assets" | "reports">(
     "overview",
   )
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     setClient(initialClient)
   }, [initialClient])
-  const [team, setTeam] = useState<User[]>([])
-  const [references, setReferences] = useState<ClientReference[]>([])
-  const [referencesLoading, setReferencesLoading] = useState(true)
   const [isReferenceDialogOpen, setIsReferenceDialogOpen] = useState(false)
   const [editingReference, setEditingReference] =
     useState<ClientReference | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const router = useRouter()
   const { toast } = useToast()
 
-  const [cycles, setCycles] = useState<ServiceCycleWithPlan[]>([])
   const [isCycleFormOpen, setIsCycleFormOpen] = useState(false)
   const [editingCycle, setEditingCycle] = useState<ServiceCycle | null>(null)
   const [cycleFormPrefill, setCycleFormPrefill] = useState<
     Partial<ServiceCycle> | undefined
   >(undefined)
 
-  useEffect(() => {
-    let isActive = true
-    cyclesApi
-      .list(client.id)
-      .then((data) => {
-        if (isActive) setCycles(data)
-      })
-      .catch(() => {
-        if (isActive) setCycles([])
-      })
-    return () => {
-      isActive = false
-    }
-  }, [client.id])
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: () => authApi.getCurrentUser(),
+    staleTime: 5 * 60_000,
+  })
+  const currentUser = meQuery.data ?? null
+
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(),
+    staleTime: 5 * 60_000,
+  })
+  const team = useMemo(
+    () =>
+      (usersQuery.data ?? []).filter((u) =>
+        client.assignedTeamMembers.includes(u.id),
+      ),
+    [usersQuery.data, client.assignedTeamMembers],
+  )
+
+  const referencesQuery = useQuery({
+    queryKey: ["references", client.id],
+    queryFn: () => clientReferencesApi.getByClientId(client.id),
+  })
+  const references = referencesQuery.data ?? []
+  const referencesLoading = referencesQuery.isLoading
+
+  const cyclesQuery = useQuery({
+    queryKey: ["cycles", client.id],
+    queryFn: () => cyclesApi.list(client.id),
+  })
+  const cycles = cyclesQuery.data ?? []
 
   const handleCycleFormSubmit = async (input: CreateCycleInput) => {
     if (editingCycle) {
@@ -460,21 +473,18 @@ export function ClientDetail({
     } else {
       await cyclesApi.create(input)
     }
-    const updated = await cyclesApi.list(client.id)
-    setCycles(updated)
+    await queryClient.invalidateQueries({ queryKey: ["cycles", client.id] })
   }
 
   const handleCompleteCycle = async (cycleId: string) => {
     await cyclesApi.complete(cycleId)
-    const updated = await cyclesApi.list(client.id)
-    setCycles(updated)
+    await queryClient.invalidateQueries({ queryKey: ["cycles", client.id] })
     toast({ title: "Cycle completed" })
   }
 
   const handleCancelCycle = async (cycleId: string) => {
     await cyclesApi.cancel(cycleId)
-    const updated = await cyclesApi.list(client.id)
-    setCycles(updated)
+    await queryClient.invalidateQueries({ queryKey: ["cycles", client.id] })
     toast({ title: "Cycle cancelled" })
   }
 
@@ -491,80 +501,6 @@ export function ClientDetail({
   }
 
   const activeCycle = cycles.find((c) => c.status === "active") ?? null
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await authApi.getCurrentUser()
-        setCurrentUser(user)
-      } catch (err) {
-        console.error("Failed to get current user", err)
-      }
-    }
-    fetchUser()
-  }, [])
-
-  useEffect(() => {
-    let isActive = true
-
-    const loadTeam = async () => {
-      try {
-        const allUsers = await usersApi.getAll()
-        const teamUsers = allUsers.filter((u) =>
-          client.assignedTeamMembers.includes(u.id),
-        )
-        if (isActive) {
-          setTeam(teamUsers)
-        }
-      } catch {
-        if (isActive) {
-          setTeam([])
-        }
-      }
-    }
-
-    void loadTeam()
-
-    return () => {
-      isActive = false
-    }
-  }, [client.assignedTeamMembers])
-
-  useEffect(() => {
-    let isActive = true
-
-    const loadReferences = async () => {
-      setReferencesLoading(true)
-      console.info("[references][fetch]", { clientId: client.id })
-      try {
-        const clientReferences = await clientReferencesApi.getByClientId(
-          client.id,
-        )
-        console.info("[references][fetch]", {
-          clientId: client.id,
-          count: clientReferences.length,
-        })
-        if (isActive) {
-          setReferences(clientReferences)
-        }
-      } catch (error) {
-        console.error("[references][fetch]", { clientId: client.id, error })
-        if (isActive) {
-          setReferences([])
-        }
-      } finally {
-        if (isActive) {
-          setReferencesLoading(false)
-        }
-      }
-    }
-
-    void loadReferences()
-
-    return () => {
-      isActive = false
-    }
-  }, [client.id])
 
   // Monthly targets & completions
   const monthlyPostsTarget = client.monthlyPostsTarget ?? 0
@@ -640,7 +576,9 @@ export function ClientDetail({
       })
       await clientReferencesApi.delete(client.id, reference.id)
       toast({ title: "Reference deleted" })
-      setReferences((prev) => prev.filter((item) => item.id !== reference.id))
+      await queryClient.invalidateQueries({
+        queryKey: ["references", client.id],
+      })
       clearApiClientCache()
       router.refresh()
     } catch (error) {
@@ -1346,12 +1284,9 @@ export function ClientDetail({
             setEditingReference(null)
           }
         }}
-        onSaved={async (savedReference) => {
-          setReferences((prev) => {
-            const next = prev.filter((item) => item.id !== savedReference.id)
-            return [savedReference, ...next].sort(
-              (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
-            )
+        onSaved={async () => {
+          await queryClient.invalidateQueries({
+            queryKey: ["references", client.id],
           })
         }}
       />

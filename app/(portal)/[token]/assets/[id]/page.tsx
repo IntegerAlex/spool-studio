@@ -1,9 +1,10 @@
 "use client"
 
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowLeft, CheckCircle, Image as ImageIcon, XCircle } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -103,38 +104,37 @@ export default function PortalAssetDetailPage() {
   // SAFETY: useParams returns string | string[] | undefined; for this route it is a single string.
   const assetId = params?.id as string
 
-  const [data, setData] = useState<PortalDetailData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [decisionLoading, setDecisionLoading] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
 
-  const fetchDetail = useCallback(async () => {
-    if (!token || !assetId) return
-    try {
+  const {
+    data,
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ["portal-asset", token, assetId],
+    enabled: Boolean(token) && Boolean(assetId),
+    queryFn: async (): Promise<PortalDetailData> => {
       const res = await fetch(`/api/portal/${token}/assets/${assetId}`)
       if (!res.ok) {
         const body = await res.json()
         throw new Error(body.error || "Failed to load asset")
       }
       // SAFETY: the API returns the PortalDetailData shape; we trust the contract.
-      const detail = (await res.json()) as PortalDetailData
-      setData(detail)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load asset")
-    } finally {
-      setLoading(false)
-    }
-  }, [token, assetId])
+      return (await res.json()) as PortalDetailData
+    },
+  })
 
-  useEffect(() => {
-    void fetchDetail()
-  }, [fetchDetail])
+  const errorMessage =
+    error instanceof Error ? error.message : "Failed to load asset"
 
   const handleDecision = async (
     decision: "approved" | "revision_requested",
   ) => {
     if (!data || !token) return
     setDecisionLoading(true)
+    setDecisionError(null)
     try {
       const res = await fetch(
         `/api/portal/${token}/assets/${assetId}/approve`,
@@ -148,11 +148,15 @@ export default function PortalAssetDetailPage() {
         const body = await res.json()
         throw new Error(body.error || "Failed to submit decision")
       }
-      setData((prev) =>
-        prev ? { ...prev, asset: { ...prev.asset, status: decision } } : prev,
+      queryClient.setQueryData<PortalDetailData>(
+        ["portal-asset", token, assetId],
+        (prev) =>
+          prev ? { ...prev, asset: { ...prev.asset, status: decision } } : prev,
       )
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to submit decision")
+      setDecisionError(
+        err instanceof Error ? err.message : "Failed to submit decision",
+      )
     } finally {
       setDecisionLoading(false)
     }
@@ -170,7 +174,7 @@ export default function PortalAssetDetailPage() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
         <XCircle className="h-10 w-10 text-destructive" />
-        <p className="text-sm text-muted-foreground">{error}</p>
+        <p className="text-sm text-muted-foreground">{errorMessage}</p>
         <Button variant="outline" size="sm" asChild>
           <Link href={`/portal/${token}`}>Back to portal</Link>
         </Button>
@@ -291,6 +295,10 @@ export default function PortalAssetDetailPage() {
                 </dd>
               </div>
             </dl>
+
+            {decisionError && (
+              <p className="text-sm text-destructive">{decisionError}</p>
+            )}
 
             {asset.status !== "approved" && (
               <div className="flex gap-2 pt-2">

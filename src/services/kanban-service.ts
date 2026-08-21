@@ -1,5 +1,4 @@
 import { sanitizeFileUrl } from "@/lib/file-url"
-import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { listKanbanAssets } from "@/repositories/assets-repository"
 import { listClientOptions } from "@/repositories/clients-repository"
 import type { Asset, KanbanClientOption } from "@/types/index"
@@ -48,18 +47,13 @@ function mapKanbanAsset(
 }
 
 export async function getKanbanBoardData(): Promise<KanbanBoardData> {
-  try {
-    const [assets, clients] = await Promise.all([
-      listKanbanAssets(),
-      listClientOptions(),
-    ])
+  const [assets, clients] = await Promise.all([
+    listKanbanAssets(),
+    listClientOptions(),
+  ])
 
-    return {
-      assets: assets.map(mapKanbanAsset),
-      clients,
-    }
-  } catch (error) {
-    logProductionRuntimeError("kanban-board-loader", error)
-    return { assets: [], clients: [] }
+  return {
+    assets: assets.map(mapKanbanAsset),
+    clients,
   }
 }

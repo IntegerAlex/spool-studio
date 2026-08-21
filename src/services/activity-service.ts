@@ -71,7 +71,7 @@ export async function getAssetActivity(
     return rows.map((row) => mapActivity(row))
   } catch (error) {
     logProductionRuntimeError("activity-loader", error, { assetId })
-    return []
+    throw error
   }
 }
 

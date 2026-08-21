@@ -93,7 +93,7 @@ export async function getClientReferences(
     }))
   } catch (error) {
     logProductionRuntimeError("client-references-loader", error, { clientId })
-    return []
+    throw error
   }
 }
 

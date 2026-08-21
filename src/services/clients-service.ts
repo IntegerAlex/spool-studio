@@ -299,39 +299,32 @@ function mapClient(
 export async function getClients(
   preFetchedAssetSummaries?: DbAssetSummary[],
 ): Promise<Client[]> {
-  try {
-    const [clients, assetSummaries] = await Promise.all([
-      listClients(),
-      preFetchedAssetSummaries
-        ? Promise.resolve(preFetchedAssetSummaries)
-        : listAssetSummaries(),
-    ])
+  const [clients, assetSummaries] = await Promise.all([
+    listClients(),
+    preFetchedAssetSummaries
+      ? Promise.resolve(preFetchedAssetSummaries)
+      : listAssetSummaries(),
+  ])
 
-    const now = new Date()
-    const metricsMap = buildClientMetricsMap(
-      assetSummaries,
-      getMonthStart(now),
-      getWeekStart(now),
-      now,
-    )
+  const now = new Date()
+  const metricsMap = buildClientMetricsMap(
+    assetSummaries,
+    getMonthStart(now),
+    getWeekStart(now),
+    now,
+  )
 
-    const mappedClients = clients
-      .map((client) => {
-        const mapped = mapClient(client, assetSummaries, metricsMap)
-        if (!mapped) return null
-        mapped.weeklyRemaining = Math.max(
-          0,
-          (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0),
-        )
-        return mapped
-      })
-      .filter((client): client is Client => Boolean(client))
-
-    return mappedClients
-  } catch (error) {
-    logProductionRuntimeError("clients-loader", error)
-    return []
-  }
+  return clients
+    .map((client) => {
+      const mapped = mapClient(client, assetSummaries, metricsMap)
+      if (!mapped) return null
+      mapped.weeklyRemaining = Math.max(
+        0,
+        (mapped.weeklyGoal ?? 0) - (mapped.weeklyCompleted ?? 0),
+      )
+      return mapped
+    })
+    .filter((client): client is Client => Boolean(client))
 }
 
 export async function getClientDetail(
@@ -361,7 +354,7 @@ export async function getClientDetail(
     return mapped
   } catch (error) {
     logProductionRuntimeError("client-detail-loader", error, { clientId })
-    return null
+    throw error
   }
 }
 

@@ -1,8 +1,9 @@
 "use client"
 
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, CheckCircle, Eye, Image as ImageIcon } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -64,31 +65,31 @@ export default function PortalPage() {
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
   const token = params?.token as string
   const router = useRouter()
-  const [data, setData] = useState<PortalData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [decisionLoading, setDecisionLoading] = useState(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
 
-  const fetchPortalData = useCallback(async () => {
-    if (!token) return
-    try {
+  const {
+    data: portalData,
+    isLoading: loading,
+    error,
+  } = useQuery({
+    queryKey: ["portal", token],
+    enabled: Boolean(token),
+    queryFn: async (): Promise<PortalData> => {
       const res = await fetch(`/api/portal/${token}`)
       if (!res.ok) {
         const body = await res.json()
         throw new Error(body.error || "Failed to load portal")
       }
-      const { data: portalData } = await res.json()
-      setData(portalData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load portal")
-    } finally {
-      setLoading(false)
-    }
-  }, [token])
+      const { data } = await res.json()
+      // SAFETY: the API returns the PortalData shape; we trust the contract.
+      return data as PortalData
+    },
+  })
 
-  useEffect(() => {
-    void fetchPortalData()
-  }, [fetchPortalData])
+  const errorMessage =
+    error instanceof Error ? error.message : "Failed to load portal"
 
   const handleDecision = async (
     assetId: string,
@@ -96,6 +97,7 @@ export default function PortalPage() {
     comment?: string,
   ) => {
     setDecisionLoading(true)
+    setDecisionError(null)
     try {
       const res = await fetch(
         `/api/portal/${token}/assets/${assetId}/approve`,
@@ -111,7 +113,7 @@ export default function PortalPage() {
         throw new Error(body.error || "Failed to submit decision")
       }
 
-      setData((prev) => {
+      queryClient.setQueryData<PortalData>(["portal", token], (prev) => {
         if (!prev) return prev
         return {
           ...prev,
@@ -121,7 +123,9 @@ export default function PortalPage() {
         }
       })
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to submit decision")
+      setDecisionError(
+        err instanceof Error ? err.message : "Failed to submit decision",
+      )
     } finally {
       setDecisionLoading(false)
     }
@@ -139,15 +143,20 @@ export default function PortalPage() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
         <AlertCircle className="h-10 w-10 text-destructive" />
-        <p className="text-sm text-muted-foreground">{error}</p>
+        <p className="text-sm text-muted-foreground">{errorMessage}</p>
       </div>
     )
   }
 
-  if (!data) return null
+  if (!portalData) return null
+
+  const data = portalData
 
   return (
     <div className="space-y-6">
+      {decisionError && (
+        <p className="text-sm text-destructive">{decisionError}</p>
+      )}
       <div>
         <h1 className="text-xl font-semibold text-foreground">
           {data.client.name}

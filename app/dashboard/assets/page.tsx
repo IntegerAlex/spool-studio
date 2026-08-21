@@ -43,7 +43,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { usersApi } from "@/lib/api-client"
+import { assetsApi, clientsApi, usersApi } from "@/lib/api-client"
 import {
   type AssetDiscoveryContext,
   type AssetDiscoveryFilters,
@@ -68,16 +68,6 @@ import {
 import { assetStatusLabels, assetStatusValues } from "@/lib/asset-workflow"
 import { cn } from "@/lib/utils"
 import type { Asset, AssetStatus, AssetType, Client, User } from "@/types/index"
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url)
-  if (!response.ok) throw new Error("Request failed")
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-  const envelope = (await response.json()) as { data?: T; error?: string }
-  if (envelope.error) throw new Error(envelope.error)
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-  return envelope.data as T
-}
 
 function hydrateAssetDates(asset: Asset): Asset {
   return {
@@ -151,12 +141,12 @@ export default function AssetsPage() {
     data: rawAssets,
     error: assetsError,
     isLoading: assetsLoading,
-  } = useQuery({ queryKey: ["assets"], queryFn: () => fetchJson<Asset[]>("/api/assets") })
+  } = useQuery({ queryKey: ["assets"], queryFn: () => assetsApi.getAll() })
   const {
     data: rawClients,
     error: clientsError,
     isLoading: clientsLoading,
-  } = useQuery({ queryKey: ["clients"], queryFn: () => fetchJson<Client[]>("/api/clients") })
+  } = useQuery({ queryKey: ["clients"], queryFn: () => clientsApi.getAll() })
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["users"],
     queryFn: () => usersApi.getAll(),
@@ -302,20 +292,6 @@ export default function AssetsPage() {
     pages.push(last)
     return pages
   }, [totalPages, safeCurrentPage])
-
-  useEffect(() => {
-    console.info("[assets][discovery]", {
-      searchQuery: discoveryFilters.searchQuery,
-      filterCount: activeFilterCount,
-      resultCount: visibleAssets.length,
-      sortMode: discoveryFilters.sortMode,
-    })
-  }, [
-    activeFilterCount,
-    discoveryFilters.searchQuery,
-    discoveryFilters.sortMode,
-    visibleAssets.length,
-  ])
 
   const toggleQuickFilter = (quickFilter: AssetQuickFilter) => {
     setActiveQuickFilters((current) =>

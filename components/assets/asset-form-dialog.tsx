@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -48,7 +49,7 @@ import {
   getUserSelectableStatuses,
   isUserSelectableStatus,
 } from "@/lib/asset-workflow"
-import type { Asset, AssetStatus, Client, User } from "@/types/index"
+import type { Asset, AssetStatus } from "@/types/index"
 
 const assetTypes = ["reel", "poster"] as const
 const assetStatuses = assetStatusValues
@@ -130,10 +131,6 @@ export function AssetFormDialog({
 }: AssetFormDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [clients, setClients] = useState<Client[]>([])
-  const [users, setUsers] = useState<User[]>([])
-  const [isLoadingOptions, setIsLoadingOptions] = useState(false)
-  const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadState, setUploadState] = useState<
     "idle" | "uploading" | "uploaded" | "failed"
@@ -165,6 +162,24 @@ export function AssetFormDialog({
   const uploadAllowed = canUploadFromStatus(currentUploadStatus)
   const uploadBlockedReason = getUploadEligibilityReason(currentUploadStatus)
 
+  const clientsQuery = useQuery({
+    queryKey: ["clients"],
+    queryFn: () => clientsApi.getAll(),
+    enabled: open,
+    staleTime: 0,
+  })
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.getAll(),
+    enabled: open,
+    staleTime: 0,
+  })
+  const clients = clientsQuery.data ?? []
+  const users = usersQuery.data ?? []
+  const isLoadingOptions = clientsQuery.isLoading || usersQuery.isLoading
+  const loadError =
+    clientsQuery.error?.message ?? usersQuery.error?.message ?? null
+
   useEffect(() => {
     console.info("[asset][upload-eligibility]", {
       assetId: asset?.id ?? "new",
@@ -184,46 +199,6 @@ export function AssetFormDialog({
       setUploadProgress(0)
     }
   }, [selectedFile, uploadAllowed])
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    let isActive = true
-
-    const loadOptions = async () => {
-      setIsLoadingOptions(true)
-      setLoadError(null)
-      try {
-        const [clientsData, usersData] = await Promise.all([
-          clientsApi.getAll(),
-          usersApi.getAll(),
-        ])
-        if (isActive) {
-          setClients(clientsData)
-          setUsers(usersData)
-        }
-      } catch (error) {
-        if (!isActive) {
-          return
-        }
-        const message =
-          error instanceof Error ? error.message : "Failed to load form options"
-        setLoadError(message)
-      } finally {
-        if (isActive) {
-          setIsLoadingOptions(false)
-        }
-      }
-    }
-
-    void loadOptions()
-
-    return () => {
-      isActive = false
-    }
-  }, [open])
 
   useEffect(() => {
     if (!open) {

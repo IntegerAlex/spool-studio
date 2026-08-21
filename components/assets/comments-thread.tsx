@@ -1,7 +1,8 @@
 "use client"
 
 import { MessageCircle } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import type { AssetComment, User } from "@/types/index"
@@ -67,8 +68,8 @@ export function CommentsThread({
   const [isInternal, setIsInternal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mentionQuery, setMentionQuery] = useState("")
+  const [debouncedMentionQuery, setDebouncedMentionQuery] = useState("")
   const [showMentions, setShowMentions] = useState(false)
-  const [mentionResults, setMentionResults] = useState<MentionUser[]>([])
   const [mentionIndex, setMentionIndex] = useState(0)
   const [mentionStart, setMentionStart] = useState(-1)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -84,28 +85,40 @@ export function CommentsThread({
     return new Map(users.map((user) => [user.id, user]))
   }, [users])
 
-  const fetchMentionUsers = useCallback(async (query: string) => {
-    try {
-      const res = await fetch(
-        `/api/users/search?q=${encodeURIComponent(query)}`,
-      )
-      if (res.ok) {
-        const { data } = await res.json()
-        setMentionResults(data ?? [])
-        setMentionIndex(0)
-      }
-    } catch {
-      setMentionResults([])
-    }
-  }, [])
-
   useEffect(() => {
-    if (mentionQuery.length > 0) {
-      void fetchMentionUsers(mentionQuery)
-    } else {
-      setMentionResults([])
+    const timeout = window.setTimeout(() => {
+      setDebouncedMentionQuery(mentionQuery)
+      setMentionIndex(0)
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timeout)
     }
-  }, [mentionQuery, fetchMentionUsers])
+  }, [mentionQuery])
+
+  const mentionSearchQuery = useQuery({
+    queryKey: ["user-search", debouncedMentionQuery],
+    queryFn: async (): Promise<MentionUser[]> => {
+      const res = await fetch(
+        `/api/users/search?q=${encodeURIComponent(debouncedMentionQuery)}`,
+      )
+      if (!res.ok) {
+        throw new Error("Failed to search users")
+      }
+      // SAFETY: the search endpoint returns a { data } envelope of MentionUser records.
+      const payload = (await res.json()) as { data?: MentionUser[] }
+      return payload.data ?? []
+    },
+    enabled: debouncedMentionQuery.length > 0,
+    placeholderData: keepPreviousData,
+  })
+
+  const mentionResults = useMemo(() => {
+    if (debouncedMentionQuery.length === 0) {
+      return []
+    }
+    return mentionSearchQuery.data ?? []
+  }, [debouncedMentionQuery, mentionSearchQuery.data])
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
