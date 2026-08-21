@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       status: "pending",
     })
 
-    return NextResponse.json({ uploadUrl, key: r2Key })
+    return NextResponse.json({ data: { uploadUrl, key: r2Key } })
   } catch (error) {
     logProductionRuntimeError("api-uploads-r2-session", error)
     return NextResponse.json(
