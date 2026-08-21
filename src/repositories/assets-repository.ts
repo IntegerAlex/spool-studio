@@ -1,5 +1,5 @@
 import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { assetRevisions, contentAssets } from "@/db/schema"
 import type { AssetStatus } from "@/types/index"
 
@@ -247,10 +247,9 @@ export async function getAssetById(assetId: string): Promise<DbAsset | null> {
 }
 
 export async function insertAsset(
-  payload: FlexibleInsert<typeof contentAssets.$inferInsert>,
+  payload: typeof contentAssets.$inferInsert,
 ): Promise<DbAsset> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
-  const insertValues = payload as typeof contentAssets.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(contentAssets)
     .values(insertValues)
@@ -260,10 +259,9 @@ export async function insertAsset(
 
 export async function updateAsset(
   assetId: string,
-  updates: Partial<FlexibleInsert<typeof contentAssets.$inferInsert>>,
+  updates: Partial<typeof contentAssets.$inferInsert>,
 ): Promise<DbAsset> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates are valid for DB update.
-  const setValues = updates as Partial<typeof contentAssets.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(contentAssets)
     .set(setValues)

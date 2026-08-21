@@ -1,5 +1,5 @@
 import { asc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { assetComments } from "@/db/schema"
 
 export type DbAssetComment = typeof assetComments.$inferSelect
@@ -35,10 +35,9 @@ export async function getCommentById(
 }
 
 export async function insertComment(
-  payload: FlexibleInsert<typeof assetComments.$inferInsert>,
+  payload: typeof assetComments.$inferInsert,
 ): Promise<DbAssetComment> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
-  const insertValues = payload as typeof assetComments.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(assetComments)
     .values(insertValues)
@@ -48,10 +47,9 @@ export async function insertComment(
 
 export async function updateComment(
   commentId: string,
-  updates: Partial<FlexibleInsert<typeof assetComments.$inferInsert>>,
+  updates: Partial<typeof assetComments.$inferInsert>,
 ): Promise<DbAssetComment> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates valid for DB update.
-  const setValues = updates as Partial<typeof assetComments.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(assetComments)
     .set(setValues)

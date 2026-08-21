@@ -1,5 +1,5 @@
 import { eq, sql } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { assetRevisions, contentAssets } from "@/db/schema"
 import { deleteFile, uploadFile } from "@/integrations/r2/r2-service"
 import { extractAssetMetadata } from "@/lib/asset-metadata"
@@ -452,8 +452,8 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     publish_date: input.publishDate ?? scheduledFields.publishDate,
     publish_time: input.publishTime ?? scheduledFields.publishTime,
     scheduled_by: input.scheduledBy ?? (input.scheduledAt ? user.id : null),
-    published_at: input.publishedAt ?? null,
-    approved_at: input.approvedAt ?? null,
+    published_at: toDate(input.publishedAt),
+    approved_at: toDate(input.approvedAt),
     approved_by: input.approvedBy ?? null,
     cycle_id: finalCycleId,
     asset_number: finalAssetNumber,
@@ -1164,7 +1164,7 @@ export async function updateAsset(
     }
   }
 
-  const updates: Partial<FlexibleInsert<typeof contentAssets.$inferInsert>> = {}
+  const updates: Partial<typeof contentAssets.$inferInsert> = {}
   if (input.clientId !== undefined) updates.client_id = input.clientId
   if (input.title !== undefined) updates.title = input.title
   if (input.type !== undefined) updates.type = input.type

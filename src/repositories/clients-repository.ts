@@ -1,5 +1,5 @@
 import { desc, eq, ilike, or } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { clients } from "@/db/schema"
 
 export type DbClient = typeof clients.$inferSelect
@@ -58,10 +58,9 @@ export async function getPortalClientById(
 }
 
 export async function insertClient(
-  payload: FlexibleInsert<typeof clients.$inferInsert>,
+  payload: typeof clients.$inferInsert,
 ): Promise<DbClient> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
-  const insertValues = payload as typeof clients.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(clients)
     .values(insertValues)
@@ -71,10 +70,9 @@ export async function insertClient(
 
 export async function updateClient(
   clientId: string,
-  updates: Partial<FlexibleInsert<typeof clients.$inferInsert>>,
+  updates: Partial<typeof clients.$inferInsert>,
 ): Promise<DbClient> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates valid for DB update.
-  const setValues = updates as Partial<typeof clients.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(clients)
     .set(setValues)

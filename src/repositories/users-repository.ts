@@ -1,5 +1,5 @@
 import { asc, eq, ilike, inArray, or } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { contentAssets, portalTokens, users } from "@/db/schema"
 import { verifyPassword } from "@/lib/auth/password"
 
@@ -34,10 +34,9 @@ export async function getUserById(userId: string): Promise<DbUser | null> {
 }
 
 export async function insertUser(
-  payload: FlexibleInsert<typeof users.$inferInsert>,
+  payload: typeof users.$inferInsert,
 ): Promise<DbUser> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
-  const insertValues = payload as typeof users.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(users)
     .values(insertValues)
@@ -76,10 +75,9 @@ export async function getUserByEmail(email: string): Promise<DbUser | null> {
 
 export async function updateUser(
   userId: string,
-  updates: Partial<FlexibleInsert<typeof users.$inferInsert>>,
+  updates: Partial<typeof users.$inferInsert>,
 ): Promise<DbUser> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; values valid for DB update.
-  const setValues = updates as Partial<typeof users.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(users)
     .set(setValues)

@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { clientReferences } from "@/db/schema"
 
 export type DbClientReference = typeof clientReferences.$inferSelect
@@ -27,10 +27,9 @@ export async function getClientReferenceById(
 }
 
 export async function insertClientReference(
-  payload: FlexibleInsert<typeof clientReferences.$inferInsert>,
+  payload: typeof clientReferences.$inferInsert,
 ): Promise<DbClientReference> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
-  const insertValues = payload as typeof clientReferences.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(clientReferences)
     .values(insertValues)
@@ -40,10 +39,9 @@ export async function insertClientReference(
 
 export async function updateClientReference(
   referenceId: string,
-  updates: Partial<FlexibleInsert<typeof clientReferences.$inferInsert>>,
+  updates: Partial<typeof clientReferences.$inferInsert>,
 ): Promise<DbClientReference> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; string dates valid for DB update.
-  const setValues = updates as Partial<typeof clientReferences.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(clientReferences)
     .set(setValues)

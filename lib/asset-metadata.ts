@@ -1,4 +1,3 @@
-import type { FlexibleInsert } from "@/db"
 import type { contentAssets } from "@/db/schema"
 
 export type AssetMediaType = "image" | "video" | "other"
@@ -17,7 +16,7 @@ export interface AssetMetadataExtractionInput {
 
 export interface AssetMetadataExtractionResult {
   updates: Pick<
-    Partial<FlexibleInsert<typeof contentAssets.$inferInsert>>,
+    Partial<typeof contentAssets.$inferInsert>,
     | "mime_type"
     | "file_size"
     | "file_extension"
@@ -443,7 +442,7 @@ export async function extractAssetMetadata(
     mime_type: input.mimeType ?? input.file.type ?? null,
     file_size: input.fileSize,
     file_extension: fileExtension,
-    uploaded_at: input.uploadedAt,
+    uploaded_at: new Date(input.uploadedAt),
     uploaded_by: input.uploadedBy,
     drive_file_id: input.driveFileId,
     drive_file_url: input.driveFileUrl,

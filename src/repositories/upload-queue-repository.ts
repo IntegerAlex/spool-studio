@@ -1,5 +1,5 @@
 import { and, desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { contentAssets, uploadQueue } from "@/db/schema"
 
 export type DbUploadQueue = typeof uploadQueue.$inferSelect
@@ -46,10 +46,9 @@ export async function getUploadQueueItemByAssetId(
 }
 
 export async function insertUploadQueueItem(
-  payload: FlexibleInsert<typeof uploadQueue.$inferInsert>,
+  payload: typeof uploadQueue.$inferInsert,
 ): Promise<DbUploadQueue> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof uploadQueue.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(uploadQueue)
     .values(insertValues)
@@ -59,10 +58,9 @@ export async function insertUploadQueueItem(
 
 export async function updateUploadQueueItem(
   id: string,
-  updates: Partial<FlexibleInsert<typeof uploadQueue.$inferInsert>>,
+  updates: Partial<typeof uploadQueue.$inferInsert>,
 ): Promise<DbUploadQueue> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; values valid for DB update.
-  const setValues = updates as Partial<typeof uploadQueue.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(uploadQueue)
     .set(setValues)

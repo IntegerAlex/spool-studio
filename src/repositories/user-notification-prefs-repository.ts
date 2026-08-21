@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { userNotificationPrefs } from "@/db/schema"
 
 export type DbUserNotificationPref = typeof userNotificationPrefs.$inferSelect
@@ -16,10 +16,9 @@ export async function getUserNotificationPrefs(
 }
 
 export async function upsertUserNotificationPrefs(
-  payload: FlexibleInsert<typeof userNotificationPrefs.$inferInsert>,
+  payload: typeof userNotificationPrefs.$inferInsert,
 ): Promise<DbUserNotificationPref> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof userNotificationPrefs.$inferInsert
+  const insertValues = payload
   const { user_id: _user_id, created_at: _created_at, updated_at: _updated_at, ...updateValues } =
     insertValues
   const rows = await db
@@ -38,10 +37,9 @@ export async function upsertUserNotificationPrefs(
 
 export async function updateUserNotificationPrefs(
   userId: string,
-  updates: Partial<FlexibleInsert<typeof userNotificationPrefs.$inferInsert>>,
+  updates: Partial<typeof userNotificationPrefs.$inferInsert>,
 ): Promise<DbUserNotificationPref> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; values valid for DB update.
-  const setValues = updates as Partial<typeof userNotificationPrefs.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(userNotificationPrefs)
     .set(setValues)

@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { uploadSessions } from "@/db/schema"
 
 export type DbUploadSession = typeof uploadSessions.$inferSelect
@@ -26,10 +26,9 @@ export async function listUploadSessionsByAssetId(
 }
 
 export async function insertUploadSession(
-  payload: FlexibleInsert<typeof uploadSessions.$inferInsert>,
+  payload: typeof uploadSessions.$inferInsert,
 ): Promise<DbUploadSession> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof uploadSessions.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(uploadSessions)
     .values(insertValues)
@@ -39,10 +38,9 @@ export async function insertUploadSession(
 
 export async function updateUploadSession(
   id: string,
-  updates: Partial<FlexibleInsert<typeof uploadSessions.$inferInsert>>,
+  updates: Partial<typeof uploadSessions.$inferInsert>,
 ): Promise<DbUploadSession> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; values valid for DB update.
-  const setValues = updates as Partial<typeof uploadSessions.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(uploadSessions)
     .set(setValues)

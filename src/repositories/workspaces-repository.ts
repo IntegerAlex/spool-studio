@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { workspaces } from "@/db/schema"
 
 export type DbWorkspace = typeof workspaces.$inferSelect
@@ -31,10 +31,9 @@ export async function getFirstWorkspace(): Promise<DbWorkspace | null> {
 }
 
 export async function insertWorkspace(
-  payload: FlexibleInsert<typeof workspaces.$inferInsert>,
+  payload: typeof workspaces.$inferInsert,
 ): Promise<DbWorkspace> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof workspaces.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(workspaces)
     .values(insertValues)
@@ -44,10 +43,9 @@ export async function insertWorkspace(
 
 export async function updateWorkspace(
   id: string,
-  updates: Partial<FlexibleInsert<typeof workspaces.$inferInsert>>,
+  updates: Partial<typeof workspaces.$inferInsert>,
 ): Promise<DbWorkspace> {
-  // SAFETY: updates is Partial<FlexibleInsert<$inferInsert>>; values valid for DB update.
-  const setValues = updates as Partial<typeof workspaces.$inferInsert>
+  const setValues = updates
   const rows = await db
     .update(workspaces)
     .set(setValues)

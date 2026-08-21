@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { assetActivityLogs } from "@/db/schema"
 
 export type DbAssetActivity = typeof assetActivityLogs.$inferSelect
@@ -35,10 +35,9 @@ export async function listRecentActivity(options?: {
 }
 
 export async function insertActivity(
-  payload: FlexibleInsert<typeof assetActivityLogs.$inferInsert>,
+  payload: typeof assetActivityLogs.$inferInsert,
 ): Promise<DbAssetActivity> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; string dates are valid for DB insert.
-  const insertValues = payload as typeof assetActivityLogs.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(assetActivityLogs)
     .values(insertValues)

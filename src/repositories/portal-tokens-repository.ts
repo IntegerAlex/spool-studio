@@ -1,5 +1,5 @@
 import { desc, eq, gt, isNull, or } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { clients, portalTokens } from "@/db/schema"
 
 export type DbPortalToken = typeof portalTokens.$inferSelect
@@ -69,10 +69,9 @@ export async function listPortalTokensByClientId(
 }
 
 export async function insertPortalToken(
-  payload: FlexibleInsert<typeof portalTokens.$inferInsert>,
+  payload: typeof portalTokens.$inferInsert,
 ): Promise<DbPortalToken> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof portalTokens.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(portalTokens)
     .values(insertValues)

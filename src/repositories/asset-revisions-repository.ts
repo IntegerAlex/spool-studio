@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { assetRevisions } from "@/db/schema"
 
 export type DbAssetRevision = typeof assetRevisions.$inferSelect
@@ -26,10 +26,9 @@ export async function getAssetRevisionById(
 }
 
 export async function insertAssetRevision(
-  payload: FlexibleInsert<typeof assetRevisions.$inferInsert>,
+  payload: typeof assetRevisions.$inferInsert,
 ): Promise<DbAssetRevision> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof assetRevisions.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(assetRevisions)
     .values(insertValues)

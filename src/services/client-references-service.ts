@@ -1,4 +1,3 @@
-import type { FlexibleInsert } from "@/db"
 import type { clientReferences } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth"
 import { sendReferenceNotification } from "@/lib/notifications/mailgun"
@@ -182,7 +181,7 @@ export async function updateClientReference(
     throw new Error("Unauthorized")
   }
 
-  const updates: Partial<FlexibleInsert<typeof clientReferences.$inferInsert>> =
+  const updates: Partial<typeof clientReferences.$inferInsert> =
     {}
 
   if (input.title !== undefined) {

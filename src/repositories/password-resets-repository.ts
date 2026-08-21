@@ -1,5 +1,5 @@
 import { desc, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { passwordResets } from "@/db/schema"
 
 export type DbPasswordReset = typeof passwordResets.$inferSelect
@@ -27,10 +27,9 @@ export async function listPasswordResetsByUserId(
 }
 
 export async function insertPasswordReset(
-  payload: FlexibleInsert<typeof passwordResets.$inferInsert>,
+  payload: typeof passwordResets.$inferInsert,
 ): Promise<DbPasswordReset> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof passwordResets.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(passwordResets)
     .values(insertValues)

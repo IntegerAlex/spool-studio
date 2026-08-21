@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { pushSubscriptions } from "@/db/schema"
 
 export type DbPushSubscription = typeof pushSubscriptions.$inferSelect
@@ -42,10 +42,9 @@ export async function getPushSubscriptionByUserAndEndpoint(
 }
 
 export async function insertPushSubscription(
-  payload: FlexibleInsert<typeof pushSubscriptions.$inferInsert>,
+  payload: typeof pushSubscriptions.$inferInsert,
 ): Promise<DbPushSubscription> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof pushSubscriptions.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(pushSubscriptions)
     .values(insertValues)

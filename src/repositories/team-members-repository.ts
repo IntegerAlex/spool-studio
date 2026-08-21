@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm"
-import { db, type FlexibleInsert } from "@/db"
+import { db } from "@/db"
 import { teamMembers } from "@/db/schema"
 
 export type DbTeamMember = typeof teamMembers.$inferSelect
@@ -40,10 +40,9 @@ export async function getTeamMember(
 }
 
 export async function insertTeamMember(
-  payload: FlexibleInsert<typeof teamMembers.$inferInsert>,
+  payload: typeof teamMembers.$inferInsert,
 ): Promise<DbTeamMember> {
-  // SAFETY: payload is FlexibleInsert<$inferInsert>; values are valid for DB insert.
-  const insertValues = payload as typeof teamMembers.$inferInsert
+  const insertValues = payload
   const rows = await db
     .insert(teamMembers)
     .values(insertValues)
