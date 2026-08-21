@@ -1,3 +1,4 @@
+import { sanitizeFileUrl } from "@/lib/file-url"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { listKanbanAssets } from "@/repositories/assets-repository"
 import { listClientOptions } from "@/repositories/clients-repository"
@@ -26,7 +27,7 @@ function mapKanbanAsset(
     driveFileId: undefined,
     fileUrl: undefined,
     driveFileUrl: undefined,
-    thumbnailUrl: asset.thumbnail_url ?? undefined,
+    thumbnailUrl: sanitizeFileUrl(asset.thumbnail_url),
     mediaWidth: undefined,
     mediaHeight: undefined,
     durationSeconds: undefined,

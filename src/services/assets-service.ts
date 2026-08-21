@@ -8,6 +8,7 @@ import {
   canUploadRevisionFromStatus,
 } from "@/lib/asset-workflow"
 import { getCurrentUser } from "@/lib/auth"
+import { sanitizeFileUrl } from "@/lib/file-url"
 import { emitEvent } from "@/lib/event-bus"
 import {
   sendAssetUploadNotification,
@@ -132,17 +133,8 @@ async function mapAsset(
     ? await getPresignedDownloadUrl(asset.drive_file_id)
     : (asset.drive_file_url ?? undefined)
 
-  // Stored thumbnail/drive URLs pointing at dead bases (localhost fallback,
-  // S3 API endpoint) are unusable - drop them; key-based presign covers access.
-  const isDeadUrl = (url: string | null | undefined) =>
-    Boolean(
-      url &&
-        (url.includes("localhost:4567") ||
-          url.includes("r2.cloudflarestorage.com")),
-    )
-  const thumbnailUrl = isDeadUrl(asset.thumbnail_url)
-    ? undefined
-    : (asset.thumbnail_url ?? undefined)
+  // Stored thumbnail URLs pointing at dead bases are unusable; drop them.
+  const thumbnailUrl = sanitizeFileUrl(asset.thumbnail_url)
 
   return {
     id: asset.id,

@@ -1,5 +1,6 @@
 import { getClientById } from "@/repositories/clients-repository"
 import { listClientAssetsForReport } from "@/repositories/reports-repository"
+import { sanitizeFileUrl } from "@/lib/file-url"
 
 export interface ReportOptions {
   clientId: string
@@ -145,7 +146,7 @@ export async function generateReport(
         ? new Date(asset.approved_at).toISOString()
         : null,
       publishedAt: resolvedPublishTime,
-      driveFileUrl: asset.drive_file_url || null,
+      driveFileUrl: sanitizeFileUrl(asset.drive_file_url) ?? null,
     }
   })
 
