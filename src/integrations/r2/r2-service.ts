@@ -54,7 +54,9 @@ async function uploadFile(input: R2UploadInput): Promise<R2UploadResult> {
 
     return {
       key: input.key,
-      url: generatePublicUrl(input.key),
+      // No public URL exists for a private bucket; drive_file_id is the
+      // source of truth and URLs are presigned per-request in assets-service.
+      url: null,
       versionId: response.VersionId,
       etag: response.ETag,
     }

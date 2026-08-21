@@ -132,6 +132,18 @@ async function mapAsset(
     ? await getPresignedDownloadUrl(asset.drive_file_id)
     : (asset.drive_file_url ?? undefined)
 
+  // Stored thumbnail/drive URLs pointing at dead bases (localhost fallback,
+  // S3 API endpoint) are unusable - drop them; key-based presign covers access.
+  const isDeadUrl = (url: string | null | undefined) =>
+    Boolean(
+      url &&
+        (url.includes("localhost:4567") ||
+          url.includes("r2.cloudflarestorage.com")),
+    )
+  const thumbnailUrl = isDeadUrl(asset.thumbnail_url)
+    ? undefined
+    : (asset.thumbnail_url ?? undefined)
+
   return {
     id: asset.id,
     clientId: asset.client_id,
@@ -147,7 +159,7 @@ async function mapAsset(
     driveFileId: asset.drive_file_id ?? undefined,
     fileUrl,
     driveFileUrl: fileUrl,
-    thumbnailUrl: asset.thumbnail_url ?? undefined,
+    thumbnailUrl,
     mediaWidth: asset.media_width ?? undefined,
     mediaHeight: asset.media_height ?? undefined,
     durationSeconds: asset.duration_seconds ?? undefined,
@@ -511,7 +523,7 @@ export interface AssetUploadResult {
   asset: Asset
   upload: {
     r2Key: string
-    fileUrl: string
+    fileUrl: string | null
     mimeType: string
     fileSize: number
     uploadStatus: "uploaded"
@@ -925,7 +937,7 @@ export async function uploadAssetFile(
         mimeType: file.type || "application/octet-stream",
         fileSize: file.size,
         driveFileId: uploadResult.key,
-        driveFileUrl: uploadResult.url,
+        driveFileUrl: uploadResult.url ?? null,
         thumbnailUrl: asset.thumbnail_url ?? null,
         uploadedBy: user.id,
         uploadedAt,

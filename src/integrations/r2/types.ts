@@ -17,7 +17,8 @@ export interface R2UploadInput {
 
 export interface R2UploadResult {
   key: string
-  url: string
+  /** Presigned GET URL; private buckets have no stable public URL. */
+  url: string | null
   versionId?: string
   etag?: string
 }

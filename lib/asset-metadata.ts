@@ -8,7 +8,7 @@ export interface AssetMetadataExtractionInput {
   mimeType: string | null
   fileSize: number
   driveFileId: string
-  driveFileUrl: string
+  driveFileUrl: string | null
   thumbnailUrl: string | null
   uploadedBy: string
   uploadedAt: string
