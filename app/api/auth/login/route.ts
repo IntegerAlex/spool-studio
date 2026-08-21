@@ -42,13 +42,16 @@ export async function POST(request: Request) {
       throw ApiError.unauthorized("Invalid credentials")
     }
 
-    const session = await createSession({
-      id: user.id,
-      email: user.email,
-      name: user.full_name,
-      role: user.role,
-      avatarUrl: user.avatar_url,
-    })
+    const session = await createSession(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.full_name,
+        role: user.role,
+        avatarUrl: user.avatar_url,
+      },
+      user.token_version,
+    )
 
     const response = NextResponse.json({
       data: {

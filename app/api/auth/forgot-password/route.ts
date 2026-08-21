@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       sub: user.id,
       email: user.email,
       role: "designer",
+      ver: user.token_version,
     })
 
     // Replace any previous reset token for this user.

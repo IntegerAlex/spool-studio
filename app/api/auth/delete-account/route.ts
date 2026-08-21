@@ -10,6 +10,9 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser()
 
+    // No token_version bump needed here: deleteUserAccount removes the row,
+    // and validateSession rejects tokens whose user no longer exists.
+
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const { password } = (await readJsonBody(request)) as { password?: string }
 

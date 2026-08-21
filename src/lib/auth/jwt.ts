@@ -38,6 +38,8 @@ export async function verifyToken(token: string): Promise<TokenPayload | null> {
       role: payload.role as TokenPayload["role"],
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
       name: payload.name as string | undefined,
+      // SAFETY: jose stores custom claims opaquely; ver was set by signToken.
+      ver: payload.ver as number | undefined,
       iat: payload.iat,
       exp: payload.exp,
     }
@@ -57,6 +59,8 @@ export function decodeToken(token: string): TokenPayload | null {
       role: payload.role as TokenPayload["role"],
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
       name: payload.name as string | undefined,
+      // SAFETY: jose stores custom claims opaquely; ver was set by signToken.
+      ver: payload.ver as number | undefined,
       iat: payload.iat,
       exp: payload.exp,
     }

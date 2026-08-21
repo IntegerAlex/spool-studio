@@ -39,6 +39,10 @@ export class ApiError extends Error {
     return new ApiError(message, 404)
   }
 
+  static conflict(message = "Conflict") {
+    return new ApiError(message, 409)
+  }
+
   static tooManyRequests(retryAfterSeconds: number) {
     return new ApiError("Too many requests", 429, undefined, {
       "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))),

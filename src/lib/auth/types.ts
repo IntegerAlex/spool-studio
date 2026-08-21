@@ -5,6 +5,12 @@ export interface TokenPayload {
   email: string
   role: UserRole
   name?: string
+  /**
+   * Token version matching users.token_version at issue time. validateSession
+   * rejects tokens whose ver is stale (e.g. issued before a password change).
+   * Absent ver is treated as 0 for tokens issued before the column existed.
+   */
+  ver?: number
   iat?: number
   exp?: number
 }

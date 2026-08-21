@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm"
+import { db } from "@/db"
+import { users } from "@/db/schema"
 import { signToken, verifyToken } from "./jwt"
 import type { AuthUser } from "./types"
 
@@ -29,12 +32,16 @@ function getCookieOptions(): CookieOptions {
   }
 }
 
-export async function createSession(user: AuthUser) {
+export async function createSession(
+  user: AuthUser,
+  tokenVersion = 0,
+) {
   const token = await signToken({
     sub: user.id,
     email: user.email,
     role: user.role,
     name: user.name ?? undefined,
+    ver: tokenVersion,
   })
 
   return {
@@ -64,6 +71,18 @@ export async function validateSession(cookieStore?: {
 
   const payload = await verifyToken(token)
   if (!payload) return null
+
+  // Revocation check: the token must carry the user's current token_version.
+  // Also rejects tokens for deleted users. Tokens issued before the
+  // token_version column existed carry no ver, treated as 0 (the default).
+  const rows = await db
+    .select({ tokenVersion: users.token_version })
+    .from(users)
+    .where(eq(users.id, payload.sub))
+    .limit(1)
+  const row = rows[0]
+  if (!row) return null
+  if ((payload.ver ?? 0) !== row.tokenVersion) return null
 
   return {
     id: payload.sub,

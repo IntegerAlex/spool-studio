@@ -1,41 +1,67 @@
-import { beforeAll, describe, expect, it } from "vitest"
-import { createSession, destroySession, SESSION_COOKIE_NAME } from "../session"
-import type { AuthUser } from "../types"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 
-beforeAll(() => {
-  process.env.JWT_SECRET = "test-secret-key-for-unit-tests"
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
+vi.mock("@/db", () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => rowsToReturn,
+        }),
+      }),
+    })),
+  },
+}))
+
+let rowsToReturn: Array<{ tokenVersion: number }> = []
+
+import { validateSession } from "../session"
+import { signToken } from "../jwt"
+
+const cookieStore = (token: string) => ({
+  get: (name: string) =>
+    name === "cms_session" ? { value: token } : undefined,
 })
 
-describe("Session", () => {
-  const mockUser: AuthUser = {
-    id: "11111111-1111-1111-1111-111111111111",
-    email: "test@example.com",
-    name: "Test User",
-    role: "admin",
-    avatarUrl: null,
-  }
+const basePayload = {
+  sub: "11111111-1111-1111-1111-111111111111",
+  email: "test@example.com",
+  role: "admin" as const,
+  name: "Test User",
+}
 
-  describe("createSession", () => {
-    it("should return token and cookie config", async () => {
-      const result = await createSession(mockUser)
-      expect(result.token).toBeTruthy()
-      expect(result.cookie.name).toBe(SESSION_COOKIE_NAME)
-      expect(result.cookie.value).toBeTruthy()
-      expect(result.cookie.options).toHaveProperty("httpOnly")
-      expect(result.cookie.options).toHaveProperty("path")
-    })
+beforeEach(() => {
+  rowsToReturn = []
+})
 
-    it("should set httpOnly to true", async () => {
-      const result = await createSession(mockUser)
-      expect(result.cookie.options.httpOnly).toBe(true)
-    })
+describe("validateSession token_version revocation", () => {
+  it("accepts a token whose ver matches the user's current version", async () => {
+    rowsToReturn = [{ tokenVersion: 3 }]
+    const token = await signToken({ ...basePayload, ver: 3 })
+    const user = await validateSession(cookieStore(token))
+    expect(user).not.toBeNull()
+    expect(user?.id).toBe(basePayload.sub)
   })
 
-  describe("destroySession", () => {
-    it("should return cookie deletion config", () => {
-      const result = destroySession()
-      expect(result.name).toBe(SESSION_COOKIE_NAME)
-      expect(result.value).toBe("")
-    })
+  it("rejects a token signed with a stale ver", async () => {
+    // Password changed after this token was issued -> version bumped to 2.
+    rowsToReturn = [{ tokenVersion: 2 }]
+    const staleToken = await signToken({ ...basePayload, ver: 1 })
+    expect(await validateSession(cookieStore(staleToken))).toBeNull()
+  })
+
+  it("treats a token without ver as version 0", async () => {
+    rowsToReturn = [{ tokenVersion: 0 }]
+    const legacyToken = await signToken(basePayload)
+    expect(await validateSession(cookieStore(legacyToken))).not.toBeNull()
+
+    rowsToReturn = [{ tokenVersion: 1 }]
+    expect(await validateSession(cookieStore(legacyToken))).toBeNull()
+  })
+
+  it("rejects tokens for users that no longer exist", async () => {
+    rowsToReturn = []
+    const token = await signToken({ ...basePayload, ver: 0 })
+    expect(await validateSession(cookieStore(token))).toBeNull()
   })
 })

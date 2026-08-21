@@ -46,7 +46,11 @@ export async function POST(request: Request) {
     }
 
     const newHash = await hashPassword(newPassword)
-    await updateUser(user.id, { password_hash: newHash })
+    // Bumping token_version invalidates every JWT issued before this change.
+    await updateUser(user.id, {
+      password_hash: newHash,
+      token_version: existing.token_version + 1,
+    })
 
     try {
       await logAuditEvent({

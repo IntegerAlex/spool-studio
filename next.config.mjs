@@ -8,6 +8,21 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const projectRoot = dirname(fileURLToPath(import.meta.url))
 
+const CSP_REPORT_ONLY = [
+  "default-src 'self'",
+  // Next.js bootstrap requires inline scripts; nonce-based strict CSP is a
+  // future pass once this report-only policy has survived a manual smoke.
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: *.r2.cloudflarestorage.com *.cloudflarestream.com",
+  "connect-src 'self' *.r2.cloudflarestorage.com",
+  "worker-src 'self'",
+  "font-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ")
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Vercel deploys via its own adapter, which (Next 16.3, Turbopack) skips
@@ -42,6 +57,37 @@ const nextConfig = {
       { protocol: "https", hostname: "**.r2.cloudflarestorage.com" },
       { protocol: "https", hostname: "**.cloudflarestream.com" },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            // Ignored over plain HTTP, so safe to ship in dev.
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+          {
+            // Staged rollout: report violations only. After a clean manual
+            // smoke of every dashboard route + login + portal, rename this
+            // header to Content-Security-Policy to enforce.
+            key: "Content-Security-Policy-Report-Only",
+            value: CSP_REPORT_ONLY,
+          },
+        ],
+      },
+    ]
   },
 }
 

@@ -56,7 +56,12 @@ export async function POST(request: Request) {
     })
     const userId = inserted.id
 
-    const resetToken = await signToken({ sub: userId, email, role: userRole })
+    const resetToken = await signToken({
+      sub: userId,
+      email,
+      role: userRole,
+      ver: inserted.token_version,
+    })
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const resetUrl = `${appUrl}/reset-password?token=${resetToken}`
 

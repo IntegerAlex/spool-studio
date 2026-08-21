@@ -36,6 +36,13 @@
       "when": 1787190000000,
       "tag": "0004_content_planning",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787326746185,
+      "tag": "0005_add_users_token_version",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
 import { userRoleEnum } from "./enums"
 
 export const users = pgTable("users", {
@@ -8,6 +8,8 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("designer"),
   avatar_url: text("avatar_url"),
   password_hash: text("password_hash"),
+  // Incremented to invalidate previously issued JWTs (see validateSession).
+  token_version: integer("token_version").notNull().default(0),
   created_at: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

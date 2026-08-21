@@ -3,7 +3,7 @@ import { hashPassword, verifyToken } from "@/lib/auth"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
-import { updateUser } from "@/repositories/users-repository"
+import { updateUser, getUserById } from "@/repositories/users-repository"
 import {
   deletePasswordResetsByUserId,
   getPasswordResetByTokenHash,
@@ -48,7 +48,15 @@ export async function POST(request: Request) {
 
     const passwordHash = await hashPassword(password)
 
-    await updateUser(decoded.sub, { password_hash: passwordHash })
+    // Bump token_version so sessions issued before the reset are revoked.
+    const targetUser = await getUserById(decoded.sub)
+    if (!targetUser) {
+      throw ApiError.badRequest("Invalid or expired reset token")
+    }
+    await updateUser(decoded.sub, {
+      password_hash: passwordHash,
+      token_version: targetUser.token_version + 1,
+    })
     await deletePasswordResetsByUserId(decoded.sub)
 
     return NextResponse.json({
