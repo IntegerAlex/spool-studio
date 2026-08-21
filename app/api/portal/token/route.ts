@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
+import { parseBody } from "@/lib/api-validation"
 import { requirePermission } from "@/lib/auth"
 import { rateLimit } from "@/src/lib/rate-limit"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
@@ -21,17 +23,17 @@ export async function POST(request: Request) {
       throw ApiError.tooManyRequests(userLimit.retryAfterSeconds)
     }
 
-    // SAFETY: this cast is safe because the value already conforms to the asserted type.
-    const body = (await readJsonBody(request)) as {
-      clientId?: string
-      expiresInDays?: number
+    const Schema = z.object({
+      clientId: z.string().uuid("clientId must be a valid id"),
+      expiresInDays: z.number().int().min(1).max(365).default(30),
+    })
+    const parsed = parseBody(Schema, await readJsonBody(request))
+    if (!parsed.ok) {
+      return parsed.response
     }
-    const clientId = body.clientId?.trim()
-    if (!clientId) {
-      throw ApiError.badRequest("clientId is required")
-    }
+    const clientId = parsed.data.clientId
+    const expiresInDays = parsed.data.expiresInDays
 
-    const expiresInDays = body.expiresInDays ?? 30
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + expiresInDays)
 

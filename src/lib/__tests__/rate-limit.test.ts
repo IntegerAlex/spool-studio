@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { ApiError, jsonError } from "@/lib/api-error"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 
@@ -39,6 +39,39 @@ describe("rateLimit", () => {
       await new Promise((r) => setTimeout(r, 25))
     }
     expect(rateLimit(key, { limit: 1, windowMs: 20 }).ok).toBe(true)
+  })
+
+  it("keeps long windows intact past a 2-minute sweep threshold", () => {
+    // Regression: the sweeper used to evict entries older than a fixed
+    // 2 minutes regardless of windowMs, silently shortening long windows.
+    vi.useFakeTimers()
+    try {
+      const key = "test-key-long-window"
+      const tenMinutes = 10 * 60_000
+
+      // Burn the 3-call budget of forgot-password's 10-min window.
+      for (let i = 0; i < 3; i++) {
+        rateLimit(key, { limit: 3, windowMs: tenMinutes })
+      }
+      expect(
+        rateLimit(key, { limit: 3, windowMs: tenMinutes }).ok,
+      ).toBe(false)
+
+      // Advance past the old 2-minute eviction threshold but stay well
+      // inside the 10-min window - the block must still hold.
+      vi.advanceTimersByTime(2 * 60_000 + 1_000)
+      expect(
+        rateLimit(key, { limit: 3, windowMs: tenMinutes }).ok,
+      ).toBe(false)
+
+      // Advancing past the full window releases the limit.
+      vi.advanceTimersByTime(tenMinutes)
+      expect(
+        rateLimit(key, { limit: 3, windowMs: tenMinutes }).ok,
+      ).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

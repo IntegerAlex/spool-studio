@@ -21,7 +21,10 @@ export interface RateLimitResult {
   retryAfterSeconds: number
 }
 
-const hits = new Map<string, { count: number; windowStart: number }>()
+const hits = new Map<
+  string,
+  { count: number; windowStart: number; expiresAt: number }
+>()
 
 const SWEEP_INTERVAL_MS = 60_000
 let sweeperStarted = false
@@ -32,7 +35,9 @@ function startSweeper() {
   const timer = setInterval(() => {
     const now = Date.now()
     for (const [key, entry] of hits) {
-      if (now - entry.windowStart > 2 * 60_000) {
+      // Expire per-entry using the entry's own window length; a fixed
+      // threshold would cut long windows (e.g. 1hr reset-password) short.
+      if (now > entry.expiresAt) {
         hits.delete(key)
       }
     }
@@ -55,7 +60,7 @@ export function rateLimit(
   const entry = hits.get(key)
 
   if (!entry || now - entry.windowStart >= windowMs) {
-    hits.set(key, { count: 1, windowStart: now })
+    hits.set(key, { count: 1, windowStart: now, expiresAt: now + windowMs })
     return { ok: true, retryAfterSeconds: 0 }
   }
 

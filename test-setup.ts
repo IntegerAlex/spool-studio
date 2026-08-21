@@ -30,9 +30,10 @@ const localStorageShim = (() => {
   }
 })()
 
-if (globalThis.localStorage === undefined) {
-  Object.defineProperty(globalThis, "localStorage", {
-    value: localStorageShim,
-    configurable: true,
-  })
-}
+// Node 22 exposes a non-functional localStorage global that throws on use,
+// so override unconditionally rather than checking for undefined.
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageShim,
+  configurable: true,
+  writable: true,
+})

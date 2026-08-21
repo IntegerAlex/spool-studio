@@ -1,7 +1,7 @@
 "use client"
 
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { createJSONStorage, persist } from "zustand/middleware"
 import type { KanbanWorkflowColumnId } from "@/lib/kanban-workflow"
 
 interface KanbanState {
@@ -20,6 +20,11 @@ export const useKanbanStore = create<KanbanState>()(
             : [...state.collapsedColumns, id],
         })),
     }),
-    { name: "kanban-preferences" },
+    {
+      name: "kanban-preferences",
+      // zustand's default getter reads window.localStorage, which does not
+      // exist in node test envs; globalThis covers both browser and tests.
+      storage: createJSONStorage(() => globalThis.localStorage),
+    },
   ),
 )

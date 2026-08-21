@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server"
-import type { ZodType } from "zod"
+import type { ZodTypeAny, output } from "zod"
 
-export function parseBody<T>(
-  schema: ZodType<T>,
+export function parseBody<S extends ZodTypeAny>(
+  schema: S,
   // oxlint-disable-next-line anti-slop/no-unknown-parameters  // generic boundary helper: schema parses the unknown payload
   body: unknown,
-): { ok: true; data: T } | { ok: false; response: NextResponse } {
+): { ok: true; data: output<S> } | { ok: false; response: NextResponse } {
   const result = schema.safeParse(body)
   if (!result.success) {
     const issues = result.error.issues.map((issue) => ({
