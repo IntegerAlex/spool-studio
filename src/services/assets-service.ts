@@ -103,6 +103,16 @@ function combinePublishDateTime(
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+// Drizzle timestamp columns require Date objects (mapToDriverValue calls
+// .toISOString()); coerce strings/null safely before any insert/update.
+function toDate(value: string | Date | null | undefined): Date | null {
+  if (!value) {
+    return null
+  }
+  const parsed = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 function mapAsset(
   asset: Awaited<ReturnType<typeof getAssetById>>,
 ): Asset | null {
@@ -438,7 +448,7 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
     thumbnail_url: input.thumbnailUrl ?? null,
     assigned_to: input.assignedTo ?? null,
     created_by: user.id,
-    scheduled_at: input.scheduledAt ?? null,
+    scheduled_at: toDate(input.scheduledAt),
     publish_date: input.publishDate ?? scheduledFields.publishDate,
     publish_time: input.publishTime ?? scheduledFields.publishTime,
     scheduled_by: input.scheduledBy ?? (input.scheduledAt ? user.id : null),
@@ -586,7 +596,7 @@ export async function finalizeAssetUpload(
     mime_type: input.uploadResult.mimeType,
     file_size: input.uploadResult.fileSize,
     file_extension: fileExtension,
-    uploaded_at: uploadedAt,
+    uploaded_at: toDate(uploadedAt),
     uploaded_by: user.id,
     media_width: input.uploadResult.mediaWidth ?? null,
     media_height: input.uploadResult.mediaHeight ?? null,
@@ -645,7 +655,7 @@ export async function finalizeAssetUpload(
       asset_id: assetId,
       version_number: versionNumber,
       uploaded_by: user.id,
-      uploaded_at: uploadedAt,
+      uploaded_at: toDate(uploadedAt),
       drive_file_id: input.uploadResult.key,
       drive_file_url: input.uploadResult.url,
       file_size: input.uploadResult.fileSize,
@@ -873,7 +883,7 @@ export async function uploadAssetFile(
       mime_type: file.type || "application/octet-stream",
       file_size: file.size,
       file_extension: fileExtension,
-      uploaded_at: uploadedAt,
+      uploaded_at: toDate(uploadedAt),
       uploaded_by: user.id,
     }
 
@@ -928,7 +938,7 @@ export async function uploadAssetFile(
           asset_id: assetId,
           version_number: versionNumber,
           uploaded_by: user.id,
-          uploaded_at: uploadedAt,
+          uploaded_at: toDate(uploadedAt),
           drive_file_id: uploadResult.key,
           drive_file_url: uploadResult.url,
           file_size: file.size,
@@ -1154,7 +1164,7 @@ export async function updateAsset(
     }
   }
 
-  const updates: Record<string, Json> = {}
+  const updates: Record<string, unknown> = {}
   if (input.clientId !== undefined) updates.client_id = input.clientId
   if (input.title !== undefined) updates.title = input.title
   if (input.type !== undefined) updates.type = input.type
@@ -1166,7 +1176,7 @@ export async function updateAsset(
   if (input.assignedTo !== undefined) updates.assigned_to = input.assignedTo
   if (input.scheduledAt !== undefined) {
     const scheduledFields = splitScheduledAt(input.scheduledAt)
-    updates.scheduled_at = input.scheduledAt
+    updates.scheduled_at = toDate(input.scheduledAt)
     updates.publish_date = scheduledFields.publishDate
     updates.publish_time = scheduledFields.publishTime
     updates.scheduled_by =
@@ -1175,26 +1185,31 @@ export async function updateAsset(
   if (input.publishDate !== undefined) updates.publish_date = input.publishDate
   if (input.publishTime !== undefined) updates.publish_time = input.publishTime
   if (input.scheduledBy !== undefined) updates.scheduled_by = input.scheduledBy
-  if (input.publishedAt !== undefined) updates.published_at = input.publishedAt
-  if (input.approvedAt !== undefined) updates.approved_at = input.approvedAt
+  if (input.publishedAt !== undefined)
+    updates.published_at = toDate(input.publishedAt)
+  if (input.approvedAt !== undefined)
+    updates.approved_at = toDate(input.approvedAt)
   if (input.approvedBy !== undefined) updates.approved_by = input.approvedBy
   if (input.recurrence !== undefined) updates.recurrence = input.recurrence
 
   if (input.status === "approved") {
-    updates.approved_at = input.approvedAt ?? new Date().toISOString()
+    updates.approved_at = toDate(input.approvedAt) ?? new Date()
     updates.approved_by =
       input.approvedBy ?? user?.id ?? existing.approved_by ?? null
   }
 
   if (input.status === "published") {
-    updates.published_at = input.publishedAt ?? new Date().toISOString()
+    updates.published_at = toDate(input.publishedAt) ?? new Date()
   }
 
   let record: Awaited<ReturnType<typeof getAssetById>>
   if (updates.status === "published") {
     // Atomic publication: apply all updates and create the immutable
     // publication record in a single transaction via the SQL function.
-    const publishedAt = updates.published_at as string
+    const publishedAt =
+      updates.published_at instanceof Date
+        ? updates.published_at.toISOString()
+        : ((updates.published_at as string) ?? new Date().toISOString())
     await db.execute(sql`
       select public.publish_asset_with_record(
         ${assetId}::uuid,
@@ -1332,7 +1347,7 @@ export async function approveAsset(
     throw new Error("Asset has no uploaded file and cannot be approved")
   }
 
-  const approvedAt = new Date().toISOString()
+  const approvedAt = new Date()
   const updated = await updateAssetRow(assetId, {
     status: "approved",
     approved_at: approvedAt,
