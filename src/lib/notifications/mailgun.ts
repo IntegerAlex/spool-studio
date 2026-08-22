@@ -1,3 +1,4 @@
+import { getAppUrl } from "@/lib/app-url"
 import FormData from "form-data"
 import Mailgun from "mailgun.js"
 import { enqueueBackgroundJob } from "@/lib/background-queue"
@@ -65,13 +66,7 @@ function formatSender(recipient?: NotificationRecipient): string {
 }
 
 function formatAssetDashboardUrl(assetId: string): string {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.APP_URL ??
-    process.env.SITE_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000")
+  const baseUrl = getAppUrl()
 
   return new URL(`/dashboard/assets/${assetId}`, baseUrl).toString()
 }
@@ -411,13 +406,7 @@ export async function sendReferenceNotification(
 ): Promise<void> {
   const addedBy = formatSender(input.addedBy)
   const timeStr = formatTimestamp(input.timestamp)
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    process.env.APP_URL ??
-    process.env.SITE_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000")
+  const baseUrl = getAppUrl()
   const clientUrl = new URL(
     `/dashboard/clients/${input.clientId}`,
     baseUrl,

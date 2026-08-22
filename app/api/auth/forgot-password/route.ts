@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { signToken } from "@/lib/auth"
+import { getAppUrl } from "@/lib/app-url"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { rateLimit, requestIp } from "@/src/lib/rate-limit"
 import { rateLimits } from "@/src/lib/rate-limit-config"
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       expires_at: new Date(Date.now() + 60 * 60 * 1000),
     })
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const appUrl = getAppUrl()
     const resetUrl = `${appUrl}/reset-password?token=${resetToken}`
 
     if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {

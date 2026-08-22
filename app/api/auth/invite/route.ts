@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { hashPassword, requirePermission } from "@/lib/auth"
 import { signToken } from "@/lib/auth/jwt"
+import { getAppUrl } from "@/lib/app-url"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { logAuditEvent } from "@/services/audit-log-service"
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       role: userRole,
       ver: inserted.token_version,
     })
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const appUrl = getAppUrl()
     const resetUrl = `${appUrl}/reset-password?token=${resetToken}`
 
     if (process.env.MAILGUN_API_KEY && process.env.MAILGUN_DOMAIN) {

@@ -5,16 +5,29 @@ let client: S3Client | null = null
 export function getR2Client(): S3Client {
   if (client) return client
 
-  const endpoint = process.env.R2_ENDPOINT || "http://localhost:4567"
+  // Dev defaults target a local MinIO/S3RVER instance; production must
+  // configure these explicitly - no silent localhost fallback.
+  const isProd = process.env.NODE_ENV === "production"
+  const endpoint = process.env.R2_ENDPOINT
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
+  if (isProd && (!endpoint || !accessKeyId || !secretAccessKey)) {
+    throw new Error(
+      "R2_ENDPOINT, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY must be set in production - refusing to fall back to localhost credentials",
+    )
+  }
+
+  const resolvedEndpoint = endpoint ?? "http://localhost:4567"
   const isLocal =
-    endpoint.includes("localhost") || endpoint.includes("127.0.0.1")
+    resolvedEndpoint.includes("localhost") ||
+    resolvedEndpoint.includes("127.0.0.1")
 
   client = new S3Client({
-    endpoint,
+    endpoint: resolvedEndpoint,
     region: process.env.R2_REGION || (isLocal ? "us-east-1" : "auto"),
     credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID || "S3RVER",
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "S3RVER",
+      accessKeyId: accessKeyId ?? "S3RVER",
+      secretAccessKey: secretAccessKey ?? "S3RVER",
     },
     forcePathStyle: isLocal, // Cloudflare R2 uses virtual-hosted style
   })
@@ -27,7 +40,15 @@ export function getR2BucketName(): string {
 }
 
 export function getR2PublicBaseUrl(): string {
-  return process.env.R2_PUBLIC_URL || "http://localhost:4567/cms-uploads"
+  if (process.env.R2_PUBLIC_URL) {
+    return process.env.R2_PUBLIC_URL
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "R2_PUBLIC_URL must be set in production - refusing to fall back to a localhost asset URL",
+    )
+  }
+  return "http://localhost:4567/cms-uploads"
 }
 
 export function getR2AccountId(): string {
