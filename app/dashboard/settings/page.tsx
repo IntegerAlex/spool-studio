@@ -111,12 +111,14 @@ export default function SettingsPage() {
   const workspace = workspaceQuery.data ?? null
   const teamMembers = usersQuery.data ?? []
   const isLoading = workspaceQuery.isLoading
-  const [workspaceName, setWorkspaceName] = useState("")
+  const [workspaceName, setWorkspaceName] = useState(() => workspace?.name ?? "")
+  const [hasInitializedWorkspaceName, setHasInitializedWorkspaceName] = useState(false)
   useEffect(() => {
-    if (workspace && !workspaceName) {
+    if (workspace && !hasInitializedWorkspaceName) {
       setWorkspaceName(workspace.name)
+      setHasInitializedWorkspaceName(true)
     }
-  }, [workspace, workspaceName])
+  }, [workspace, hasInitializedWorkspaceName])
   const [activeSection, setActiveSection] =
     useState<(typeof sections)[number]["id"]>("workspace")
 

@@ -9,9 +9,11 @@ import {
   SlidersHorizontal,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { PreviewShell } from "@/components/preview"
+import dynamic from "next/dynamic"
+
+const PreviewShell = dynamic(() => import("@/components/preview").then((m) => m.PreviewShell), { ssr: false })
 import {
   Pagination,
   PaginationContent,
@@ -134,6 +136,150 @@ function parseSizeMb(value: string): number | null {
 function formatUserLabel(user: User | undefined): string {
   return user?.name ?? "Unknown user"
 }
+
+// ── Extracted memoized components (rerender-no-inline-components) ──
+
+const FilterGrid = memo(function FilterGrid({
+  compact,
+  selectedStatus,
+  setSelectedStatus,
+  selectedAssetType,
+  setSelectedAssetType,
+  uploadedDateFilter,
+  setUploadedDateFilter,
+  selectedAssignedUserId,
+  setSelectedAssignedUserId,
+  metadataFilter,
+  setMetadataFilter,
+  minFileSizeMb,
+  setMinFileSizeMb,
+  maxFileSizeMb,
+  setMaxFileSizeMb,
+  users,
+}: {
+  compact: boolean
+  selectedStatus: AssetStatus | "all"
+  setSelectedStatus: (v: AssetStatus | "all") => void
+  selectedAssetType: AssetType | "all"
+  setSelectedAssetType: (v: AssetType | "all") => void
+  uploadedDateFilter: AssetUploadedDateFilter
+  setUploadedDateFilter: (v: AssetUploadedDateFilter) => void
+  selectedAssignedUserId: string | "all" | "unassigned"
+  setSelectedAssignedUserId: (v: string | "all" | "unassigned") => void
+  metadataFilter: AssetMetadataFilter
+  setMetadataFilter: (v: AssetMetadataFilter) => void
+  minFileSizeMb: string
+  setMinFileSizeMb: (v: string) => void
+  maxFileSizeMb: string
+  setMaxFileSizeMb: (v: string) => void
+  users: User[]
+}) {
+  return (
+    <div className={cn("grid gap-3", compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4")}>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Workflow status</p>
+        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as AssetStatus | "all")}>
+          <SelectTrigger className="w-full"><SelectValue placeholder="Any status" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">Any status</SelectItem>{statusOptions.map((s) => (<SelectItem key={s} value={s}>{assetStatusLabels[s]}</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Asset type</p>
+        <Select value={selectedAssetType} onValueChange={(value) => setSelectedAssetType(value as AssetType | "all")}>
+          <SelectTrigger className="w-full"><SelectValue placeholder="Any type" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">Any type</SelectItem>{assetTypes.map((t) => (<SelectItem key={t} value={t}>{t === "reel" ? "Reel" : "Poster"}</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Uploaded date</p>
+        <Select value={uploadedDateFilter} onValueChange={(value) => setUploadedDateFilter(value as AssetUploadedDateFilter)}>
+          <SelectTrigger className="w-full"><SelectValue placeholder="Any date" /></SelectTrigger>
+          <SelectContent>{Object.entries(assetUploadedDateLabels).map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Assigned user</p>
+        <Select value={selectedAssignedUserId} onValueChange={(value) => setSelectedAssignedUserId(value as string | "all" | "unassigned")}>
+          <SelectTrigger className="w-full"><SelectValue placeholder="Any user" /></SelectTrigger>
+          <SelectContent><SelectItem value="all">Any user</SelectItem><SelectItem value="unassigned">Unassigned</SelectItem>{users.map((u) => (<SelectItem key={u.id} value={u.id}>{formatUserLabel(u)}</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Metadata</p>
+        <Select value={metadataFilter} onValueChange={(value) => setMetadataFilter(value as AssetMetadataFilter)}>
+          <SelectTrigger className="w-full"><SelectValue placeholder="Any metadata state" /></SelectTrigger>
+          <SelectContent>{Object.entries(assetMetadataLabels).map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}</SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">File size range</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Input type="number" min="0" step="0.1" inputMode="decimal" placeholder="Min MB" value={minFileSizeMb} onChange={(e) => setMinFileSizeMb(e.target.value)} />
+          <Input type="number" min="0" step="0.1" inputMode="decimal" placeholder="Max MB" value={maxFileSizeMb} onChange={(e) => setMaxFileSizeMb(e.target.value)} />
+        </div>
+      </div>
+    </div>
+  )
+})
+
+const QuickFilters = memo(function QuickFilters({
+  activeQuickFilters,
+  onToggle,
+  onClearAll,
+}: {
+  activeQuickFilters: AssetQuickFilter[]
+  onToggle: (f: AssetQuickFilter) => void
+  onClearAll: () => void
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {quickFilterChips.map((qf) => {
+        const isAll = qf === "all"
+        const isActive = isAll ? activeQuickFilters.length === 0 : activeQuickFilters.includes(qf as AssetQuickFilter)
+        return (
+          <Button key={qf} type="button" variant="outline" size="sm"
+            onClick={() => { if (isAll) onClearAll(); else onToggle(qf as AssetQuickFilter) }}
+            className={cn("h-7 rounded-full border border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-[#a1a1aa] shadow-none hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white", isActive && "border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.15)] text-emerald-400 hover:bg-[rgba(16,185,129,0.15)]")}>
+            {isAll ? "All" : assetQuickFilterLabels[qf as AssetQuickFilter]}
+          </Button>
+        )
+      })}
+    </div>
+  )
+})
+
+const AssetRow = memo(function AssetRow({
+  asset,
+  clientName,
+  onPreview,
+}: {
+  asset: Asset
+  clientName: string
+  onPreview: (a: Asset) => void
+}) {
+  const AssetIcon = getAssetIcon(asset)
+  const previewType = getAssetPreviewType(asset)
+  return (
+    <Link href={`/dashboard/assets/${asset.id}`} className="table-row-item">
+      <div className="flex flex-1 items-center gap-3 min-w-0">
+        <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview(asset) }}>
+          {asset.thumbnailUrl && previewType === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={asset.thumbnailUrl} alt={asset.title} className="h-full w-full object-cover" loading="lazy" />
+          ) : (<AssetIcon className="h-5 w-5 text-[var(--color-text-faint)]" />)}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-medium text-[var(--color-text-primary)]">{asset.title}</p>
+          <p className="text-[11px] text-[var(--color-text-faint)] uppercase tracking-wider mt-0.5">{asset.fileExtension ?? asset.type}</p>
+        </div>
+      </div>
+      <div className="w-32 shrink-0"><StatusBadge status={asset.status} /></div>
+      <div className="w-32 shrink-0 text-[var(--color-text-secondary)] truncate">{clientName}</div>
+      <div className="w-32 shrink-0 text-right text-[var(--color-text-muted)] text-[12px]">{formatRelativeTime(asset.updatedAt)}</div>
+    </Link>
+  )
+})
 
 export default function AssetsPage() {
   const queryClient = useQueryClient()
@@ -293,13 +439,15 @@ export default function AssetsPage() {
     return pages
   }, [totalPages, safeCurrentPage])
 
-  const toggleQuickFilter = (quickFilter: AssetQuickFilter) => {
+  const toggleQuickFilter = useCallback((quickFilter: AssetQuickFilter) => {
     setActiveQuickFilters((current) =>
       current.includes(quickFilter)
         ? current.filter((value) => value !== quickFilter)
         : [...current, quickFilter],
     )
-  }
+  }, [])
+
+  const handlePreview = useCallback((asset: Asset) => setPreviewAsset(asset), [])
 
   const clearFilters = () => {
     setSearchInput("")
@@ -315,256 +463,7 @@ export default function AssetsPage() {
     setSortMode(defaultSortMode)
   }
 
-  const renderFilterGrid = (compact: boolean) => (
-    <div
-      className={cn(
-        "grid gap-3",
-        compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
-      )}
-    >
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Workflow status
-        </p>
-        <Select
-          value={selectedStatus}
-          onValueChange={(value) =>
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-            setSelectedStatus(value as AssetStatus | "all")
-          }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Any status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Any status</SelectItem>
-            {statusOptions.map((status) => (
-              <SelectItem key={status} value={status}>
-                {assetStatusLabels[status]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Asset type
-        </p>
-        <Select
-          value={selectedAssetType}
-          onValueChange={(value) =>
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-            setSelectedAssetType(value as AssetType | "all")
-          }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Any type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Any type</SelectItem>
-            {assetTypes.map((assetType) => (
-              <SelectItem key={assetType} value={assetType}>
-                {assetType === "reel" ? "Reel" : "Poster"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Uploaded date
-        </p>
-        <Select
-          value={uploadedDateFilter}
-          onValueChange={(value) =>
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-            setUploadedDateFilter(value as AssetUploadedDateFilter)
-          }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Any date" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(assetUploadedDateLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Assigned user
-        </p>
-        <Select
-          value={selectedAssignedUserId}
-          onValueChange={(value) =>
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-            setSelectedAssignedUserId(value as string | "all" | "unassigned")
-          }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Any user" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Any user</SelectItem>
-            <SelectItem value="unassigned">Unassigned</SelectItem>
-            {users.map((user) => (
-              <SelectItem key={user.id} value={user.id}>
-                {formatUserLabel(user)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Metadata
-        </p>
-        <Select
-          value={metadataFilter}
-          onValueChange={(value) =>
-// SAFETY: this cast is safe because the value already conforms to the asserted type.
-            setMetadataFilter(value as AssetMetadataFilter)
-          }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Any metadata state" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(assetMetadataLabels).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          File size range
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <Input
-            type="number"
-            min="0"
-            step="0.1"
-            inputMode="decimal"
-            placeholder="Min MB"
-            value={minFileSizeMb}
-            onChange={(event) => setMinFileSizeMb(event.target.value)}
-          />
-          <Input
-            type="number"
-            min="0"
-            step="0.1"
-            inputMode="decimal"
-            placeholder="Max MB"
-            value={maxFileSizeMb}
-            onChange={(event) => setMaxFileSizeMb(event.target.value)}
-          />
-        </div>
-      </div>
-    </div>
-  )
-
-  const renderQuickFilters = () => (
-    <div className="flex flex-wrap gap-2">
-      {quickFilterChips.map((quickFilter) => {
-        const isAll = quickFilter === "all"
-        const isActive = isAll
-          ? activeQuickFilters.length === 0
-          : activeQuickFilters.includes(quickFilter)
-
-        return (
-          <Button
-            key={quickFilter}
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (isAll) {
-                setActiveQuickFilters([])
-                return
-              }
-
-              toggleQuickFilter(quickFilter)
-            }}
-            className={cn(
-              "h-7 rounded-full border border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-[#a1a1aa] shadow-none hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white",
-              isActive &&
-                "border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.15)] text-emerald-400 hover:bg-[rgba(16,185,129,0.15)]",
-            )}
-          >
-            {isAll ? "All" : assetQuickFilterLabels[quickFilter]}
-          </Button>
-        )
-      })}
-    </div>
-  )
-
-  const renderAssetRow = (asset: Asset) => {
-    const AssetIcon = getAssetIcon(asset)
-    const previewType = getAssetPreviewType(asset)
-    const clientName = clientsById.get(asset.clientId)?.name ?? "Unknown client"
-
-    return (
-      <Link
-        key={asset.id}
-        href={`/dashboard/assets/${asset.id}`}
-        className="table-row-item"
-      >
-        <div className="flex flex-1 items-center gap-3 min-w-0">
-          <div
-            className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded bg-[#0f0f0f]"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              setPreviewAsset(asset)
-            }}
-          >
-            {asset.thumbnailUrl && previewType === "image" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={asset.thumbnailUrl}
-                alt={asset.title}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <AssetIcon className="h-5 w-5 text-[var(--color-text-faint)]" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-medium text-[var(--color-text-primary)]">
-              {asset.title}
-            </p>
-            <p className="text-[11px] text-[var(--color-text-faint)] uppercase tracking-wider mt-0.5">
-              {asset.fileExtension ?? asset.type}
-            </p>
-          </div>
-        </div>
-
-        <div className="w-32 shrink-0">
-          <StatusBadge status={asset.status} />
-        </div>
-
-        <div className="w-32 shrink-0 text-[var(--color-text-secondary)] truncate">
-          {clientName}
-        </div>
-
-        <div className="w-32 shrink-0 text-right text-[var(--color-text-muted)] text-[12px]">
-          {formatRelativeTime(asset.updatedAt)}
-        </div>
-      </Link>
-    )
-  }
 
   if (isLoading) {
     return (
@@ -819,13 +718,13 @@ export default function AssetsPage() {
                   </Select>
                 </div>
 
-                {renderFilterGrid(true)}
+                <FilterGrid compact users={users} selectedStatus={selectedStatus} setSelectedStatus={setSelectedStatus} selectedAssetType={selectedAssetType} setSelectedAssetType={setSelectedAssetType} uploadedDateFilter={uploadedDateFilter} setUploadedDateFilter={setUploadedDateFilter} selectedAssignedUserId={selectedAssignedUserId} setSelectedAssignedUserId={setSelectedAssignedUserId} metadataFilter={metadataFilter} setMetadataFilter={setMetadataFilter} minFileSizeMb={minFileSizeMb} setMinFileSizeMb={setMinFileSizeMb} maxFileSizeMb={maxFileSizeMb} setMaxFileSizeMb={setMaxFileSizeMb} />
 
                 <div className="space-y-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-[#71717a]">
                     Quick filters
                   </p>
-                  {renderQuickFilters()}
+                  <QuickFilters activeQuickFilters={activeQuickFilters} onToggle={toggleQuickFilter} onClearAll={() => setActiveQuickFilters([])} />
                 </div>
 
                 <div className="flex gap-2">
@@ -874,7 +773,7 @@ export default function AssetsPage() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {renderQuickFilters()}
+        <QuickFilters activeQuickFilters={activeQuickFilters} onToggle={toggleQuickFilter} onClearAll={() => setActiveQuickFilters([])} />
       </div>
 
       {visibleAssets.length > 0 ? (
@@ -900,7 +799,7 @@ export default function AssetsPage() {
                   Updated
                 </div>
               </div>
-              <div>{visibleAssets.map((asset) => renderAssetRow(asset))}</div>
+              <div>{visibleAssets.map((asset) => (<AssetRow key={asset.id} asset={asset} clientName={clientsById.get(asset.clientId)?.name ?? "Unknown client"} onPreview={handlePreview} />))}</div>
             </div>
           </div>
         )
