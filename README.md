@@ -1,173 +1,111 @@
 # Spool Studio
 
-Open-source content and asset operations platform for creative teams.
+Content and asset operations platform for creative teams.
 
-Spool Studio is a workspace for agencies and content teams to plan, produce, review, approve, and publish client content.
-
-It includes a content calendar, Kanban production board, asset library, approval workflow, upload queue, and client portal.
+Plan, produce, review, approve, and publish client content from a single workspace. Built for agencies managing multiple clients with recurring content cycles.
 
 ## Features
 
-### Calendar
+**Calendar** — Month, week, and day views with drag-to-reschedule. Overlays client contract periods, content assets, and upload queue items. Supports recurring events.
 
-- Month, week, and day views
-- Drag-to-reschedule
-- Recurring publish and upload events
-- Multi-day client contract periods
-- Combined view of contracts, content, and uploads
+**Kanban Board** — Drag-and-drop content production pipeline. Track status from draft through approval. Filter by client or team member.
 
-### Production
+**Asset Library** — Central repository for reels and posters. Upload, download, version history, comments, and activity logs. Inline previews.
 
-- Kanban board for content production
-- Status tracking from draft through approval
-- Client and team views
-- Upload queue with processing states
-- Retry and cancellation for queued uploads
+**Approval Workflow** — Approve, reject, or request revisions on assets. Comment threads per asset. Full approval history with activity logging.
 
-### Assets
+**Client Portal** — Token-based, read-only interface for clients to review assets, leave comments, approve or request revisions. No client account required.
 
-- Central asset library
-- Reel and poster support
-- Uploads and downloads
-- Asset versions and revision history
-- Comments and activity history
-- Asset previews
+**Content Planner** — Service cycles with weekly content plans. Automated asset numbering and publication records.
 
-### Approvals
+**Upload Queue** — Scheduled uploads with R2 presigned URLs. Processing states, retry, and cancellation.
 
-- Approve or reject assets
-- Request revisions
-- Comments on individual assets
-- Approval history
-- Activity logging
+**Dashboard** — Command palette search (Ctrl/Cmd+K), notifications bell with unread badge, global search across clients and assets.
 
-### Client Portal
+**Auth & Security** — JWT with token versioning, password reset, team invitations, rate limiting, security headers, report-only CSP. Portal tokens are hashed at rest.
 
-The client portal provides a token-based, read-only interface for reviewing content.
+**Notifications** — In-app notifications via SSE. Email through Mailgun. Per-user preference controls.
 
-Clients can:
-
-- View assets
-- Preview content
-- Leave comments
-- Approve assets
-- Request revisions
-- View revision history
-
-No client account is required.
-
-### Dashboard
-
-- Command palette search (Ctrl/Cmd+K)
-- Notifications bell with unread badge
-- Global search across clients and assets
-- Responsive sidebar navigation
-
-### Other
-
-- JWT authentication with token versioning
-- Password reset and team invitations
-- In-app notifications with SSE
-- S3-compatible object storage (Cloudflare R2)
-- Mailgun email notifications
-- PDF client reports
-- Workspace activity and audit logs
-- Security headers and report-only CSP
+**Reporting** — PDF client reports with asset summaries and publication history.
 
 ## Tech Stack
 
-| Area           | Technology                                  |
-| -------------- | ------------------------------------------- |
-| Framework      | Next.js 16, App Router                      |
-| UI             | React 19, Tailwind CSS v4, Radix UI         |
-| Language       | TypeScript 5.7                              |
-| Database       | PostgreSQL 15+                              |
-| ORM            | Drizzle ORM                                 |
-| Authentication | jose, bcryptjs                             |
-| Storage        | S3-compatible storage / Cloudflare R2       |
-| Email          | Mailgun                                     |
-| Data Fetching  | TanStack React Query                        |
-| Forms          | React Hook Form                             |
-| Validation     | Zod                                         |
-| Charts         | Recharts                                    |
-| Animation      | Framer Motion                               |
-| PDF            | @react-pdf/renderer                         |
-| Testing        | Vitest, Playwright                          |
-| Formatting     | Biome                                       |
-| Linting        | Biome, oxlint                               |
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| UI | React 19, Tailwind CSS v4, Radix UI |
+| Language | TypeScript 5.7 |
+| Database | PostgreSQL 15+ |
+| ORM | Drizzle ORM |
+| Auth | jose, bcryptjs |
+| Storage | Cloudflare R2 (S3-compatible) |
+| Email | Mailgun |
+| Data Fetching | TanStack React Query |
+| Forms | React Hook Form, Zod |
+| Charts | Recharts |
+| PDF | @react-pdf/renderer |
+| Testing | Vitest, Playwright |
+| Linting | Biome, oxlint (anti-slop plugin) |
 
 ## Getting Started
 
 ### Requirements
 
-- Node.js 24+ (required for oxlint anti-slop plugin)
+- Node.js 24+ (needed for oxlint anti-slop plugin)
 - PostgreSQL 15+
 - pnpm
 
-Cloudflare R2 or another S3-compatible provider is required for asset storage.
-
-Mailgun is required for email functionality.
-
-### Installation
+### Install
 
 ```bash
 git clone <your-repo-url> spool-studio
 cd spool-studio
-
 pnpm install
 ```
 
-Create the environment file:
+### Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Configure the required variables:
+Required variables:
 
-```
-DATABASE_URL=
-JWT_SECRET=
-NEXT_PUBLIC_APP_URL=
-```
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Secret for signing JWTs |
+| `NEXT_PUBLIC_APP_URL` | Public URL (e.g. `http://localhost:3000`) |
 
-Storage and email variables are listed in `.env.example`.
+Optional — storage, email, and debug variables are listed in `.env.example`.
 
 ### Database
-
-Run migrations:
 
 ```bash
 pnpm db:migrate
 ```
 
-Seed development data if needed:
+Seed development data (3 users, 2 clients, 14 assets):
 
 ```bash
 npx tsx scripts/seed.ts
 ```
 
-To reset the database:
+Reset the database completely:
 
 ```bash
 npx tsx scripts/fresh-db.ts
 ```
 
-This removes all existing tables and recreates them from the migration history.
-
-### Development
+### Develop
 
 ```bash
 pnpm dev
 ```
 
-The application runs at:
+Open `http://localhost:3000`.
 
-```
-http://localhost:3000
-```
-
-### Production
+### Build
 
 ```bash
 pnpm build
@@ -176,48 +114,64 @@ pnpm start
 
 ## Testing
 
-Unit and integration tests use Vitest (17 files, 108 tests):
+Unit and integration tests (Vitest — 17 files, 108 tests):
 
 ```bash
 pnpm test
 ```
 
-End-to-end tests use Playwright (8 spec files):
+End-to-end tests (Playwright — 8 spec files):
 
 ```bash
 npx playwright install
 pnpm test:e2e
 ```
 
-Run the main checks before submitting changes:
+Before submitting changes, run the full check suite:
 
 ```bash
 nvm use 24
-
 pnpm lint
 npx oxlint
 pnpm typecheck
 pnpm test
 ```
 
+## Project Structure
+
+```
+src/
+  db/             Drizzle schema and migrations client
+  lib/            Core utilities (auth, email, storage, RBAC, etc.)
+  repositories/   Data access layer
+  services/       Business logic
+  types/          Shared TypeScript types
+  actions/        Server actions
+  integrations/   External service clients (R2, Mailgun)
+
+app/
+  (auth)/         Login, forgot-password
+  (portal)/       Client portal (token-based)
+  dashboard/      Main app (calendar, assets, kanban, etc.)
+  api/            Route handlers
+
+components/       React components (ui/, layout/, assets/, calendar/, etc.)
+e2e/              Playwright end-to-end tests
+drizzle/          Migration SQL files
+scripts/          Database and maintenance scripts
+tools/            Build and lint tooling (oxlint anti-slop plugin)
+```
+
 ## Contributing
 
-Contributions are welcome.
+1. Fork and create a feature branch.
+2. Install dependencies and configure `.env`.
+3. Make changes with tests where appropriate.
+4. Run `pnpm lint`, `npx oxlint`, `pnpm typecheck`, `pnpm test`.
+5. Open a pull request.
 
-1. Fork the repository.
-2. Create a feature branch.
-3. Install dependencies and configure `.env`.
-4. Make your changes.
-5. Add or update tests where appropriate.
-6. Run the lint, typecheck, and test commands.
-7. Open a pull request.
-
-For larger changes, open an issue before starting implementation so the proposed approach can be discussed.
-
-Use clear commit messages and keep pull requests focused on a single change.
+For larger changes, open an issue first to discuss the approach.
 
 ## License
 
-Spool Studio is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
-
-See [LICENSE](./LICENSE) for the full license text.
+AGPL-3.0 — see [LICENSE](./LICENSE).
