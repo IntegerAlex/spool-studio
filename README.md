@@ -1,5 +1,10 @@
 # Spool Studio
 
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
+![Node.js 24+](https://img.shields.io/badge/node-24%2B-339933.svg)
+![TypeScript 5.7](https://img.shields.io/badge/typescript-5.7-3178c6.svg)
+![Tests](https://img.shields.io/badge/tests-108%20passed-brightgreen.svg)
+
 Content and asset operations platform for creative teams.
 
 Plan, produce, review, approve, and publish client content from a single workspace. Built for agencies managing multiple clients with recurring content cycles.
