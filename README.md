@@ -56,17 +56,23 @@ Clients can:
 
 No client account is required.
 
+### Dashboard
+
+- Command palette search (Ctrl/Cmd+K)
+- Notifications bell with unread badge
+- Global search across clients and assets
+- Responsive sidebar navigation
+
 ### Other
 
-- JWT authentication
-- Password reset
-- Team invitations
-- In-app notifications
-- Server-Sent Events (SSE)
-- S3-compatible object storage
+- JWT authentication with token versioning
+- Password reset and team invitations
+- In-app notifications with SSE
+- S3-compatible object storage (Cloudflare R2)
 - Mailgun email notifications
 - PDF client reports
-- Workspace activity logs
+- Workspace activity and audit logs
+- Security headers and report-only CSP
 
 ## Tech Stack
 
@@ -80,7 +86,7 @@ No client account is required.
 | Authentication | jose, bcryptjs                             |
 | Storage        | S3-compatible storage / Cloudflare R2       |
 | Email          | Mailgun                                     |
-| Data Fetching  | SWR                                         |
+| Data Fetching  | TanStack React Query                        |
 | Forms          | React Hook Form                             |
 | Validation     | Zod                                         |
 | Charts         | Recharts                                    |
@@ -94,8 +100,7 @@ No client account is required.
 
 ### Requirements
 
-- Node.js 20.9+
-- Node.js 24.x for oxlint
+- Node.js 24+ (required for oxlint anti-slop plugin)
 - PostgreSQL 15+
 - pnpm
 
@@ -171,13 +176,13 @@ pnpm start
 
 ## Testing
 
-Unit and integration tests use Vitest:
+Unit and integration tests use Vitest (17 files, 108 tests):
 
 ```bash
 pnpm test
 ```
 
-End-to-end tests use Playwright:
+End-to-end tests use Playwright (8 spec files):
 
 ```bash
 npx playwright install
