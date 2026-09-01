@@ -8,7 +8,7 @@ const ENV_KEYS = [
   "VERCEL_URL",
 ]
 
-// Vitest's env types mark NODE_ENV read-only; these tests must flip it,
+// SAFETY: Vitest's env types mark NODE_ENV read-only; these tests must flip it,
 // so go through a mutable view of process.env.
 const env = process.env as Record<string, string | undefined>
 const saved = new Map<string, string | undefined>()
