@@ -1,6 +1,3 @@
-import { and, ne, sql } from "drizzle-orm"
-import { db } from "@/db"
-import { notifications, users } from "@/db/schema"
 import { getCurrentUser } from "@/lib/auth"
 import { emitEvent } from "@/lib/event-bus"
 import { sendDesignerNotification } from "@/lib/notifications/mailgun"
@@ -14,7 +11,11 @@ import {
 } from "@/repositories/asset-comments-repository"
 import { getAssetById } from "@/repositories/assets-repository"
 import { getClientById } from "@/repositories/clients-repository"
-import { getUserById } from "@/repositories/users-repository"
+import { createNotification } from "@/repositories/notifications-repository"
+import {
+  findUserByNormalizedName,
+  getUserById,
+} from "@/repositories/users-repository"
 import { logAuditEvent } from "@/services/audit-log-service"
 import {
   getOrCreateCurrentUserProfile,
@@ -73,25 +74,15 @@ async function createMentionNotifications(
 
   for (const username of mentionedUsernames) {
     try {
-      const userRows = await db
-        .select({ id: users.id, full_name: users.full_name })
-        .from(users)
-        .where(
-          and(
-            sql`LOWER(REPLACE(${users.full_name}, ' ', '')) = ${username}`,
-            ne(users.id, commenterId),
-          ),
-        )
-        .limit(1)
+      const targetUser = await findUserByNormalizedName(username, commenterId)
 
-      if (userRows.length > 0) {
-        const targetUser = userRows[0]
-        await db.insert(notifications).values({
-          user_id: targetUser.id,
+      if (targetUser) {
+        await createNotification({
+          userId: targetUser.id,
           type: "comment",
           title: "You were mentioned",
           message: `You were mentioned in a comment on an asset: "${commentMessage.slice(0, 100)}${commentMessage.length > 100 ? "..." : ""}"`,
-          related_asset_id: assetId,
+          relatedAssetId: assetId,
         })
       }
     } catch (err) {

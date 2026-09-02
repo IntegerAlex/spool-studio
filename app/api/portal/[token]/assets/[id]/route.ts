@@ -3,10 +3,8 @@ import { ApiError, jsonError } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { getPortalTokenByToken } from "@/repositories/portal-tokens-repository"
 import { hashPortalToken } from "@/src/lib/portal-token"
-import {
-  getAssetById,
-  listRevisionsByAssetId,
-} from "@/repositories/assets-repository"
+import { getAssetById } from "@/repositories/assets-repository"
+import { listAssetRevisionsByAssetId } from "@/repositories/asset-revisions-repository"
 import { getClientById } from "@/repositories/clients-repository"
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
 import { listUsersByIds } from "@/repositories/users-repository"
@@ -48,7 +46,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const comments = await listCommentsByAssetId(assetId, { limit: 50 })
-    const revisions = (await listRevisionsByAssetId(assetId)).slice(0, 10)
+    const revisions = (await listAssetRevisionsByAssetId(assetId)).slice(0, 10)
 
     const userIds = new Set<string>()
     comments.forEach((c) => {

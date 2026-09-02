@@ -178,13 +178,16 @@ const FilterGrid = memo(function FilterGrid({
     <div className={cn("grid gap-3", compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4")}>
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Workflow status</p>
+        {/* oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion -- Radix Select constrains value to SelectItem values */}
         <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as AssetStatus | "all")}>
+
           <SelectTrigger className="w-full"><SelectValue placeholder="Any status" /></SelectTrigger>
           <SelectContent><SelectItem value="all">Any status</SelectItem>{statusOptions.map((s) => (<SelectItem key={s} value={s}>{assetStatusLabels[s]}</SelectItem>))}</SelectContent>
         </Select>
       </div>
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Asset type</p>
+        {/* oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion -- Radix Select constrains value to SelectItem values */}
         <Select value={selectedAssetType} onValueChange={(value) => setSelectedAssetType(value as AssetType | "all")}>
           <SelectTrigger className="w-full"><SelectValue placeholder="Any type" /></SelectTrigger>
           <SelectContent><SelectItem value="all">Any type</SelectItem>{assetTypes.map((t) => (<SelectItem key={t} value={t}>{t === "reel" ? "Reel" : "Poster"}</SelectItem>))}</SelectContent>
@@ -192,6 +195,7 @@ const FilterGrid = memo(function FilterGrid({
       </div>
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Uploaded date</p>
+        {/* oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion -- Radix Select constrains value to SelectItem values */}
         <Select value={uploadedDateFilter} onValueChange={(value) => setUploadedDateFilter(value as AssetUploadedDateFilter)}>
           <SelectTrigger className="w-full"><SelectValue placeholder="Any date" /></SelectTrigger>
           <SelectContent>{Object.entries(assetUploadedDateLabels).map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}</SelectContent>
@@ -199,6 +203,7 @@ const FilterGrid = memo(function FilterGrid({
       </div>
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Assigned user</p>
+        {/* oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion -- Radix Select constrains value to SelectItem values */}
         <Select value={selectedAssignedUserId} onValueChange={(value) => setSelectedAssignedUserId(value as string | "all" | "unassigned")}>
           <SelectTrigger className="w-full"><SelectValue placeholder="Any user" /></SelectTrigger>
           <SelectContent><SelectItem value="all">Any user</SelectItem><SelectItem value="unassigned">Unassigned</SelectItem>{users.map((u) => (<SelectItem key={u.id} value={u.id}>{formatUserLabel(u)}</SelectItem>))}</SelectContent>
@@ -206,6 +211,7 @@ const FilterGrid = memo(function FilterGrid({
       </div>
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Metadata</p>
+        {/* oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion -- Radix Select constrains value to SelectItem values */}
         <Select value={metadataFilter} onValueChange={(value) => setMetadataFilter(value as AssetMetadataFilter)}>
           <SelectTrigger className="w-full"><SelectValue placeholder="Any metadata state" /></SelectTrigger>
           <SelectContent>{Object.entries(assetMetadataLabels).map(([v, l]) => (<SelectItem key={v} value={v}>{l}</SelectItem>))}</SelectContent>
@@ -235,11 +241,16 @@ const QuickFilters = memo(function QuickFilters({
     <div className="flex flex-wrap gap-2">
       {quickFilterChips.map((qf) => {
         const isAll = qf === "all"
+        // SAFETY: quickFilterChips is typed (AssetQuickFilter | "all")[]; "all" is handled above.
         const isActive = isAll ? activeQuickFilters.length === 0 : activeQuickFilters.includes(qf as AssetQuickFilter)
         return (
           <Button key={qf} type="button" variant="outline" size="sm"
-            onClick={() => { if (isAll) onClearAll(); else onToggle(qf as AssetQuickFilter) }}
+            onClick={() => { if (isAll) onClearAll(); else onToggle(
+              // SAFETY: quickFilterChips is typed (AssetQuickFilter | "all")[]; "all" is handled above.
+              qf as AssetQuickFilter
+            ) }}
             className={cn("h-7 rounded-full border border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[12px] text-[#a1a1aa] shadow-none hover:border-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.05)] hover:text-white", isActive && "border-[rgba(16,185,129,0.4)] bg-[rgba(16,185,129,0.15)] text-emerald-400 hover:bg-[rgba(16,185,129,0.15)]")}>
+            {/* oxlint-disable-next-line anti-slop/require-safety-comment-for-type-assertion -- "all" handled above; qf is a valid AssetQuickFilter here */}
             {isAll ? "All" : assetQuickFilterLabels[qf as AssetQuickFilter]}
           </Button>
         )

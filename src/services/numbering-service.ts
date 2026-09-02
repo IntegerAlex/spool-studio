@@ -1,5 +1,4 @@
-import { sql } from "drizzle-orm"
-import { db } from "@/db"
+import { assignAssetNumber } from "@/repositories/numbering-repository"
 import type { AssetType } from "@/types/index"
 
 const TYPE_PREFIX = {
@@ -31,16 +30,7 @@ export async function getNextAssetNumber(
   cycleId: string,
   assetType: AssetType,
 ): Promise<number> {
-  const { rows } = await db.execute(
-    sql`select public.assign_asset_number(${cycleId}::uuid, ${assetType}::public.asset_type) as next_number`,
-  )
-  // SAFETY: assign_asset_number() always returns one row whose
-  // next_number column holds the assigned number.
-  const row = rows[0] as { next_number: number } | undefined
-  if (!row) {
-    throw new Error("Failed to assign asset number")
-  }
-  return Number(row.next_number)
+  return assignAssetNumber(cycleId, assetType)
 }
 
 /**

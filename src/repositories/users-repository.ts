@@ -1,4 +1,4 @@
-import { asc, eq, ilike, inArray, or } from "drizzle-orm"
+import { and, asc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { contentAssets, portalTokens, users } from "@/db/schema"
 import { verifyPassword } from "@/lib/auth/password"
@@ -84,6 +84,23 @@ export async function updateUser(
     .where(eq(users.id, userId))
     .returning()
   return rows[0]
+}
+
+export async function findUserByNormalizedName(
+  normalizedUsername: string,
+  excludeUserId: string,
+): Promise<Pick<DbUser, "id" | "full_name"> | null> {
+  const rows = await db
+    .select({ id: users.id, full_name: users.full_name })
+    .from(users)
+    .where(
+      and(
+        sql`LOWER(REPLACE(${users.full_name}, ' ', '')) = ${normalizedUsername}`,
+        ne(users.id, excludeUserId),
+      ),
+    )
+    .limit(1)
+  return rows[0] ?? null
 }
 
 export async function deleteUserAccount(

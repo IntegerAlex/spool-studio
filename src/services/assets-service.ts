@@ -1,6 +1,4 @@
-import { eq, sql } from "drizzle-orm"
-import { db } from "@/db"
-import { assetRevisions, contentAssets } from "@/db/schema"
+import { contentAssets } from "@/db/schema"
 import { deleteFile, uploadFile, getPresignedDownloadUrl } from "@/integrations/r2/r2-service"
 import { extractAssetMetadata } from "@/lib/asset-metadata"
 import {
@@ -17,13 +15,18 @@ import {
 } from "@/lib/notifications/mailgun"
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
 import {
+  listAssetRevisionsByAssetId,
+  getAssetRevisionById,
+  insertAssetRevision,
+} from "@/repositories/asset-revisions-repository"
+import {
   deleteAsset as deleteAssetRow,
   getAssetById,
   insertAsset,
   listAssets,
   listAssetsByClientId,
   listAssetsByStatuses,
-  listRevisionsByAssetId,
+  publishAssetWithRecord,
   updateAsset as updateAssetRow,
 } from "@/repositories/assets-repository"
 import { getClientById } from "@/repositories/clients-repository"
@@ -174,7 +177,7 @@ async function mapAsset(
 }
 
 async function mapAssetRevisions(
-  revisions: Awaited<ReturnType<typeof listRevisionsByAssetId>>,
+  revisions: Awaited<ReturnType<typeof listAssetRevisionsByAssetId>>,
 ): Promise<AssetRevision[]> {
   return Promise.all(
     revisions.map(async (rev) => ({
@@ -296,7 +299,7 @@ export async function getAssetDetail(assetId: string): Promise<Asset | null> {
   const row = await getAssetById(assetId)
   const mapped = await mapAsset(row)
   if (!mapped) return null
-  const revisions = await listRevisionsByAssetId(assetId)
+  const revisions = await listAssetRevisionsByAssetId(assetId)
   mapped.revisions = await mapAssetRevisions(revisions)
   // populate revision pointers/count from asset row
   mapped.currentRevisionId = row?.current_revision_id ?? undefined
@@ -336,7 +339,7 @@ export async function getAssetSummary(assetId: string): Promise<Asset | null> {
 export async function getAssetRevisions(
   assetId: string,
 ): Promise<AssetRevision[]> {
-  const revisions = await listRevisionsByAssetId(assetId)
+  const revisions = await listAssetRevisionsByAssetId(assetId)
   return mapAssetRevisions(revisions)
 }
 
@@ -345,12 +348,7 @@ export async function setAssetCurrentRevision(
   revisionId: string,
 ): Promise<void> {
   // Ensure the revision belongs to the asset
-  const revs = await db
-    .select({ id: assetRevisions.id, asset_id: assetRevisions.asset_id })
-    .from(assetRevisions)
-    .where(eq(assetRevisions.id, revisionId))
-    .limit(1)
-  const rev = revs[0]
+  const rev = await getAssetRevisionById(revisionId)
   if (!rev || rev.asset_id !== assetId) {
     throw new Error("Revision not found for asset")
   }
@@ -652,12 +650,11 @@ export async function finalizeAssetUpload(
 
     let revisionData: { id: string } | undefined
     try {
-      const inserted = await db
-        .insert(assetRevisions)
-        // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion  // const-literal insert row at DB boundary
-        .values(revisionInsert as unknown as typeof assetRevisions.$inferInsert)
-        .returning({ id: assetRevisions.id })
-      revisionData = inserted[0]
+      revisionData = await insertAssetRevision(
+        // SAFETY: revisionInsert is a partial revision row built from upload data; the cast
+        // narrows to the inferred insert type required by the repository.
+        revisionInsert as Parameters<typeof insertAssetRevision>[0],
+      )
     } catch (revisionError) {
       console.error("[revision][create][failed]", {
         assetId,
@@ -928,14 +925,11 @@ export async function uploadAssetFile(
 
         let revisionData: { id: string } | undefined
         try {
-          const inserted = await db
-            .insert(assetRevisions)
-            .values(
-              // oxlint-disable-next-line anti-slop/no-chained-type-assertions, anti-slop/require-safety-comment-for-type-assertion  // insert row at DB boundary
-              revisionInsert as unknown as typeof assetRevisions.$inferInsert,
-            )
-            .returning({ id: assetRevisions.id })
-          revisionData = inserted[0]
+          revisionData = await insertAssetRevision(
+            // SAFETY: revisionInsert is a partial revision row built from uploaded file metadata;
+            // the cast narrows to the inferred insert type required by the repository.
+            revisionInsert as Parameters<typeof insertAssetRevision>[0],
+          )
         } catch (revisionError) {
           console.error("[revision][create][failed]", {
             assetId,
@@ -1186,13 +1180,7 @@ export async function updateAsset(
       updates.published_at instanceof Date
         ? updates.published_at.toISOString()
         : (updates.published_at ?? new Date().toISOString())
-    await db.execute(sql`
-      select public.publish_asset_with_record(
-        ${assetId}::uuid,
-        ${JSON.stringify(updates)}::jsonb,
-        ${publishedAt}::timestamptz
-      )
-    `)
+    await publishAssetWithRecord(assetId, updates, publishedAt)
     const refreshed = await getAssetById(assetId)
     if (!refreshed) {
       throw new Error("Asset not found after publication")

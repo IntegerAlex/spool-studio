@@ -1,12 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm"
-import { db } from "@/db"
-import { contentAssets } from "@/db/schema"
 import {
   type DbContentPlan,
   deletePlansByCycleId,
   insertPlans,
   listPlansByCycleId,
 } from "@/repositories/plans-repository"
+import { listPublishedAssetsByCycleId } from "@/repositories/assets-repository"
 import {
   type DbNewServiceCycle,
   type DbServiceCycle,
@@ -90,15 +88,7 @@ function mapPlanRow(row: DbContentPlan): ContentPlanRow {
 async function computeActuals(
   cycleId: string,
 ): Promise<{ totalReelsPublished: number; totalPostersPublished: number }> {
-  const assets = await db
-    .select({ type: contentAssets.type, status: contentAssets.status })
-    .from(contentAssets)
-    .where(
-      and(
-        eq(contentAssets.cycle_id, cycleId),
-        inArray(contentAssets.status, ["published", "scheduled"]),
-      ),
-    )
+  const assets = await listPublishedAssetsByCycleId(cycleId)
 
   let totalReelsPublished = 0
   let totalPostersPublished = 0

@@ -1,6 +1,6 @@
 import { and, desc, eq, ilike, inArray, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { assetRevisions, contentAssets } from "@/db/schema"
+import { contentAssets } from "@/db/schema"
 import type { AssetStatus } from "@/types/index"
 
 export type DbAsset = typeof contentAssets.$inferSelect
@@ -279,13 +279,32 @@ export async function deleteAsset(assetId: string): Promise<void> {
   await db.delete(contentAssets).where(eq(contentAssets.id, assetId))
 }
 
-export async function listRevisionsByAssetId(
-  assetId: string,
-): Promise<(typeof assetRevisions.$inferSelect)[]> {
-  const rows = await db
-    .select()
-    .from(assetRevisions)
-    .where(eq(assetRevisions.asset_id, assetId))
-    .orderBy(desc(assetRevisions.version_number))
-  return rows
+export async function listPublishedAssetsByCycleId(
+  cycleId: string,
+): Promise<Pick<DbAsset, "type" | "status">[]> {
+  return db
+    .select({ type: contentAssets.type, status: contentAssets.status })
+    .from(contentAssets)
+    .where(
+      and(
+        eq(contentAssets.cycle_id, cycleId),
+        inArray(contentAssets.status, ["published", "scheduled"]),
+      ),
+    )
 }
+
+export async function publishAssetWithRecord(
+  assetId: string,
+  updates: Partial<typeof contentAssets.$inferInsert>,
+  publishedAt: string,
+): Promise<void> {
+  await db.execute(sql`
+    select public.publish_asset_with_record(
+      ${assetId}::uuid,
+      ${JSON.stringify(updates)}::jsonb,
+      ${publishedAt}::timestamptz
+    )
+  `)
+}
+
+
