@@ -44,7 +44,7 @@ export default function RootLayout({
           </Suspense>
           <div className="global-loader-overlay">
             <div className="global-loader-content">
-              <Image src="/Spool_logo.png" alt="Spool Studio" width={72} height={72} priority className="global-loader-logo" />
+              <Image src="/Spool_logo.png" alt="Spool Studio" width={72} height={72} priority className="global-loader-logo" style={{ height: "auto" }} />
               <div className="global-loader-bar-container">
                 <div className="global-loader-bar-fill"></div>
               </div>
