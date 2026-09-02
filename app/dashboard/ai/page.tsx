@@ -16,16 +16,9 @@ import {
 } from "@/components/ui/select"
 import { toast } from "@/hooks/use-toast"
 import { aiSettingsApi } from "@/lib/ai-settings-api"
-import { PROVIDER_MODELS } from "@/lib/ai-models"
-import type { AiProvider } from "@/repositories/user-ai-settings-repository"
+import { PROVIDER_GROUPS } from "@/lib/ai-models"
 
-type Provider = AiProvider
-
-function toProvider(value: string): Provider {
-  // SAFETY: the Select value is one of our two known provider keys
-  // ("openai" | "anthropic"), so re-narrowing the string is an identity cast.
-  return value as Provider
-}
+type ProviderKey = string
 
 export default function AiSettingsPage() {
   const queryClient = useQueryClient()
@@ -35,26 +28,43 @@ export default function AiSettingsPage() {
     staleTime: 60_000,
   })
 
-  const [provider, setProvider] = useState<Provider>("openai")
-  const [model, setModel] = useState<string>(PROVIDER_MODELS.openai[0].id)
+  const [providerKey, setProviderKey] = useState<ProviderKey>(PROVIDER_GROUPS[0].label.toLowerCase().replace(/\s+/g, "-"))
+  const [model, setModel] = useState<string>(PROVIDER_GROUPS[0].models[0].id)
   const [apiKey, setApiKey] = useState("")
   const [fieldTouched, setFieldTouched] = useState(false)
 
   useEffect(() => {
     if (!settings?.configured) return
-    if (settings.provider) setProvider(settings.provider)
-    if (settings.model) setModel(settings.model)
+    // SAFETY: settings.provider is a gateway provider slug from our own API;
+    // re-narrowing to a known key is safe — any unknown key falls back to default.
+    if (settings.provider) {
+      const slug = settings.provider.toLowerCase().replace(/\s+/g, "-")
+      const group = PROVIDER_GROUPS.find(
+        (g) => g.label.toLowerCase().replace(/\s+/g, "-") === slug,
+      )
+      if (group) {
+        setProviderKey(slug)
+        if (settings.model) setModel(settings.model)
+      }
+    }
   }, [settings])
 
-  const modelsForProvider = PROVIDER_MODELS[provider]
+  const activeGroup = PROVIDER_GROUPS.find(
+    (g) => g.label.toLowerCase().replace(/\s+/g, "-") === providerKey,
+  ) ?? PROVIDER_GROUPS[0]
 
-  const onProviderChange = (next: Provider) => {
-    setProvider(next)
-    setModel(PROVIDER_MODELS[next][0].id)
+  const modelsForProvider = activeGroup.models
+
+  const onProviderChange = (next: ProviderKey) => {
+    setProviderKey(next)
+    const group = PROVIDER_GROUPS.find(
+      (g) => g.label.toLowerCase().replace(/\s+/g, "-") === next,
+    )
+    if (group) setModel(group.models[0].id)
   }
 
   const saveMutation = useMutation({
-    mutationFn: () => aiSettingsApi.save({ provider, model, apiKey: apiKey.trim() }),
+    mutationFn: () => aiSettingsApi.save({ provider: activeGroup.label, model, apiKey: apiKey.trim() }),
     onSuccess: (saved) => {
       queryClient.setQueryData(["ai-settings"], saved)
       setApiKey("")
@@ -108,8 +118,9 @@ export default function AiSettingsPage() {
           </Badge>
         </div>
         <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Connect your own AI provider so Spool can help you drive workflows conversationally. Your
-          key is encrypted at rest and never shown back to you.
+          Connect your own AI provider so Spool can help you drive workflows conversationally.
+          Powered by the Vercel AI Gateway — access OpenAI, Anthropic, Google, Meta, Mistral,
+          DeepSeek, and more with a single key.
         </p>
       </div>
 
@@ -137,13 +148,19 @@ export default function AiSettingsPage() {
               <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Provider
               </label>
-              <Select value={provider} onValueChange={(v) => onProviderChange(toProvider(v))}>
+              <Select value={providerKey} onValueChange={onProviderChange}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select provider" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  {PROVIDER_GROUPS.map((g) => (
+                    <SelectItem
+                      key={g.label}
+                      value={g.label.toLowerCase().replace(/\s+/g, "-")}
+                    >
+                      {g.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -181,13 +198,16 @@ export default function AiSettingsPage() {
               <Input
                 type="password"
                 autoComplete="off"
-                placeholder="sk-… or your provider key"
+                placeholder="Your provider API key"
                 value={apiKey}
                 onChange={(e) => {
                   setApiKey(e.target.value)
                   setFieldTouched(true)
                 }}
               />
+              <p className="text-[11px] text-[var(--color-text-faint)]">
+                Your key is encrypted at rest and never shared. It is used only for your chat sessions.
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-2 pt-1">

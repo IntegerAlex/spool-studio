@@ -12,7 +12,9 @@ import {
   upsertUserAiSettings as repoUpsert,
 } from "@/repositories/user-ai-settings-repository"
 
-export const aiProviderSchema = z.enum(["openai", "anthropic"])
+// Any non-empty string is a valid gateway provider slug. The gateway routes
+// based on the model-ID prefix, not this field — it exists for display only.
+export const aiProviderSchema = z.string().trim().min(1).max(60)
 
 // Zod schema reused by the API route for validation.
 export const saveAiSettingsSchema = z.object({

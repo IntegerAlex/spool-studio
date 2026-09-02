@@ -89,11 +89,8 @@ export async function POST(request: Request) {
     if (userSettings && userSettings.apiKey) {
       providerConfig = userSettings
     } else {
-      const envProvider = process.env.AI_PROVIDER
-      const isAnthropic = envProvider === "anthropic"
-      const apiKey = isAnthropic
-        ? process.env.ANTHROPIC_API_KEY
-        : process.env.OPENAI_API_KEY
+      // Fallback: use a gateway key from env and a default model ID.
+      const apiKey = process.env.AI_GATEWAY_KEY ?? process.env.AI_API_KEY
       if (!apiKey) {
         return NextResponse.json(
           {
@@ -105,10 +102,8 @@ export async function POST(request: Request) {
         )
       }
       providerConfig = {
-        provider: isAnthropic ? "anthropic" : "openai",
-        model:
-          process.env.AI_MODEL ??
-          (isAnthropic ? "claude-sonnet-4-5" : "gpt-4o"),
+        provider: "gateway",
+        model: process.env.AI_MODEL ?? "openai/gpt-4o",
         apiKey,
       }
     }
@@ -144,11 +139,11 @@ export async function POST(request: Request) {
         .map((m) => ({ role: m.role, content: messageText(m) })),
       tools,
       // Anthropic prompt caching: tag the stable prefix (system + tools) as
-      // cacheable so repeated turns reuse cached tokens. OpenAI caches
-      // automatically on stable prefixes. Confirm cache hits via the provider's
-      // response metadata on turn 2+.
+      // cacheable so repeated turns reuse cached tokens. The gateway forwards
+      // provider options to the upstream provider; detect Anthropic via the
+      // model-ID prefix (e.g. `anthropic/claude-sonnet-4.5`).
       providerOptions:
-        providerConfig.provider === "anthropic"
+        providerConfig.model.startsWith("anthropic/")
           ? { anthropic: { cacheControl: { type: "ephemeral" } } }
           : undefined,
       onFinish: () => {

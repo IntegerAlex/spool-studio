@@ -4,7 +4,12 @@ import { userAiSettings } from "@/db/schema"
 
 export type DbUserAiSettings = typeof userAiSettings.$inferSelect
 
-export type AiProvider = "openai" | "anthropic"
+/**
+ * The gateway embeds the provider in the model ID (e.g. `openai/gpt-4o`).
+ * `AiProvider` is the human-readable provider slug stored for display and
+ * model-filtering — routing is handled entirely by the gateway.
+ */
+export type AiProvider = string
 
 export interface StoredAiSettings {
   provider: AiProvider

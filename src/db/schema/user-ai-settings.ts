@@ -11,7 +11,7 @@ export const userAiSettings = pgTable("user_ai_settings", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" })
     .unique(),
-  provider: text("provider").notNull(), // "openai" | "anthropic"
+  provider: text("provider").notNull(), // display slug e.g. "OpenAI", "Anthropic", "Google"
   model: text("model").notNull(),
   // AES-256-GCM ciphertext (base64) of the API key.
   encrypted_api_key: text("encrypted_api_key").notNull(),
