@@ -9,7 +9,6 @@ import { getCurrentUser } from "@/lib/auth"
 import { emitEvent } from "@/lib/event-bus"
 import {
   sendAssetUploadNotification,
-  sendDesignerNotification,
   sendRevisionUploadNotification,
 } from "@/lib/notifications/mailgun"
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
@@ -46,6 +45,7 @@ import {
   splitScheduledAt,
   toDate,
 } from "@/services/asset-mapping"
+import { notifyDesignerOfChange } from "@/services/asset-notifications"
 import type { AssetStatus, AssetType, Json } from "@/types"
 import type { Asset } from "@/types/index"
 
@@ -1211,61 +1211,23 @@ export async function rejectAsset(
     approved_by: null,
   })
 
-  // Handle Notifications
+  // Handle Notifications: email the assigned designer (skip if self).
+  let latestCommentText: string | null = null
   try {
-    if (existing.assigned_to) {
-      const assignedDesigner = await getUserById(existing.assigned_to)
-
-      // Do not send if the user rejecting is the assigned designer
-      if (assignedDesigner?.email && userId !== assignedDesigner.id) {
-        let clientName = "Unknown Client"
-        if (existing.client_id) {
-          const client = await getClientById(existing.client_id)
-          if (client) {
-            clientName = client.name
-          }
-        }
-
-        const requestingUser = await getUserById(userId)
-
-        // Fetch latest comment to include in the email
-        let latestCommentText = null
-        try {
-          const comments = await listCommentsByAssetId(assetId, {
-            limit: 1,
-          })
-          if (comments && comments.length > 0) {
-            latestCommentText = comments[0].message
-          }
-        } catch {
-          // non-blocking
-        }
-
-        void sendDesignerNotification({
-          notificationType: "revision_requested",
-          assetId: existing.id,
-          assetTitle: existing.title,
-          assetType: existing.type,
-          clientId: existing.client_id,
-          clientName,
-          commentMessage: latestCommentText,
-          designerId: assignedDesigner.id,
-          designerEmail: assignedDesigner.email,
-          designerName: assignedDesigner.full_name || null,
-          requestedBy: {
-            email: requestingUser?.email || "unknown",
-            name: requestingUser?.full_name || null,
-          },
-          timestamp: new Date().toISOString(),
-        })
-      }
+    const comments = await listCommentsByAssetId(assetId, { limit: 1 })
+    if (comments && comments.length > 0) {
+      latestCommentText = comments[0].message
     }
-  } catch (err) {
-    console.error(
-      "[assets-service] Failed to send designer notification on reject",
-      err,
-    )
+  } catch {
+    // non-blocking
   }
+
+  await notifyDesignerOfChange({
+    assetId,
+    notificationType: "revision_requested",
+    commentMessage: latestCommentText,
+    triggeredByUserId: userId,
+  })
 
   const mapped = await mapAsset(updated)
   if (!mapped) {
