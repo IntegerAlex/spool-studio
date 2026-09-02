@@ -122,6 +122,7 @@ vi.mock("@/lib/file-url", () => ({
 import {
   approveAsset,
   createAsset,
+  finalizeAssetUpload,
   getAssetDetail,
   getAssetR2Key,
   getAssets,
@@ -130,6 +131,8 @@ import {
   removeAsset,
   setAssetCurrentRevision,
   updateAsset,
+  uploadAssetFile,
+  type AssetUploadFinalizationInput,
 } from "@/services/assets-service"
 
 const AUTH_USER = {
@@ -688,5 +691,169 @@ describe("removeAsset", () => {
 
     expect(mocks.deleteFile).not.toHaveBeenCalled()
     expect(mocks.deleteAsset).toHaveBeenCalledWith("asset-1")
+  })
+})
+
+function uploadResult(
+  overrides: Partial<AssetUploadFinalizationInput["uploadResult"]> = {},
+): AssetUploadFinalizationInput["uploadResult"] {
+  const base = {
+    key: "clients/client-1/assets/asset-1/test.png",
+    url: "https://r2.example/object",
+    mimeType: "image/png",
+    fileSize: 2048,
+    uploadStatus: "uploaded" as const,
+    mediaWidth: 100,
+    mediaHeight: 200,
+    durationSeconds: null,
+    thumbnailLink: null,
+  }
+  // SAFETY: spread merges override fields onto base, both of the target type.
+  return { ...base, ...overrides }
+}
+
+function makeFile(): File {
+  const fileLike = {
+    name: "test.png",
+    type: "image/png",
+    size: 4,
+    arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2, 3, 4]).buffer),
+  }
+  // SAFETY: uploadAssetFile only reads name/type/size/arrayBuffer; this object satisfies that surface.
+  // oxlint-disable-next-line anti-slop/no-chained-type-assertions  // File has many members this helper doesn't need
+  return fileLike as unknown as File
+}
+
+describe("finalizeAssetUpload", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getCurrentUser.mockResolvedValue(AUTH_USER)
+    mocks.getOrCreateCurrentUserProfile.mockResolvedValue({})
+    mocks.getPresignedDownloadUrl.mockResolvedValue(null)
+    mocks.insertAssetRevision.mockResolvedValue({ id: "rev-1" })
+    mocks.updateAsset.mockResolvedValue(dbAsset())
+    mocks.logAssetActivity.mockResolvedValue(undefined)
+    mocks.logAuditEvent.mockResolvedValue(undefined)
+  })
+
+  it("throws Unauthorized when no user is present", async () => {
+    mocks.getCurrentUser.mockResolvedValue(null)
+    await expect(
+      finalizeAssetUpload("asset-1", {
+        fileName: "test.png",
+        uploadResult: uploadResult(),
+      }),
+    ).rejects.toThrow("Unauthorized")
+  })
+
+  it("throws when the asset does not exist", async () => {
+    mocks.getAssetById.mockResolvedValue(null)
+    await expect(
+      finalizeAssetUpload("asset-1", {
+        fileName: "test.png",
+        uploadResult: uploadResult(),
+      }),
+    ).rejects.toThrow("Asset not found")
+  })
+
+  it("finalizes a fresh upload and records a revision", async () => {
+    mocks.getAssetById.mockResolvedValue(dbAsset({ status: "draft" }))
+    mocks.listAssetRevisionsByAssetId.mockResolvedValue([])
+
+    const result = await finalizeAssetUpload("asset-1", {
+      fileName: "test.png",
+      uploadResult: uploadResult(),
+    })
+
+    expect(mocks.insertAssetRevision).toHaveBeenCalled()
+    expect(result.upload.uploadStatus).toBe("uploaded")
+    expect(result.upload.r2Key).toBe(
+      "clients/client-1/assets/asset-1/test.png",
+    )
+    expect(mocks.sendAssetUploadNotification).toHaveBeenCalled()
+    expect(mocks.sendRevisionUploadNotification).not.toHaveBeenCalled()
+  })
+
+  it("treats an existing file as a revision upload and sends the revision notification", async () => {
+    mocks.getAssetById.mockResolvedValue(
+      dbAsset({
+        status: "ready_for_review",
+        drive_file_id: "clients/client-1/assets/asset-1/v1.png",
+        revision_count: 1,
+        uploaded_at: "2026-01-01T00:00:00.000Z",
+      }),
+    )
+
+    const result = await finalizeAssetUpload("asset-1", {
+      fileName: "v2.png",
+      uploadResult: uploadResult(),
+    })
+
+    expect(result.upload.uploadStatus).toBe("uploaded")
+    expect(mocks.sendRevisionUploadNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ revisionVersion: 2 }),
+    )
+    expect(mocks.sendAssetUploadNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe("uploadAssetFile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getCurrentUser.mockResolvedValue(AUTH_USER)
+    mocks.getOrCreateCurrentUserProfile.mockResolvedValue({})
+    mocks.getPresignedDownloadUrl.mockResolvedValue(null)
+    mocks.insertAssetRevision.mockResolvedValue({ id: "rev-1" })
+    mocks.updateAsset.mockResolvedValue(dbAsset())
+    mocks.logAssetActivity.mockResolvedValue(undefined)
+    mocks.logAuditEvent.mockResolvedValue(undefined)
+    mocks.uploadFile.mockResolvedValue({
+      key: "clients/client-1/assets/asset-1/test.png",
+      url: "https://r2.example/object",
+    })
+    mocks.extractAssetMetadata.mockResolvedValue({
+      updates: { mime_type: "image/png" },
+      extractedFields: { mediaWidth: 100, mediaHeight: 200, durationSeconds: null },
+    })
+  })
+
+  it("throws Unauthorized when no user is present", async () => {
+    mocks.getCurrentUser.mockResolvedValue(null)
+    const file = makeFile()
+    await expect(uploadAssetFile("asset-1", file)).rejects.toThrow(
+      "Unauthorized",
+    )
+  })
+
+  it("throws when the asset does not exist", async () => {
+    mocks.getAssetById.mockResolvedValue(null)
+    const file = makeFile()
+    await expect(uploadAssetFile("asset-1", file)).rejects.toThrow(
+      "Asset not found",
+    )
+  })
+
+  it("uploads a file, records a revision, and notifies", async () => {
+    mocks.getAssetById.mockResolvedValue(dbAsset({ status: "draft" }))
+    const file = makeFile()
+
+    const result = await uploadAssetFile("asset-1", file)
+
+    expect(mocks.uploadFile).toHaveBeenCalled()
+    expect(mocks.extractAssetMetadata).toHaveBeenCalled()
+    expect(mocks.insertAssetRevision).toHaveBeenCalled()
+    expect(result.upload.uploadStatus).toBe("uploaded")
+    expect(mocks.sendAssetUploadNotification).toHaveBeenCalled()
+  })
+
+  it("propagates R2 upload failures", async () => {
+    mocks.getAssetById.mockResolvedValue(dbAsset({ status: "draft" }))
+    mocks.uploadFile.mockRejectedValue(new Error("R2 unreachable"))
+    const file = makeFile()
+
+    await expect(uploadAssetFile("asset-1", file)).rejects.toThrow(
+      "R2 unreachable",
+    )
+    expect(mocks.uploadFile).toHaveBeenCalled()
   })
 })
