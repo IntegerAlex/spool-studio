@@ -140,10 +140,10 @@ export function SidebarLayout({ user = null }: SidebarLayoutProps) {
           <SidebarMenuItem>
             <Link href="/dashboard" className="flex items-center gap-2">
               <Image
-                src="/asset_flow.png"
-                alt="Asset Flow"
-                width={260}
-                height={78}
+                src="/Spool_Name.png"
+                alt="Spool Studio"
+                width={400}
+                height={124}
                 priority
                 className="h-10 w-auto shrink-0 object-contain group-data-[collapsible=icon]:h-7"
               />

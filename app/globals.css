@@ -461,10 +461,8 @@ a:focus-visible,
 }
 
 .global-loader-logo {
-  font-size: 36px;
-  font-weight: 800;
-  color: #e8e8f0;
-  letter-spacing: -0.03em;
+  width: 72px;
+  height: auto;
   margin-bottom: 24px;
   animation: pulse-glow 2s ease-in-out infinite;
 }

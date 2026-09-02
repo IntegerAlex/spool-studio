@@ -56,8 +56,8 @@ export default function ForgotPasswordPage() {
         >
           <div className="flex justify-center my-6">
             <Image
-              src="/asset_flow.png"
-              alt="Asset Flow"
+              src="/Spool_Bg.png"
+              alt="Spool Studio"
               width={200}
               height={60}
               priority

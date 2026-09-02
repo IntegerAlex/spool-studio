@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/Spool_Bg.png" alt="Spool Studio" width="480" />
+</p>
+
 # Spool Studio
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)

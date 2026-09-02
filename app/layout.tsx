@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
+import Image from "next/image"
 import { Inter } from "next/font/google"
 import { Suspense } from "react"
 import { Toaster } from "@/components/ui/toaster"
@@ -11,26 +12,13 @@ import { QueryProvider } from "@/lib/query-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Content Ops Pro - Content Management Platform",
+  title: "Spool Studio - Content Management Platform",
   description:
     "Professional content operations platform for managing Instagram reels, approvals, and team collaboration",
   generator: "v0.app",
   icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    apple: "/apple-icon.png",
+    icon: "/Spool_logo.png",
+    apple: "/Spool_logo.png",
   },
 }
 
@@ -56,7 +44,7 @@ export default function RootLayout({
           </Suspense>
           <div className="global-loader-overlay">
             <div className="global-loader-content">
-              <div className="global-loader-logo">AF</div>
+              <Image src="/Spool_logo.png" alt="Spool Studio" width={72} height={72} priority className="global-loader-logo" />
               <div className="global-loader-bar-container">
                 <div className="global-loader-bar-fill"></div>
               </div>
