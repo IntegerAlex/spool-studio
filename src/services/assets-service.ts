@@ -15,7 +15,6 @@ import {
 import { listCommentsByAssetId } from "@/repositories/asset-comments-repository"
 import {
   listAssetRevisionsByAssetId,
-  getAssetRevisionById,
   insertAssetRevision,
 } from "@/repositories/asset-revisions-repository"
 import {
@@ -48,7 +47,16 @@ import {
   toDate,
 } from "@/services/asset-mapping"
 import type { AssetStatus, AssetType, Json } from "@/types"
-import type { Asset, AssetRevision } from "@/types/index"
+import type { Asset } from "@/types/index"
+
+import { getAssetR2Key } from "@/services/asset-uploads"
+export {
+  getAssetR2Key,
+} from "@/services/asset-uploads"
+export {
+  getAssetRevisions,
+  setAssetCurrentRevision,
+} from "@/services/asset-revisions"
 
 export interface AssetInput {
   clientId: string
@@ -132,13 +140,6 @@ async function transitionAssetStatus(
   })
 }
 
-export function getAssetR2Key(
-  clientId: string,
-  assetId: string,
-  fileName: string,
-): string {
-  return `clients/${clientId}/assets/${assetId}/${fileName}`
-}
 
 export async function getAssets(limit = 200): Promise<Asset[]> {
   const rows = await listAssets(limit)
@@ -202,34 +203,6 @@ export async function getAssetSummary(assetId: string): Promise<Asset | null> {
   return mapAsset(row)
 }
 
-export async function getAssetRevisions(
-  assetId: string,
-): Promise<AssetRevision[]> {
-  const revisions = await listAssetRevisionsByAssetId(assetId)
-  return mapAssetRevisions(revisions)
-}
-
-export async function setAssetCurrentRevision(
-  assetId: string,
-  revisionId: string,
-): Promise<void> {
-  // Ensure the revision belongs to the asset
-  const rev = await getAssetRevisionById(revisionId)
-  if (!rev || rev.asset_id !== assetId) {
-    throw new Error("Revision not found for asset")
-  }
-
-  await updateAssetRow(assetId, { current_revision_id: revisionId })
-  try {
-    await logAssetActivity({
-      assetId,
-      action: "revision_activated",
-      metadata: { revisionId },
-    })
-  } catch {
-    // non-blocking
-  }
-}
 
 export async function createAsset(input: AssetInput): Promise<Asset> {
   const user = await getCurrentUser()
