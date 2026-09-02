@@ -3,7 +3,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](./LICENSE)
 ![Node.js 24+](https://img.shields.io/badge/node-24%2B-339933.svg)
 ![TypeScript 5.7](https://img.shields.io/badge/typescript-5.7-3178c6.svg)
-![Tests](https://img.shields.io/badge/tests-108%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-175%20passed-brightgreen.svg)
 
 Content and asset operations platform for creative teams.
 
@@ -33,6 +33,13 @@ Plan, produce, review, approve, and publish client content from a single workspa
 
 **Reporting** — PDF client reports with asset summaries and publication history.
 
+**Ask Spool AI** — A secure, conversational assistant that drives the app
+("move this asset to review", "show approvals for client X"). Each user
+connects their own AI provider/model/key (encrypted at rest, managed from
+Settings → Ask Spool AI). Chat never bypasses authorization — every action
+flows through the existing API with the user's own session, with injection
+guardrails and RBAC that fails closed. See `docs/CHAT_HARNESS.md`.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -46,6 +53,7 @@ Plan, produce, review, approve, and publish client content from a single workspa
 | Storage | Cloudflare R2 (S3-compatible) |
 | Email | Mailgun |
 | Data Fetching | TanStack React Query |
+| AI Assistant | Vercel AI SDK (`ai` 7), provider-agnostic (OpenAI / Anthropic) |
 | Forms | React Hook Form, Zod |
 | Charts | Recharts |
 | PDF | @react-pdf/renderer |
@@ -84,6 +92,12 @@ Required variables:
 
 Optional — storage, email, and debug variables are listed in `.env.example`.
 
+For Ask Spool AI there is no shared API key: each user connects their own
+provider/model/key from **Settings → Ask Spool AI** (`/dashboard/ai`). Keys are
+encrypted at rest (AES-256-GCM, derived from `JWT_SECRET`) and only ever shown
+masked. Optional `AI_PROVIDER` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` env vars
+act only as a server fallback for users without a configured key.
+
 ### Database
 
 ```bash
@@ -119,7 +133,7 @@ pnpm start
 
 ## Testing
 
-Unit and integration tests (Vitest — 17 files, 108 tests):
+Unit and integration tests (Vitest — 21 files, 175 tests):
 
 ```bash
 pnpm test
@@ -148,6 +162,7 @@ pnpm test
 src/
   db/             Drizzle schema and migrations client
   lib/            Core utilities (auth, email, storage, RBAC, etc.)
+    chat/         Ask Spool AI harness (guardrails, tools, crypto, provider)
   repositories/   Data access layer
   services/       Business logic
   types/          Shared TypeScript types
@@ -157,15 +172,18 @@ src/
 app/
   (auth)/         Login, forgot-password
   (portal)/       Client portal (token-based)
-  dashboard/      Main app (calendar, assets, kanban, etc.)
-  api/            Route handlers
+  dashboard/      Main app (calendar, assets, kanban, ai, etc.)
+  api/            Route handlers (incl. chat/ and user/ai-settings/)
 
-components/       React components (ui/, layout/, assets/, calendar/, etc.)
+components/       React components (ui/, layout/, assets/, chat/ask-spool/, etc.)
 e2e/              Playwright end-to-end tests
 drizzle/          Migration SQL files
 scripts/          Database and maintenance scripts
 tools/            Build and lint tooling (oxlint anti-slop plugin)
 ```
+
+Architecture and security notes for the AI assistant live in
+[`docs/CHAT_HARNESS.md`](./docs/CHAT_HARNESS.md).
 
 ## Contributing
 
