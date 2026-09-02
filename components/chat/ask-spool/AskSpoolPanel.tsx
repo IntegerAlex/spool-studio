@@ -63,7 +63,7 @@ export function AskSpoolPanel() {
 
   return (
     <div
-      className="fixed bottom-[76px] right-4 z-[60] flex w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.1)] bg-[var(--surface-elevated)] shadow-2xl"
+      className="fixed bottom-[76px] right-4 z-[60] flex w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border border-[rgba(255,255,255,0.1)] bg-[var(--surface-elevated)] shadow-2xl"
       style={{ maxHeight: "calc(100vh - 6rem)" }}
       role="dialog"
       aria-label="Ask Spool AI assistant"
