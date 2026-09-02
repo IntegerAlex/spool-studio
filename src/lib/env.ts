@@ -16,6 +16,12 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
+  // Optional provider-agnostic AI fallbacks. The primary config is stored per
+  // user (encrypted in user_ai_settings); these env vars are only used as a
+  // server default when a user has not configured their own key yet.
+  AI_PROVIDER: z.enum(["openai", "anthropic"]).optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   DB_POOL_MAX: z.coerce.number().int().min(1).max(10).optional(),
   DB_IDLE_TIMEOUT: z.coerce.number().int().min(1000).optional(),

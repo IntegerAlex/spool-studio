@@ -1,6 +1,6 @@
 "use client"
 
-import { BarChart3, Calendar, CheckSquare, ClipboardList, Image as ImageIcon, LayoutList, LogOut, Settings, Upload, Users } from "lucide-react"
+import { BarChart3, Calendar, CheckSquare, ClipboardList, Image as ImageIcon, LayoutList, LogOut, Settings, Sparkles, Upload, Users } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
@@ -80,6 +80,11 @@ const navigationSections = [
   {
     title: "SYSTEM",
     items: [
+      {
+        label: "Ask Spool AI",
+        href: "/dashboard/ai",
+        icon: Sparkles,
+      },
       {
         label: "Settings",
         href: "/dashboard/settings",

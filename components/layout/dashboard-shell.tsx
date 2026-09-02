@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query"
 import { NotificationsBell } from "@/components/layout/notifications-bell"
 import { SearchPalette } from "@/components/layout/search-palette"
 import { SidebarLayout } from "@/components/layout/sidebar"
+import { AskSpoolLauncher } from "@/components/chat/ask-spool"
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar"
 import type { AuthUser } from "@/lib/auth"
 import { authApi } from "@/lib/api-client"
@@ -27,6 +28,7 @@ function getRouteTitle(pathname: string, fallback: string): string {
   if (pathname.startsWith("/dashboard/kanban")) return "Kanban"
   if (pathname.startsWith("/dashboard/queue")) return "Upload Queue"
   if (pathname.startsWith("/dashboard/calendar")) return "Calendar"
+  if (pathname.startsWith("/dashboard/ai")) return "Ask Spool AI"
   if (pathname.startsWith("/dashboard/settings")) return "Settings"
   return fallback
 }
@@ -68,24 +70,27 @@ export function DashboardShell({ title,children }: DashboardShellProps) {
   const routeTitle = getRouteTitle(pathname, title)
 
   return (
-    <SidebarProvider>
-      <SidebarLayout user={user} />
-      <SidebarInset>
-        <header className="sticky top-0 z-50 flex h-14 items-center gap-4 border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 md:px-6">
-          <SidebarTrigger className="-ml-1 text-[#71717a] hover:text-white" />
-          <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">
-            {routeTitle}
-          </div>
-          <div className="flex-1" />
-          <SearchPalette />
-          <NotificationsBell userId={user?.id} />
-        </header>
-        <main className="flex-1 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 md:px-6">
-          <div className="mx-auto w-full max-w-[1900px] min-w-0">
-            {children}
-          </div>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <>
+      <SidebarProvider>
+        <SidebarLayout user={user} />
+        <SidebarInset>
+          <header className="sticky top-0 z-50 flex h-14 items-center gap-4 border-b border-[rgba(255,255,255,0.06)] bg-[var(--sidebar)] px-4 md:px-6">
+            <SidebarTrigger className="-ml-1 text-[#71717a] hover:text-white" />
+            <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+              {routeTitle}
+            </div>
+            <div className="flex-1" />
+            <SearchPalette />
+            <NotificationsBell userId={user?.id} />
+          </header>
+          <main className="flex-1 overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 md:px-6">
+            <div className="mx-auto w-full max-w-[1900px] min-w-0">
+              {children}
+            </div>
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
+      <AskSpoolLauncher />
+    </>
   )
 }
