@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
-import { requireUser } from "@/lib/auth"
+import { requirePermission } from "@/lib/rbac"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { rejectAsset } from "@/services/assets-service"
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser()
+    const user = await requirePermission("assets:approve")
 
     // SAFETY: this cast is safe because the value already conforms to the asserted type.
     const body = (await readJsonBody(request)) as { assetId?: string }

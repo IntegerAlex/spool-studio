@@ -25,9 +25,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
-import { assetsApi, kanbanApi } from "@/lib/api-client"
+import { assetsApi, authApi, kanbanApi } from "@/lib/api-client"
+import { canTransitionStatus } from "@/lib/asset-workflow"
 import { cn } from "@/lib/utils"
-import type { Asset, KanbanClientOption } from "@/types/index"
+import type { Asset, AssetStatus, KanbanClientOption } from "@/types/index"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 const AssetFormDialog = dynamic(
@@ -57,6 +58,14 @@ export default function KanbanPage() {
     queryKey: ["board"],
     queryFn: () => kanbanApi.getBoard(),
   })
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["current-user"],
+    queryFn: () => authApi.getCurrentUser(),
+    staleTime: 300_000,
+  })
+
+  const canApprove = currentUser?.role === "admin" || currentUser?.role === "approver"
 
   const assets = boardData?.assets ?? []
   const clients = boardData?.clients ?? []
@@ -119,10 +128,34 @@ export default function KanbanPage() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["board"] })
+      queryClient.invalidateQueries({ queryKey: ["planner"] })
     },
   })
 
   const handleStatusChange = (assetId: string, newStatus: Asset["status"]) => {
+    const asset = assets.find((a) => a.id === assetId)
+    if (!asset) return
+
+    // Only approvers and admins can move assets between columns
+    if (!canApprove && asset.status !== newStatus) {
+      toast({
+        title: "Permission denied",
+        description: "Only approvers and admins can move assets between columns.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate the status transition client-side
+    if (!canTransitionStatus(asset.status, newStatus)) {
+      toast({
+        title: "Invalid transition",
+        description: `Cannot move from "${asset.status}" to "${newStatus}".`,
+        variant: "destructive",
+      })
+      return
+    }
+
     statusMutation.mutate({ assetId, newStatus })
   }
 
@@ -275,6 +308,7 @@ export default function KanbanPage() {
         <KanbanBoard
           assets={filteredAssets}
           onStatusChange={handleStatusChange}
+          canApprove={canApprove}
         />
       </div>
     </ErrorBoundary>

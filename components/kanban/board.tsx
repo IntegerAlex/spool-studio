@@ -32,6 +32,7 @@ import type { Asset, AssetStatus } from "@/types/index"
 interface KanbanBoardProps {
   assets: Asset[]
   onStatusChange?: (assetId: string, newStatus: AssetStatus) => void
+  canApprove?: boolean
 }
 
 function isOverdue(asset: Asset): boolean {
@@ -56,10 +57,12 @@ function KanbanCard({
   asset,
   onQuickApprove,
   isDragging,
+  canApprove = true,
 }: {
   asset: Asset
   onQuickApprove?: () => void
   isDragging?: boolean
+  canApprove?: boolean
 }) {
   const [showActions, setShowActions] = useState(false)
   const revisionCount = asset.revisions.length
@@ -96,9 +99,11 @@ function KanbanCard({
       )}
     >
       <div className="flex items-start gap-2">
-        <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <GripVertical className="h-3.5 w-3.5 text-[var(--color-text-faint)]" />
-        </div>
+        {canApprove && (
+          <div className="mt-0.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <GripVertical className="h-3.5 w-3.5 text-[var(--color-text-faint)]" />
+          </div>
+        )}
 
         <Link href={`/dashboard/assets/${asset.id}`} className="min-w-0 flex-1">
           <div className="mb-2 overflow-hidden rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)]">
@@ -204,7 +209,8 @@ function areEqual(prev: any, next: any) {
   if ((a.comments?.length ?? 0) !== (b.comments?.length ?? 0)) return false
   return (
     prev.isDragging === next.isDragging &&
-    prev.onQuickApprove === next.onQuickApprove
+    prev.onQuickApprove === next.onQuickApprove &&
+    prev.canApprove === next.canApprove
   )
 }
 
@@ -219,6 +225,7 @@ function KanbanColumn({
   onDragStart,
   onDrop,
   onStatusChange,
+  canApprove = true,
 }: {
   status: (typeof kanbanWorkflowColumns)[number]
   assets: Asset[]
@@ -228,6 +235,7 @@ function KanbanColumn({
   onDragStart: (assetId: string, status: AssetStatus) => void
   onDrop: (e: React.DragEvent, toColumnId: KanbanWorkflowColumnId) => void
   onStatusChange?: (assetId: string, newStatus: AssetStatus) => void
+  canApprove?: boolean
 }) {
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -330,13 +338,18 @@ function KanbanColumn({
             columnAssets.map((asset) => (
               <div
                 key={asset.id}
-                draggable
-                onDragStart={() => onDragStart(asset.id, asset.status)}
+                draggable={canApprove}
+                onDragStart={
+                  canApprove
+                    ? () => onDragStart(asset.id, asset.status)
+                    : undefined
+                }
                 className="last:mb-0"
               >
                 <MemoizedKanbanCard
                   asset={asset}
                   isDragging={draggedItem?.assetId === asset.id}
+                  canApprove={canApprove}
                   onQuickApprove={
                     onStatusChange && asset.status === "revision_requested"
                       ? () => onStatusChange(asset.id, "approved")
@@ -352,7 +365,7 @@ function KanbanColumn({
   )
 }
 
-export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
+export function KanbanBoard({ assets, onStatusChange, canApprove = true }: KanbanBoardProps) {
   const collapsedColumnIds = useKanbanStore((state) => state.collapsedColumns)
   const toggleColumnStore = useKanbanStore((state) => state.toggleColumn)
   const collapsedColumns = new Set(collapsedColumnIds)
@@ -458,6 +471,7 @@ export function KanbanBoard({ assets, onStatusChange }: KanbanBoardProps) {
             onDragStart={handleDragStart}
             onDrop={handleDrop}
             onStatusChange={onStatusChange}
+            canApprove={canApprove}
           />
         ))}
       </div>

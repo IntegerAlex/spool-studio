@@ -96,7 +96,9 @@ function hydrateClientDates(client: Client): Client {
 }
 
 const assetTypes: AssetType[] = ["reel", "poster"]
-const statusOptions: AssetStatus[] = [...assetStatusValues]
+const statusOptions: AssetStatus[] = assetStatusValues.filter(
+  (s) => s !== "processing",
+)
 const _quickFilterOptions: AssetQuickFilter[] = [
   "videos",
   "images",

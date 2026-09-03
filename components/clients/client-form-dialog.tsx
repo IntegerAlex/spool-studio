@@ -36,8 +36,6 @@ const formSchema = z
     brandColor: z.string().optional(),
     monthlyReelsTarget: z.string().optional(),
     monthlyPostsTarget: z.string().optional(),
-    weeklyPosterGoal: z.string().optional(),
-    weeklyReelGoal: z.string().optional(),
     contractStartDate: z.string().optional(),
     contractEndDate: z.string().optional(),
   })
@@ -93,25 +91,10 @@ export function ClientFormDialog({
       brandColor: "",
       monthlyReelsTarget: "",
       monthlyPostsTarget: "",
-      weeklyPosterGoal: "",
-      weeklyReelGoal: "",
       contractStartDate: "",
       contractEndDate: "",
     },
   })
-
-  const monthlyReels = form.watch("monthlyReelsTarget")
-  const monthlyPosts = form.watch("monthlyPostsTarget")
-  const weeklyPosterGoalVal = form.watch("weeklyPosterGoal")
-  const weeklyReelGoalVal = form.watch("weeklyReelGoal")
-
-  const reels = toNumber(monthlyReels) ?? 0
-  const posts = toNumber(monthlyPosts) ?? 0
-  const suggestedGoal = Math.round((reels + posts) / 4)
-
-  const wPosterGoal = toNumber(weeklyPosterGoalVal) ?? 0
-  const wReelGoal = toNumber(weeklyReelGoalVal) ?? 0
-  const totalWeeklyGoal = wPosterGoal + wReelGoal
 
   useEffect(() => {
     if (open) {
@@ -129,14 +112,6 @@ export function ClientFormDialog({
             client.monthlyPostsTarget !== undefined
               ? client.monthlyPostsTarget.toString()
               : "",
-          weeklyPosterGoal:
-            client.weeklyPosterGoal !== undefined
-              ? client.weeklyPosterGoal.toString()
-              : "",
-          weeklyReelGoal:
-            client.weeklyReelGoal !== undefined
-              ? client.weeklyReelGoal.toString()
-              : "",
           contractStartDate: client.contractStartDate
             ? new Date(client.contractStartDate).toISOString().split("T")[0]
             : "",
@@ -152,8 +127,6 @@ export function ClientFormDialog({
           brandColor: "",
           monthlyReelsTarget: "",
           monthlyPostsTarget: "",
-          weeklyPosterGoal: "",
-          weeklyReelGoal: "",
           contractStartDate: "",
           contractEndDate: "",
         })
@@ -173,8 +146,6 @@ export function ClientFormDialog({
         brandColor: values.brandColor?.trim() || undefined,
         monthlyReelsTarget: toNumber(values.monthlyReelsTarget),
         monthlyPostsTarget: toNumber(values.monthlyPostsTarget),
-        weeklyPosterGoal: toNumber(values.weeklyPosterGoal),
-        weeklyReelGoal: toNumber(values.weeklyReelGoal),
         contractStartDate: values.contractStartDate || undefined,
         contractEndDate: values.contractEndDate || undefined,
       }
@@ -359,65 +330,6 @@ export function ClientFormDialog({
                   </FormItem>
                 )}
               />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FormField
-                control={form.control}
-                name="weeklyPosterGoal"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Weekly Poster Goal</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="weeklyReelGoal"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex justify-between items-center">
-                      <FormLabel>Weekly Reel Goal</FormLabel>
-                      {(reels > 0 || posts > 0) && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const sugReels = Math.round(reels / 4)
-                            const sugPosters = Math.round(posts / 4)
-                            form.setValue("weeklyReelGoal", sugReels.toString())
-                            form.setValue(
-                              "weeklyPosterGoal",
-                              sugPosters.toString(),
-                            )
-                          }}
-                          className="text-[11px] text-[var(--color-accent)] hover:underline"
-                        >
-                          Use suggested
-                        </button>
-                      )}
-                    </div>
-                    <FormControl>
-                      <Input type="number" min="0" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="p-3 bg-[rgba(255,255,255,0.02)] rounded-md border border-[var(--color-border)] text-xs space-y-1">
-              <div className="flex justify-between text-white font-medium">
-                <span>Total Weekly Goal (Calculated)</span>
-                <span className="font-mono">{totalWeeklyGoal}</span>
-              </div>
-              <p className="text-[11px] text-[var(--color-text-muted)]">
-                Suggested Weekly Goal: {suggestedGoal} (from monthly targets).
-              </p>
             </div>
 
             <DialogFooter>

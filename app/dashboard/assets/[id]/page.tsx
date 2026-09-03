@@ -109,6 +109,21 @@ export default function AssetDetailPage() {
 
   const storageLabel = "Cloud Storage"
 
+  // SAFETY: fileSize is a nullable integer from the DB; formatting is safe.
+  const fileSizeLabel = asset?.fileSize
+    ? asset.fileSize < 1024
+      ? `${asset.fileSize} B`
+      : asset.fileSize < 1024 * 1024
+        ? `${(asset.fileSize / 1024).toFixed(1)} KB`
+        : asset.fileSize < 1024 * 1024 * 1024
+          ? `${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB`
+          : `${(asset.fileSize / (1024 * 1024 * 1024)).toFixed(2)} GB`
+    : null
+
+  const uploadedLabel = asset?.uploadedAt
+    ? new Date(asset.uploadedAt).toLocaleString()
+    : null
+
   const canApproveDraft = asset?.status === "draft"
   const canRequestRevision = asset?.status === "draft"
   const canApproveRevision = asset?.status === "revision_requested"
@@ -196,6 +211,8 @@ export default function AssetDetailPage() {
       const updated = payload.data as Asset
       queryClient.setQueryData(["asset", assetId], updated)
       invalidateAsset()
+      queryClient.invalidateQueries({ queryKey: ["assets"] })
+      queryClient.invalidateQueries({ queryKey: ["planner"] })
       toast({
         title: action === "approve" ? "Asset approved" : "Revision requested",
       })
@@ -227,6 +244,8 @@ export default function AssetDetailPage() {
       const updated = await assetsApi.update(asset.id, { status: nextStatus })
       queryClient.setQueryData(["asset", assetId], updated)
       invalidateAsset()
+      queryClient.invalidateQueries({ queryKey: ["assets"] })
+      queryClient.invalidateQueries({ queryKey: ["planner"] })
       clearApiClientCache()
       router.refresh()
     } catch (err) {
@@ -590,6 +609,22 @@ export default function AssetDetailPage() {
                   {previewType}
                 </p>
               </div>
+              {uploadedLabel && (
+                <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
+                  <p className="text-[#71717a]">Uploaded</p>
+                  <p className="mt-1 font-medium text-white">
+                    {uploadedLabel}
+                  </p>
+                </div>
+              )}
+              {fileSizeLabel && (
+                <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3">
+                  <p className="text-[#71717a]">File Size</p>
+                  <p className="mt-1 font-medium text-white">
+                    {fileSizeLabel}
+                  </p>
+                </div>
+              )}
               <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[#0f0f0f] p-3 sm:col-span-2">
                 <p className="text-[#71717a]">Assigned To</p>
                 <div className="mt-2 flex flex-wrap gap-2">
