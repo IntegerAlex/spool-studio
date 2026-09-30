@@ -27,6 +27,8 @@ export async function POST(request: Request, context: RouteContext) {
       endDate?: string
       reelsTarget?: number
       postersTarget?: number
+      alreadyPublishedReels?: number
+      alreadyPublishedPosters?: number
     }
     if (!body?.startDate || !body?.endDate) {
       throw ApiError.badRequest("startDate and endDate are required")
@@ -37,6 +39,8 @@ export async function POST(request: Request, context: RouteContext) {
       endDate: body.endDate,
       reelsTarget: body.reelsTarget ?? 0,
       postersTarget: body.postersTarget ?? 0,
+      alreadyPublishedReels: body.alreadyPublishedReels ?? 0,
+      alreadyPublishedPosters: body.alreadyPublishedPosters ?? 0,
     })
 
     return NextResponse.json({ data: newCycle }, { status: 201 })

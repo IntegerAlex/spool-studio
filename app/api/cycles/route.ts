@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       endDate: z.coerce.date(),
       reelsTarget: z.number().int().nonnegative().optional(),
       postersTarget: z.number().int().nonnegative().optional(),
+      alreadyPublishedReels: z.number().int().nonnegative().optional(),
+      alreadyPublishedPosters: z.number().int().nonnegative().optional(),
     })
     const parsed = parseBody(cycleCreateSchema, body)
     if (!parsed.ok) {
@@ -47,6 +49,8 @@ export async function POST(request: Request) {
       endDate: input.endDate.toISOString().slice(0, 10),
       reelsTarget: input.reelsTarget ?? 0,
       postersTarget: input.postersTarget ?? 0,
+      alreadyPublishedReels: input.alreadyPublishedReels ?? 0,
+      alreadyPublishedPosters: input.alreadyPublishedPosters ?? 0,
     })
 
     return NextResponse.json({ data: cycle }, { status: 201 })

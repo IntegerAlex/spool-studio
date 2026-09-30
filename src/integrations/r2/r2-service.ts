@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
@@ -214,6 +215,13 @@ async function deleteFile(key: string): Promise<void> {
       key,
     })
   } catch (error) {
+    // ponytail: delete is idempotent — missing keys succeed silently;
+    // per-key loop in callers if partial-failure detail ever matters
+    const name = error instanceof Error ? error.name : ""
+    if (name === "NoSuchKey" || name === "NoSuchBucket" || name === "NotFound") {
+      console.info("[r2][delete] key already gone", { bucket: bucketName, key })
+      return
+    }
     const message =
       error instanceof Error ? error.message : "Unknown R2 delete error"
     console.error("[r2][delete] deletion failed", {
@@ -222,6 +230,44 @@ async function deleteFile(key: string): Promise<void> {
       message,
     })
     throw new Error(`R2 deletion failed for key "${key}": ${message}`)
+  }
+}
+
+export interface R2BucketUsage {
+  bytes: number
+  objects: number
+}
+
+async function getBucketUsage(): Promise<R2BucketUsage> {
+  const client = getR2Client()
+  const bucketName = getR2BucketName()
+
+  let bytes = 0
+  let objects = 0
+  let token: string | undefined
+
+  try {
+    do {
+      const response = await client.send(
+        new ListObjectsV2Command({
+          Bucket: bucketName,
+          ContinuationToken: token,
+          MaxKeys: 1000,
+        }),
+      )
+      for (const obj of response.Contents ?? []) {
+        objects += 1
+        bytes += obj.Size ?? 0
+      }
+      token = response.IsTruncated ? response.NextContinuationToken : undefined
+    } while (token)
+
+    return { bytes, objects }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown R2 usage error"
+    console.error("[r2][usage] listing failed", { bucket: bucketName, message })
+    throw new Error(`R2 usage listing failed: ${message}`)
   }
 }
 
@@ -234,6 +280,7 @@ export {
   generateDownloadUrl,
   generatePreviewUrl,
   generatePublicUrl,
+  getBucketUsage,
   getFileMetadata,
   getPresignedDownloadUrl,
   getPresignedUploadUrl,

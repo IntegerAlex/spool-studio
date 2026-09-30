@@ -1,5 +1,6 @@
 import { getClientById } from "@/repositories/clients-repository"
 import { listClientAssetsForReport } from "@/repositories/reports-repository"
+import { listAuditLogs } from "@/repositories/audit-log-repository"
 import { sanitizeFileUrl } from "@/lib/file-url"
 
 export interface ReportOptions {
@@ -46,6 +47,12 @@ export interface MonthlyReportPayload {
     approvedAt: string | null
     publishedAt: string | null
     driveFileUrl: string | null
+  }>
+  deletedAssets: Array<{
+    title: string
+    type: string
+    deletedAt: string
+    deletedBy: string
   }>
 }
 
@@ -101,6 +108,37 @@ export async function generateReport(
     startDate,
     effectiveEndDate,
   )
+
+  // Assets deleted in-period leave no publication record — surface the
+  // asset_deleted audit trail (metadata carries clientId since delete flow).
+  let deletedAssets: MonthlyReportPayload["deletedAssets"] = []
+  try {
+    const { data } = await listAuditLogs({
+      action: "asset_deleted",
+      startDate: startDate.toISOString(),
+      endDate: effectiveEndDate.toISOString(),
+      limit: 200,
+    })
+    deletedAssets = data
+      .filter((log) => {
+        const meta = (log.metadata ?? {}) as Record<string, unknown>
+        return meta.clientId === clientId
+      })
+      .map((log) => {
+        const meta = (log.metadata ?? {}) as Record<string, unknown>
+        return {
+          title:
+            (typeof meta.title === "string" && meta.title) ||
+            log.entity_name ||
+            "Untitled",
+          type: typeof meta.type === "string" ? meta.type : "—",
+          deletedAt: new Date(log.created_at).toISOString(),
+          deletedBy: log.user_name || log.user_email || "—",
+        }
+      })
+  } catch {
+    // Deletion history is additive; never break the report.
+  }
 
   const postersDelivered = dbAssets.filter(
     (asset) => asset.type === "poster",
@@ -195,6 +233,7 @@ export async function generateReport(
       targetLabel: isMonthly ? "Monthly Target" : "Monthly Target (per month)",
     },
     assets,
+    deletedAssets,
   }
 }
 

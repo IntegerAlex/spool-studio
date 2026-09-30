@@ -146,6 +146,24 @@ export function CycleCard({
         </div>
       </div>
 
+      {(cycle.alreadyPublishedReels > 0 ||
+        cycle.alreadyPublishedPosters > 0) && (
+        <p className="mt-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 text-[11px] text-amber-300">
+          Already uploaded before Spool:{" "}
+          {[
+            cycle.alreadyPublishedReels > 0
+              ? `${cycle.alreadyPublishedReels} reel${cycle.alreadyPublishedReels > 1 ? "s" : ""}`
+              : "",
+            cycle.alreadyPublishedPosters > 0
+              ? `${cycle.alreadyPublishedPosters} poster${cycle.alreadyPublishedPosters > 1 ? "s" : ""}`
+              : "",
+          ]
+            .filter(Boolean)
+            .join(" + ")}
+          {" "}— new uploads continue the numbering.
+        </p>
+      )}
+
       {cycle.status === "active" && (
         <div className="mt-3 flex gap-2">
           {onEdit && (

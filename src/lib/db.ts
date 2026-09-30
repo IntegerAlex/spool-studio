@@ -24,14 +24,18 @@ export function getPool(): Pool {
       process.env.DB_POOL_MAX ?? (process.env.VERCEL ? "1" : "5"),
       10,
     ),
+    // Neon pooler + free-tier compute sleep kill idle connections: reap them
+    // fast and keep the rest alive so checkouts rarely race a dead socket.
     idleTimeoutMillis: parseInt(
-      process.env.DB_IDLE_TIMEOUT ?? (process.env.VERCEL ? "5000" : "30000"),
+      process.env.DB_IDLE_TIMEOUT ?? (process.env.VERCEL ? "5000" : "10000"),
       10,
     ),
     connectionTimeoutMillis: parseInt(
       process.env.DB_CONNECT_TIMEOUT ?? "10000",
       10,
     ),
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
   })
 
   pool.on("error", (err) => {

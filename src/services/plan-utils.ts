@@ -68,6 +68,30 @@ export function distributeDeliverables(
 
 export type PlanStatus = "on-track" | "behind" | "ahead" | "completed"
 
+/**
+ * Spread `total - already` across weeks ending on/after `today`;
+ * elapsed weeks get 0. Reuses distributeDeliverables — no extra math lib.
+ */
+export function distributeRemaining(
+  total: number,
+  already: number,
+  weekEnds: string[],
+  today = new Date().toISOString().split("T")[0],
+): number[] {
+  const remaining = Math.max(0, total - Math.max(0, already))
+  const liveIdx = weekEnds
+    .map((end, i) => (end >= today ? i : -1))
+    .filter((i) => i >= 0)
+  // ponytail: all-elapsed cycle yields all-zero plan; backfill flow if admins need retro plans
+  if (liveIdx.length === 0) return weekEnds.map(() => 0)
+  const spread = distributeDeliverables(remaining, liveIdx.length)
+  const result = weekEnds.map(() => 0)
+  liveIdx.forEach((weekI, k) => {
+    result[weekI] = spread[k]
+  })
+  return result
+}
+
 export function computePlanStatus(planned: number, actual: number): PlanStatus {
   if (planned === 0 && actual === 0) return "completed"
   if (actual >= planned) return "ahead"

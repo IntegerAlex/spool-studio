@@ -5,11 +5,14 @@ import { getCurrentUser } from "@/lib/auth"
 import { emitEvent } from "@/lib/event-bus"
 import { sendAssetUploadNotification, sendRevisionUploadNotification } from "@/lib/notifications/mailgun"
 import { insertAssetRevision } from "@/repositories/asset-revisions-repository"
+import { getDayPlanById } from "@/repositories/day-plans-repository"
 import { getAssetById, updateAsset as updateAssetRow } from "@/repositories/assets-repository"
 import { getClientById } from "@/repositories/clients-repository"
 import { logAssetActivity } from "@/services/activity-service"
 import { logAuditEvent } from "@/services/audit-log-service"
 import { getOrCreateCurrentUserProfile } from "@/services/users-service"
+import { markDayPlanDone } from "@/services/day-plans-service"
+import { getActiveCycleForClientService } from "@/services/service-cycles-service"
 import { logAssetStatusTransition } from "@/services/asset-status"
 import { mapAsset, toDate } from "@/services/asset-mapping"
 import type { AssetStatus, Json } from "@/types"
@@ -93,6 +96,7 @@ export interface UploadFinalizationMetadata {
 
 export interface AssetUploadFinalizationInput {
   fileName: string
+  dayPlanId?: string
   uploadResult: {
     key: string
     url: string
@@ -194,6 +198,39 @@ export async function finalizeAssetUpload(
       assetId,
       statusPreserved: asset.status,
     })
+  }
+
+  // Day-plan link: stamp the cycle so client deliverable counts see this
+  // asset, then tick the task. Best-effort — never blocks the upload.
+  let linkedDayPlanId: string | null = null
+  if (input.dayPlanId) {
+    try {
+      const plan = await getDayPlanById(input.dayPlanId)
+      if (plan && plan.client_id === asset.client_id) {
+        linkedDayPlanId = plan.id
+        if (!asset.cycle_id) {
+          const cycleId =
+            plan.cycle_id ??
+            (await getActiveCycleForClientService(asset.client_id))?.id ??
+            null
+          if (cycleId) {
+            updates.cycle_id = cycleId
+          }
+        }
+      } else {
+        console.warn("[upload][dayplan-skipped]", {
+          assetId,
+          dayPlanId: input.dayPlanId,
+          reason: !plan ? "not-found" : "client-mismatch",
+        })
+      }
+    } catch (error) {
+      console.warn("[upload][dayplan-link-failed]", {
+        assetId,
+        dayPlanId: input.dayPlanId,
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
   }
 
   const updated = await updateAssetRow(assetId, updates)
@@ -334,7 +371,20 @@ export async function finalizeAssetUpload(
     mimeType: input.uploadResult.mimeType,
     fileSize: input.uploadResult.fileSize,
     uploadStatus: input.uploadResult.uploadStatus,
+    dayPlanId: linkedDayPlanId,
   })
+
+  if (linkedDayPlanId) {
+    try {
+      await markDayPlanDone(linkedDayPlanId, assetId)
+    } catch (error) {
+      console.warn("[upload][dayplan-tick-failed]", {
+        assetId,
+        dayPlanId: linkedDayPlanId,
+        message: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+  }
 
   if (isRevisionUpload) {
     if (revisionNotificationVersion != null) {

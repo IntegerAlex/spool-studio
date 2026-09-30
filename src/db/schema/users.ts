@@ -8,6 +8,8 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("designer"),
   avatar_url: text("avatar_url"),
   password_hash: text("password_hash"),
+  // Designer daily workload in capacity units (1 reel = 2, 1 poster = 1).
+  daily_capacity_units: integer("daily_capacity_units").notNull().default(4),
   // Incremented to invalidate previously issued JWTs (see validateSession).
   token_version: integer("token_version").notNull().default(0),
   created_at: timestamp("created_at", { withTimezone: true })

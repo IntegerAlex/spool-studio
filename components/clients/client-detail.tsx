@@ -16,6 +16,7 @@ import {
   Megaphone,
   Pin,
   Plus,
+  RefreshCw,
   Shield,
   Trash2,
   Users,
@@ -421,6 +422,8 @@ export function ClientDetail({
   const [editingReference, setEditingReference] =
     useState<ClientReference | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showClearDialog, setShowClearDialog] = useState(false)
+  const [isClearing, setIsClearing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
@@ -658,6 +661,22 @@ export function ClientDetail({
         </div>
 
         <div className="flex flex-wrap gap-2 lg:justify-end">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await queryClient.invalidateQueries({
+                queryKey: ["assets", { clientId: client.id }],
+              })
+              await queryClient.invalidateQueries({
+                queryKey: ["clients", client.id],
+              })
+              router.refresh()
+            }}
+            className="h-9 rounded-md border-[rgba(255,255,255,0.08)] bg-transparent px-3 text-[13px] font-medium text-white shadow-none hover:bg-[rgba(255,255,255,0.06)]"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
           <ClientFormDialog
             client={client}
             onSaved={(updatedClient) => setClient(updatedClient)}
@@ -677,6 +696,16 @@ export function ClientDetail({
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Delete Client
+            </Button>
+          )}
+          {currentUser?.role === "admin" && assets.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setShowClearDialog(true)}
+              className="h-9 rounded-md border border-amber-500/30 bg-transparent px-3 text-[13px] font-medium text-amber-400 shadow-none hover:border-amber-500/50 hover:bg-amber-500/10 hover:text-amber-300"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Clear Assets ({assets.length})
             </Button>
           )}
         </div>
@@ -1295,11 +1324,11 @@ export function ClientDetail({
         <DialogContent className="w-[95vw] max-w-md bg-[#161616] text-white border-[rgba(255,255,255,0.08)]">
           <DialogHeader>
             <DialogTitle className="text-white text-[16px] font-medium">
-              {assets.length > 0 ? "Cannot Delete Client" : "Delete Client?"}
+              Delete Client?
             </DialogTitle>
             <DialogDescription className="text-[#a1a1aa] mt-2 text-[13px] leading-relaxed">
               {assets.length > 0
-                ? `This client has ${assets.length} linked asset(s). You must delete or reassign all assets for this client before deleting the client itself.`
+                ? `This permanently deletes ${client.name} plus ${assets.length} linked asset(s), all service cycles and plans, day plans, references, and portal access — including every stored file in cloud storage (frees space). This action cannot be undone.`
                 : `Are you sure you want to delete ${client.name}? This permanently removes the client and all their reference links. This action cannot be undone.`}
             </DialogDescription>
           </DialogHeader>
@@ -1310,40 +1339,94 @@ export function ClientDetail({
               onClick={() => setShowDeleteDialog(false)}
               className="border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
             >
-              {assets.length > 0 ? "Close" : "Cancel"}
+              Cancel
             </Button>
-            {assets.length === 0 && (
-              <Button
-                type="button"
-                disabled={isDeleting}
-                onClick={async () => {
-                  try {
-                    setIsDeleting(true)
-                    await clientsApi.delete(client.id)
-                    toast({ title: "Client deleted successfully" })
-                    setShowDeleteDialog(false)
-                    clearApiClientCache()
-                    router.refresh()
-                    router.push("/dashboard/clients")
-                  } catch (err) {
-                    const message =
+            <Button
+              type="button"
+              disabled={isDeleting}
+              onClick={async () => {
+                try {
+                  setIsDeleting(true)
+                  await clientsApi.delete(client.id)
+                  toast({ title: "Client deleted successfully" })
+                  setShowDeleteDialog(false)
+                  clearApiClientCache()
+                  router.refresh()
+                  router.push("/dashboard/clients")
+                } catch (err) {
+                  const message =
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to delete client"
+                  toast({
+                    title: "Delete failed",
+                    description: message,
+                    variant: "destructive",
+                  })
+                } finally {
+                  setIsDeleting(false)
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white font-medium"
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <DialogContent className="w-[95vw] max-w-md bg-[#161616] text-white border-[rgba(255,255,255,0.08)]">
+          <DialogHeader>
+            <DialogTitle className="text-white text-[16px] font-medium">
+              Clear All Assets?
+            </DialogTitle>
+            <DialogDescription className="text-[#a1a1aa] mt-2 text-[13px] leading-relaxed">
+              This permanently deletes all {assets.length} asset(s) of{" "}
+              {client.name} — including every stored file in cloud storage
+              (frees space). Cycles, plans, and the client itself stay. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowClearDialog(false)}
+              className="border-[rgba(255,255,255,0.1)] bg-transparent text-white hover:bg-[rgba(255,255,255,0.06)]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={isClearing}
+              onClick={async () => {
+                try {
+                  setIsClearing(true)
+                  const { removed } = await clientsApi.clearAssets(client.id)
+                  toast({
+                    title: `${removed} asset(s) deleted, storage freed`,
+                  })
+                  setShowClearDialog(false)
+                  clearApiClientCache()
+                  router.refresh()
+                } catch (err) {
+                  toast({
+                    title: "Clear failed",
+                    description:
                       err instanceof Error
                         ? err.message
-                        : "Failed to delete client"
-                    toast({
-                      title: "Delete failed",
-                      description: message,
-                      variant: "destructive",
-                    })
-                  } finally {
-                    setIsDeleting(false)
-                  }
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white font-medium"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            )}
+                        : "Failed to clear assets",
+                    variant: "destructive",
+                  })
+                } finally {
+                  setIsClearing(false)
+                }
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-medium"
+            >
+              {isClearing ? "Clearing..." : "Clear All"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

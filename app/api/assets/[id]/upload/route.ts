@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getFileMetadata } from "@/integrations/r2/r2-service"
+import { getR2PublicBaseUrl } from "@/integrations/r2/r2-client"
 import { ApiError, jsonError, readJsonBody } from "@/lib/api-error"
 import { logProductionRuntimeError } from "@/lib/runtime-diagnostics"
 import { finalizeAssetUpload, uploadAssetFile } from "@/services/assets-service"
@@ -91,6 +92,7 @@ export async function POST(request: Request, context: RouteContext) {
         r2Key?: string
         key?: string
         fileName?: string
+        dayPlanId?: string
         thumbnailR2Key?: string
         thumbnailKey?: string
       }
@@ -104,7 +106,16 @@ export async function POST(request: Request, context: RouteContext) {
         throw ApiError.badRequest("fileName is required")
       }
 
-      const r2Metadata = await getFileMetadata(fileKey)
+      let r2Metadata
+      try {
+        r2Metadata = await getFileMetadata(fileKey)
+      } catch (error) {
+        // ponytail: surface storage misconfig as 502, upgrade to retry/backoff if transient R2 flakes matter
+        throw new ApiError(
+          `Storage unreachable for key "${fileKey}". Check R2_ENDPOINT/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY: ${error instanceof Error ? error.message : "unknown error"}`,
+          502,
+        )
+      }
       // Optional client-captured video poster (uploaded via its own
       // presigned session). Resolved server-side so the public URL never
       // depends on client construction. Failure here never blocks the upload.
@@ -113,7 +124,7 @@ export async function POST(request: Request, context: RouteContext) {
       if (thumbnailKey) {
         try {
           const thumbnailMetadata = await getFileMetadata(thumbnailKey)
-          thumbnailLink = `${process.env.R2_PUBLIC_BASE_URL ?? ""}/${thumbnailMetadata.key}`
+          thumbnailLink = `${getR2PublicBaseUrl()}/${thumbnailMetadata.key}`
         } catch (error) {
           console.warn("[upload][thumbnail-resolve-failed]", {
             assetId,
@@ -124,9 +135,10 @@ export async function POST(request: Request, context: RouteContext) {
       }
       const result = await finalizeAssetUpload(assetId, {
         fileName: body.fileName,
+        dayPlanId: body.dayPlanId,
         uploadResult: {
           key: r2Metadata.key,
-          url: `${process.env.R2_PUBLIC_BASE_URL ?? ""}/${r2Metadata.key}`,
+          url: `${getR2PublicBaseUrl()}/${r2Metadata.key}`,
           mimeType: r2Metadata.contentType,
           fileSize: r2Metadata.size,
           uploadStatus: "uploaded",

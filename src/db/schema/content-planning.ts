@@ -25,6 +25,12 @@ export const serviceCycles = pgTable("service_cycles", {
   end_date: date("end_date").notNull(),
   reels_target: integer("reels_target").notNull().default(0),
   posters_target: integer("posters_target").notNull().default(0),
+  already_published_reels: integer("already_published_reels")
+    .notNull()
+    .default(0),
+  already_published_posters: integer("already_published_posters")
+    .notNull()
+    .default(0),
   status: cycleStatusEnum("status").notNull().default("upcoming"),
   created_by: uuid("created_by"),
   created_at: timestamp("created_at", { withTimezone: true })

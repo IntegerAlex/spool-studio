@@ -38,6 +38,7 @@ import {
   assetsApi,
   clearApiClientCache,
   clientsApi,
+  dayPlansApi,
   usersApi,
 } from "@/lib/api-client"
 import {
@@ -137,6 +138,9 @@ export function AssetFormDialog({
   >("idle")
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
+  // ponytail: single id reuse per dialog session; full draft-cleanup queue if orphans recur at scale
+  const [createdId, setCreatedId] = useState<string | null>(null)
+  const [dayPlanId, setDayPlanId] = useState<string | null>(null)
   const { toast } = useToast()
 
   const statusOptions = useMemo(() => {
@@ -156,6 +160,7 @@ export function AssetFormDialog({
   })
 
   const watchedStatus = useWatch({ control: form.control, name: "status" })
+  const watchedClientId = useWatch({ control: form.control, name: "clientId" })
 // SAFETY: this cast is safe because the value already conforms to the asserted type.
   const currentUploadStatus = (watchedStatus ??
     resolveAssetStatus(asset?.status)) as AssetStatus
@@ -176,6 +181,18 @@ export function AssetFormDialog({
   })
   const clients = clientsQuery.data ?? []
   const users = usersQuery.data ?? []
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const dayPlansQuery = useQuery({
+    queryKey: ["dayplans", todayKey, watchedClientId],
+    queryFn: () => dayPlansApi.list(todayKey),
+    enabled: open && selectedFile !== null && (watchedClientId ?? "") !== "",
+    staleTime: 0,
+  })
+  const openTasks = (dayPlansQuery.data ?? []).filter(
+    (t) =>
+      t.clientId === watchedClientId &&
+      (t.status === "pending" || t.status === "in_progress"),
+  )
   const isLoadingOptions = clientsQuery.isLoading || usersQuery.isLoading
   const loadError =
     clientsQuery.error?.message ?? usersQuery.error?.message ?? null
@@ -221,6 +238,8 @@ export function AssetFormDialog({
       setUploadState("idle")
       setUploadError(null)
       setUploadProgress(0)
+      setCreatedId(null)
+      setDayPlanId(null)
     }
   }
 
@@ -235,10 +254,13 @@ export function AssetFormDialog({
         scheduledAt: toIsoString(values.scheduledAt),
       } as const
 
-      const saved =
-        mode === "create"
-          ? await assetsApi.create(payload)
-          : await assetsApi.update(asset?.id ?? "", payload)
+      // Retry in the same dialog reuses the already-created row instead of
+      // minting a new numbered draft per attempt.
+      const targetId = mode === "edit" ? (asset?.id ?? "") : (createdId ?? "")
+      const saved = targetId
+        ? await assetsApi.update(targetId, payload)
+        : await assetsApi.create(payload)
+      if (mode === "create" && !createdId) setCreatedId(saved.id)
 
       if (selectedFile && uploadAllowed) {
         setUploadState("uploading")
@@ -251,6 +273,7 @@ export function AssetFormDialog({
               setUploadState("uploading")
               setUploadProgress((prev) => Math.max(prev, percentage))
             },
+            ...(dayPlanId ? { dayPlanId } : {}),
           })
           setUploadState("uploaded")
           setUploadProgress(100)
@@ -479,6 +502,31 @@ export function AssetFormDialog({
 
             <FormItem>
               <FormLabel>Upload File</FormLabel>
+              {selectedFile && openTasks.length > 0 && (
+                <div className="pb-2">
+                  <Select
+                    value={dayPlanId ?? "__none__"}
+                    onValueChange={(v) =>
+                      setDayPlanId(v === "__none__" ? null : v)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Link a day-plan task (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">
+                        No task link
+                      </SelectItem>
+                      {openTasks.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.qty} {t.kind}
+                          {t.qty > 1 ? "s" : ""} · {t.status}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <FormControl>
                 <Input
                   type="file"

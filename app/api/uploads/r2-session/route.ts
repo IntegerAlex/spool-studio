@@ -24,6 +24,7 @@ const ALLOWED_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "application/pdf",
 ] as const
 
 const MIME_EXTENSIONS = {
@@ -32,6 +33,7 @@ const MIME_EXTENSIONS = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "application/pdf": "pdf",
 } satisfies Record<(typeof ALLOWED_MIME_TYPES)[number], string>
 
 const UploadSessionSchema = z.object({

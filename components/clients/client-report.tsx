@@ -670,6 +670,55 @@ export function ClientReport({
               </Card>
             </div>
           )}
+
+          {(report.deletedAssets ?? []).length > 0 && (
+            <Card className="rounded-[10px] border border-[rgba(255,255,255,0.07)] bg-[#161616] p-5 shadow-none">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[13px] font-medium text-white">
+                  Deleted During Period
+                </h3>
+                <Badge
+                  variant="secondary"
+                  className="bg-[#27272a] text-[#a1a1aa] hover:bg-[#27272a] border-0 text-[10px] font-normal font-mono"
+                >
+                  {(report.deletedAssets ?? []).length} Item(s)
+                </Badge>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[13px]">
+                  <thead>
+                    <tr className="border-b border-[rgba(255,255,255,0.05)] pb-2 text-[#71717a]">
+                      <th className="pb-2 font-medium">Asset Name</th>
+                      <th className="pb-2 font-medium">Type</th>
+                      <th className="pb-2 font-medium">Deleted</th>
+                      <th className="pb-2 font-medium">Deleted By</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(report.deletedAssets ?? []).map((d, i) => (
+                      <tr
+                        key={`${d.title}-${d.deletedAt}-${i}`}
+                        className="border-b border-[rgba(255,255,255,0.03)]"
+                      >
+                        <td className="py-3 font-medium text-white truncate max-w-[160px]">
+                          {d.title}
+                        </td>
+                        <td className="py-3 text-[#a1a1aa] capitalize">
+                          {d.type}
+                        </td>
+                        <td className="py-3 font-mono text-[#a1a1aa]">
+                          {formatDate(d.deletedAt)}
+                        </td>
+                        <td className="py-3 text-[#a1a1aa] truncate max-w-[140px]">
+                          {d.deletedBy}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
         </>
       ) : null}
     </div>

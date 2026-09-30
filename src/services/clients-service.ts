@@ -12,7 +12,19 @@ import {
   listClients,
   updateClient as updateClientRow,
 } from "@/repositories/clients-repository"
+import { deleteDayPlansByClientId } from "@/repositories/day-plans-repository"
+import {
+  deleteClientReference,
+  listClientReferencesByClientId,
+} from "@/repositories/client-references-repository"
+import {
+  deleteCycle,
+  listCyclesByClientId,
+} from "@/repositories/service-cycles-repository"
+import { deletePlansByCycleId } from "@/repositories/plans-repository"
+import { deletePortalTokensByClientId } from "@/repositories/portal-tokens-repository"
 import { logAuditEvent } from "@/services/audit-log-service"
+import { removeAsset } from "@/services/assets-service"
 import { getOrCreateCurrentUserProfile } from "@/services/users-service"
 import type { Client } from "@/types/index"
 
@@ -512,9 +524,22 @@ export async function updateClient(
 }
 
 export async function removeClient(clientId: string): Promise<void> {
+  // Cascade: every asset (R2 files + row), cycles + weekly plans, day plans,
+  // portal tokens. Publication records stay as immutable history.
   const assets = await listAssetsByClientId(clientId)
-  if (assets && assets.length > 0) {
-    throw new Error("Cannot delete client because it has linked assets.")
+  for (const asset of assets ?? []) {
+    await removeAsset(asset.id)
+  }
+  const cycles = await listCyclesByClientId(clientId)
+  for (const cycle of cycles ?? []) {
+    await deletePlansByCycleId(cycle.id)
+    await deleteCycle(cycle.id)
+  }
+  await deleteDayPlansByClientId(clientId)
+  await deletePortalTokensByClientId(clientId)
+  const references = await listClientReferencesByClientId(clientId)
+  for (const ref of references ?? []) {
+    await deleteClientReference(ref.id)
   }
   try {
     await logAuditEvent({

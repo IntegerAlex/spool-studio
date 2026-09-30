@@ -28,6 +28,8 @@ const mocks = vi.hoisted(() => ({
   listCommentsByAssetId: vi.fn(),
   logAssetActivity: vi.fn(),
   logAuditEvent: vi.fn(),
+  markDayPlanDone: vi.fn(),
+  getDayPlanById: vi.fn(),
   getActiveCycleForClientService: vi.fn(),
   getNextAssetNumber: vi.fn(),
   generateAssetTitle: vi.fn(),
@@ -99,6 +101,14 @@ vi.mock("@/services/audit-log-service", () => ({
 // oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("@/services/service-cycles-service", () => ({
   getActiveCycleForClientService: mocks.getActiveCycleForClientService,
+}))
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
+vi.mock("@/services/day-plans-service", () => ({
+  markDayPlanDone: mocks.markDayPlanDone,
+}))
+// oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
+vi.mock("@/repositories/day-plans-repository", () => ({
+  getDayPlanById: mocks.getDayPlanById,
 }))
 // oxlint-disable-next-line anti-slop/no-module-mocking  // test mock
 vi.mock("@/services/numbering-service", () => ({

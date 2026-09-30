@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Breadcrumb } from "@/components/layout/breadcrumb"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { DayPlanTab } from "@/components/day-plans/day-plan-tab"
 import { clientsApi, cyclesApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 import type { Client, ServiceCycleWithPlan } from "@/types/index"
@@ -57,6 +58,7 @@ export default function PlannerPage() {
   const [filter, setFilter] = useState<
     "all" | "active" | "upcoming" | "completed"
   >("all")
+  const [view, setView] = useState<"cycles" | "day">("cycles")
 
   const clientsQuery = useQuery({
     queryKey: ["clients"],
@@ -160,6 +162,28 @@ export default function PlannerPage() {
         </div>
       </div>
 
+      {/* View tabs */}
+      <div className="flex items-center gap-1 border-b border-[rgba(255,255,255,0.05)]">
+        {(["cycles", "day"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setView(tab)}
+            className={cn(
+              "px-4 py-2.5 text-[13px] font-medium border-b-2 transition-all capitalize cursor-pointer",
+              view === tab
+                ? "border-[var(--primary)] text-white font-semibold"
+                : "border-transparent text-[#71717a] hover:text-[#a1a1aa]",
+            )}
+          >
+            {tab === "day" ? "Day Plan" : "Cycles"}
+          </button>
+        ))}
+      </div>
+
+      {view === "day" ? (
+        <DayPlanTab clients={clientsQuery.data ?? []} />
+      ) : (
+        <>
       {/* Filter tabs */}
       <div className="flex items-center gap-1 border-b border-[rgba(255,255,255,0.05)]">
         {(["all", "active", "upcoming", "completed"] as const).map((tab) => (
@@ -232,12 +256,38 @@ export default function PlannerPage() {
                   const config = statusConfig[cycle.status]
                   const Icon = config.icon
                   const totalPlanned =
-                    cycle.totalReelsPlanned + cycle.totalPostersPlanned
-                  const totalPublished =
-                    cycle.totalReelsPublished + cycle.totalPostersPublished
-                  const progressPct =
+                    cycle.reelsTarget + cycle.postersTarget
+                  const madeReels =
+                    cycle.plans.reduce(
+                      (s, p) => s + (p.madeReels ?? 0),
+                      0,
+                    ) + cycle.alreadyPublishedReels
+                  const madePosters =
+                    cycle.plans.reduce(
+                      (s, p) => s + (p.madePosters ?? 0),
+                      0,
+                    ) + cycle.alreadyPublishedPosters
+                  const pubReels =
+                    cycle.plans.reduce(
+                      (s, p) => s + (p.publishedReels ?? 0),
+                      0,
+                    ) + cycle.alreadyPublishedReels
+                  const pubPosters =
+                    cycle.plans.reduce(
+                      (s, p) => s + (p.publishedPosters ?? 0),
+                      0,
+                    ) + cycle.alreadyPublishedPosters
+                  const madeTotal = madeReels + madePosters
+                  const pubTotal = pubReels + pubPosters
+                  // Designer-work progress moves on upload; publication
+                  // progress moves only on publish.
+                  const madePct =
                     totalPlanned > 0
-                      ? Math.round((totalPublished / totalPlanned) * 100)
+                      ? Math.round((madeTotal / totalPlanned) * 100)
+                      : 0
+                  const pubPct =
+                    totalPlanned > 0
+                      ? Math.round((pubTotal / totalPlanned) * 100)
                       : 0
 
                   return (
@@ -277,21 +327,16 @@ export default function PlannerPage() {
                             </span>
                           </div>
                         </div>
-                        {cycle.status === "active" && (
-                          <span className="text-[14px] font-medium text-white">
-                            {progressPct}%
-                          </span>
-                        )}
                       </div>
 
-                      {/* Targets */}
-                      <div className="flex items-center gap-4 mb-3">
+                      {/* Designer work (made) */}
+                      <div className="flex items-center gap-4 mb-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-[11px] text-[#71717a]">
-                            Reels:
+                            Made — Reels:
                           </span>
                           <span className="text-[12px] font-mono text-white">
-                            {cycle.totalReelsPublished} / {cycle.reelsTarget}
+                            {madeReels} / {cycle.reelsTarget}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -299,10 +344,35 @@ export default function PlannerPage() {
                             Posters:
                           </span>
                           <span className="text-[12px] font-mono text-white">
-                            {cycle.totalPostersPublished} /{" "}
-                            {cycle.postersTarget}
+                            {madePosters} / {cycle.postersTarget}
                           </span>
                         </div>
+                        <span className="text-[14px] font-medium text-white">
+                          {madePct}%
+                        </span>
+                      </div>
+
+                      {/* Publication */}
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-emerald-400">
+                            Published — Reels:
+                          </span>
+                          <span className="text-[12px] font-mono text-emerald-400">
+                            {pubReels} / {cycle.reelsTarget}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-emerald-400">
+                            Posters:
+                          </span>
+                          <span className="text-[12px] font-mono text-emerald-400">
+                            {pubPosters} / {cycle.postersTarget}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-zinc-500">
+                          {pubPct}%
+                        </span>
                       </div>
 
                       {/* Weekly plan table (only for active cycles) */}
@@ -323,6 +393,9 @@ export default function PlannerPage() {
                                 <th className="pb-1.5 text-center text-[9px] font-medium uppercase tracking-wider text-[#3b82f6]">
                                   Posters
                                 </th>
+                                <th className="pb-1.5 text-center text-[9px] font-medium uppercase tracking-wider text-emerald-400">
+                                  Published
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -339,11 +412,16 @@ export default function PlannerPage() {
                                     {formatDate(plan.weekEnd)}
                                   </td>
                                   <td className="py-1.5 text-center font-mono text-white">
-                                    {plan.actualReels ?? 0}/{plan.plannedReels}
+                                    {plan.madeReels}/{plan.plannedReels}
                                   </td>
                                   <td className="py-1.5 text-center font-mono text-white">
-                                    {plan.actualPosters ?? 0}/
+                                    {plan.madePosters}/
                                     {plan.plannedPosters}
+                                  </td>
+                                  <td className="py-1.5 text-center font-mono text-emerald-400">
+                                    {plan.publishedReels + plan.publishedPosters > 0
+                                      ? `${plan.publishedReels}R ${plan.publishedPosters}P`
+                                      : "—"}
                                   </td>
                                 </tr>
                               ))}
@@ -358,6 +436,8 @@ export default function PlannerPage() {
             </Card>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   )

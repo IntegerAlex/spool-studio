@@ -293,6 +293,29 @@ export async function listPublishedAssetsByCycleId(
     )
 }
 
+export interface CycleProgressAsset {
+  type: "reel" | "poster"
+  status: string
+  uploaded_at: Date | null
+  published_at: Date | null
+}
+
+export async function listCycleAssetsForProgress(
+  cycleId: string,
+): Promise<CycleProgressAsset[]> {
+  const rows = await db
+    .select({
+      type: contentAssets.type,
+      status: contentAssets.status,
+      uploaded_at: contentAssets.uploaded_at,
+      published_at: contentAssets.published_at,
+    })
+    .from(contentAssets)
+    .where(eq(contentAssets.cycle_id, cycleId))
+  // SAFETY: type column is the asset_type enum ('reel' | 'poster').
+  return rows as CycleProgressAsset[]
+}
+
 export async function publishAssetWithRecord(
   assetId: string,
   updates: Partial<typeof contentAssets.$inferInsert>,

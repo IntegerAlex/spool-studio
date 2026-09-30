@@ -7,6 +7,9 @@ import type {
   CalendarRange,
   Client,
   ClientReference,
+  CreateDayPlanInput,
+  DayPlan,
+  DayRecommendation,
   Json,
   Notification,
   NotificationPrefs,
@@ -34,6 +37,7 @@ export interface UploadProgressUpdate {
 
 export interface UploadFileOptions {
   onProgress?: (update: UploadProgressUpdate) => void
+  dayPlanId?: string
 }
 
 const pendingRequests = new Map<string, Promise<unknown>>()
@@ -456,7 +460,7 @@ async function uploadFileToR2Session(
   }
 
   try {
-    await new Promise<void>((resolve) => {
+    await new Promise<void>((resolve, reject) => {
       const xhr = new XMLHttpRequest()
 
       xhr.open("PUT", uploadUrl, true)
@@ -476,16 +480,17 @@ async function uploadFileToR2Session(
         console.info("[r2-upload][transport-complete]", {
           status: xhr.status,
         })
-
-        resolve()
+        // ponytail: fail fast on non-2xx; retry/backoff only if transient R2 PUTs prove common
+        if (xhr.status >= 200 && xhr.status < 300) resolve()
+        else reject(new Error(`R2 upload rejected with status ${xhr.status}`))
       }
 
       xhr.onerror = () => {
-        console.warn("[r2-upload][opaque-transport]", {
-          note: "Browser blocked response visibility but upload may still have succeeded.",
-        })
-
-        resolve()
+        reject(
+          new Error(
+            "R2 upload failed (network/CORS). Allow PUT from this origin in the bucket CORS policy.",
+          ),
+        )
       }
 
       xhr.send(file)
@@ -689,6 +694,14 @@ export const clientsApi = {
   delete: async (id: string): Promise<void> => {
     await fetchJson(`/api/clients/${id}`, { method: "DELETE" })
   },
+
+  clearAssets: async (id: string): Promise<{ removed: number }> => {
+    const payload = await fetchJson<{ removed: number }>(
+      `/api/clients/${id}/assets`,
+      { method: "DELETE" },
+    )
+    return payload
+  },
 }
 
 export const clientReferencesApi = {
@@ -841,6 +854,7 @@ export const assetsApi = {
           r2Key,
           fileName: file.name,
           ...(thumbnailR2Key ? { thumbnailR2Key } : {}),
+          ...(options?.dayPlanId ? { dayPlanId: options.dayPlanId } : {}),
         }),
       },
     )
@@ -890,6 +904,17 @@ export const usersApi = {
   getById: async (id: string): Promise<User | null> => {
     const user = await fetchJsonNullableDeduped<User>(`/api/users/${id}`)
     return user ? hydrateUser(user) : null
+  },
+
+  updateCapacity: async (
+    id: string,
+    dailyCapacityUnits: number,
+  ): Promise<User> => {
+    const updated = await fetchJson<User>(`/api/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ dailyCapacityUnits }),
+    })
+    return hydrateUser(updated)
   },
 }
 
@@ -1001,6 +1026,18 @@ export const dashboardApi = {
         timestamp: new Date(entry.timestamp),
       })),
     }
+  },
+}
+
+export interface StorageUsageData {
+  usedBytes: number
+  quotaBytes: number
+  objects: number
+}
+
+export const storageApi = {
+  getUsage: async (): Promise<StorageUsageData> => {
+    return fetchJsonDeduped<StorageUsageData>("/api/storage/usage")
   },
 }
 
@@ -1305,5 +1342,61 @@ export const cyclesApi = {
 
   delete: async (cycleId: string): Promise<void> => {
     await fetchJson(`/api/cycles/${cycleId}`, { method: "DELETE" })
+  },
+}
+
+function hydrateDayPlan(plan: DayPlan): DayPlan {
+  return {
+    ...plan,
+    createdAt: new Date(plan.createdAt),
+    updatedAt: new Date(plan.updatedAt),
+  }
+}
+
+export const dayPlansApi = {
+  list: async (date: string, designerId?: string): Promise<DayPlan[]> => {
+    const params = new URLSearchParams({ date })
+    if (designerId) params.set("designerId", designerId)
+    const rows = await fetchJson<DayPlan[]>(`/api/day-plans?${params}`)
+    return rows.map(hydrateDayPlan)
+  },
+
+  history: async (
+    designerId: string,
+    from: string,
+    to: string,
+  ): Promise<DayPlan[]> => {
+    const params = new URLSearchParams({ designerId, from, to })
+    const rows = await fetchJson<DayPlan[]>(`/api/day-plans?${params}`)
+    return rows.map(hydrateDayPlan)
+  },
+
+  create: async (input: CreateDayPlanInput): Promise<DayPlan> => {
+    const created = await fetchJson<DayPlan>("/api/day-plans", {
+      method: "POST",
+      body: JSON.stringify(input),
+    })
+    return hydrateDayPlan(created)
+  },
+
+  update: async (
+    id: string,
+    input: Partial<CreateDayPlanInput> & { status?: DayPlan["status"] },
+  ): Promise<DayPlan> => {
+    const updated = await fetchJson<DayPlan>(`/api/day-plans/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    })
+    return hydrateDayPlan(updated)
+  },
+
+  remove: async (id: string): Promise<void> => {
+    await fetchJson(`/api/day-plans/${id}`, { method: "DELETE" })
+  },
+
+  recommendations: async (date: string): Promise<DayRecommendation[]> => {
+    return fetchJson<DayRecommendation[]>(
+      `/api/day-plans/recommendations?date=${date}`,
+    )
   },
 }

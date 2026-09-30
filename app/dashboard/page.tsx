@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   FileWarning,
   FolderPlus,
+  HardDrive,
   KanbanSquare,
   LayoutGrid,
   Loader2,
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import ErrorBoundary from "@/components/ui/error-boundary"
 import { Skeleton } from "@/components/ui/skeleton"
-import { dashboardApi } from "@/lib/api-client"
+import { dashboardApi, storageApi } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
 
 type TrendDirection = "up" | "down" | "neutral"
@@ -47,6 +48,12 @@ export default function DashboardPage() {
   const { data: summary, isLoading, error, isFetching } = useQuery({
     queryKey: ["dashboard", "summary"],
     queryFn: () => dashboardApi.getSummary(),
+  })
+
+  const { data: storage } = useQuery({
+    queryKey: ["storage", "usage"],
+    queryFn: () => storageApi.getUsage(),
+    staleTime: 5 * 60 * 1000,
   })
 
   const clients = summary?.clients ?? []
@@ -75,6 +82,12 @@ export default function DashboardPage() {
     return { reels: { planned: plannedReels, completed: completedReels, remaining: Math.max(0, plannedReels - completedReels), pct: plannedReels > 0 ? Math.round((completedReels / plannedReels) * 100) : 0 }, posters: { planned: plannedPosters, completed: completedPosters, remaining: Math.max(0, plannedPosters - completedPosters), pct: plannedPosters > 0 ? Math.round((completedPosters / plannedPosters) * 100) : 0 } }
   }, [clients, timeframe])
   const publishedContentCount = summary?.publishedContentCount ?? 0
+  const storageUsedGb = (storage?.usedBytes ?? 0) / 1024 ** 3
+  const storageQuotaGb = (storage?.quotaBytes ?? 10 * 1024 ** 3) / 1024 ** 3
+  const storagePct =
+    storageQuotaGb > 0
+      ? Math.min(100, Math.round((storageUsedGb / storageQuotaGb) * 100))
+      : 0
   const statCards = useMemo<DashboardStatCard[]>(() => [
     { title: "Total Assets", value: totalAssets.toString(), trendLabel: "+12% this week", trendDirection: "up", icon: getStatIcon("Total Assets"), iconBgClassName: getStatBg("Total Assets") },
     { title: "Total Clients", value: totalClients.toString(), trendLabel: "+3 active this month", trendDirection: "up", icon: getStatIcon("Total Clients"), iconBgClassName: getStatBg("Total Clients") },
@@ -135,6 +148,24 @@ export default function DashboardPage() {
             <Link href="/dashboard/assets" className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] rounded-lg transition-colors border border-transparent hover:border-white/[0.06]"><Upload className="w-4 h-4" />Upload Files</Link>
             <Link href="/dashboard/clients" className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] rounded-lg transition-colors border border-transparent hover:border-white/[0.06]"><FolderPlus className="w-4 h-4" />Add Client</Link>
             <Link href="/dashboard/kanban" className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-zinc-400 hover:text-white hover:bg-white/[0.04] rounded-lg transition-colors border border-transparent hover:border-white/[0.06]"><KanbanSquare className="w-4 h-4" />View Kanban</Link>
+          </div>
+        </Card>
+        <Card className="p-4 border border-white/[0.06] bg-[var(--color-bg-surface)] rounded-xl">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <HardDrive className="h-4 w-4 text-emerald-400" />
+              <span className="text-xs text-zinc-400 uppercase tracking-wider">Storage</span>
+            </div>
+            <span className="text-sm font-medium text-white">
+              {storageUsedGb.toFixed(2)} GB of {storageQuotaGb.toFixed(0)} GB
+              <span className="text-zinc-500"> · {storage?.objects ?? 0} files</span>
+            </span>
+          </div>
+          <div className="h-1.5 w-full bg-white/[0.06] rounded-full overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all duration-300", storagePct >= 90 ? "bg-red-500" : storagePct >= 75 ? "bg-amber-500" : "bg-emerald-500")}
+              style={{ width: `${storagePct}%` }}
+            />
           </div>
         </Card>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

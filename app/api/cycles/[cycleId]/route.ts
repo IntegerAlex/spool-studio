@@ -51,6 +51,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       endDate: z.coerce.date().optional(),
       reelsTarget: z.number().int().nonnegative().optional(),
       postersTarget: z.number().int().nonnegative().optional(),
+      alreadyPublishedReels: z.number().int().nonnegative().optional(),
+      alreadyPublishedPosters: z.number().int().nonnegative().optional(),
     })
     const parsed = parseBody(cycleActionSchema, body)
     if (!parsed.ok) {
@@ -80,6 +82,8 @@ export async function PATCH(request: Request, context: RouteContext) {
           : undefined,
         reelsTarget: input.reelsTarget,
         postersTarget: input.postersTarget,
+        alreadyPublishedReels: input.alreadyPublishedReels,
+        alreadyPublishedPosters: input.alreadyPublishedPosters,
       })
       return NextResponse.json({ data: updated })
     }

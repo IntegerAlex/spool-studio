@@ -376,6 +376,9 @@ function AssetCardImpl({ asset, onThumbnailClick, usersById }: AssetCardProps) {
               <span className="block pl-3 list-item">
                 calendar sync metadata
               </span>
+              <span className="block pl-3 list-item">
+                stored files from cloud storage (frees space)
+              </span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4 gap-2">
@@ -397,6 +400,7 @@ function AssetCardImpl({ asset, onThumbnailClick, usersById }: AssetCardProps) {
                   toast({ title: "Asset deleted successfully" })
                   setShowDeleteDialog(false)
                   queryClient.invalidateQueries({ queryKey: ["assets"] })
+                  queryClient.invalidateQueries({ queryKey: ["storage"] })
                   clearApiClientCache()
                   router.refresh()
                 } catch (err) {

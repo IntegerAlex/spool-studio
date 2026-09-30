@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "daily_capacity_units" integer DEFAULT 4 NOT NULL;

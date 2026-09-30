@@ -54,6 +54,26 @@ export async function createSession(
   }
 }
 
+function isDeadSocket(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error)
+  return (
+    msg.includes("Connection terminated") ||
+    msg.includes("Connection ended") ||
+    msg.includes("ECONNRESET") ||
+    msg.includes("ENOTFOUND")
+  )
+}
+
+async function queryWithReconnect<T>(query: () => Promise<T>): Promise<T> {
+  try {
+    return await query()
+  } catch (error) {
+    if (!isDeadSocket(error)) throw error
+    console.warn("[db] dead socket, retrying once")
+    return await query()
+  }
+}
+
 export async function validateSession(cookieStore?: {
   get: (name: string) => { value: string } | undefined
 }): Promise<AuthUser | null> {
@@ -75,11 +95,15 @@ export async function validateSession(cookieStore?: {
   // Revocation check: the token must carry the user's current token_version.
   // Also rejects tokens for deleted users. Tokens issued before the
   // token_version column existed carry no ver, treated as 0 (the default).
-  const rows = await db
-    .select({ tokenVersion: users.token_version })
-    .from(users)
-    .where(eq(users.id, payload.sub))
-    .limit(1)
+  // ponytail: one retry for Neon's dead-socket race; per-query retry wrapper
+  // if other hot paths ever show the same flake
+  const rows = await queryWithReconnect(() =>
+    db
+      .select({ tokenVersion: users.token_version })
+      .from(users)
+      .where(eq(users.id, payload.sub))
+      .limit(1),
+  )
   const row = rows[0]
   if (!row) return null
   if ((payload.ver ?? 0) !== row.tokenVersion) return null

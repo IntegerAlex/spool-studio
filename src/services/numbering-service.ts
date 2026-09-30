@@ -1,4 +1,4 @@
-import { assignAssetNumber } from "@/repositories/numbering-repository"
+import { claimAssetNumber } from "@/repositories/numbering-repository"
 import type { AssetType } from "@/types/index"
 
 const TYPE_PREFIX = {
@@ -22,15 +22,15 @@ const MONTH_ABBREV = [
 ]
 
 /**
- * Get the next monotonic asset number for a cycle+type.
- * Race-safe: calls the assign_asset_number SQL function which atomically
- * increments a counter. Numbers are never reused, even after asset deletion.
+ * Get the next asset number for a cycle+type, reusing gaps left by deleted
+ * assets. `floor` is the carry-in offset (already-published count + 1).
  */
 export async function getNextAssetNumber(
   cycleId: string,
   assetType: AssetType,
+  floor = 1,
 ): Promise<number> {
-  return assignAssetNumber(cycleId, assetType)
+  return claimAssetNumber(cycleId, assetType, floor)
 }
 
 /**

@@ -1,5 +1,6 @@
 import { contentAssets } from "@/db/schema"
 import { deleteFile } from "@/integrations/r2/r2-service"
+import { getR2PublicBaseUrl } from "@/integrations/r2/r2-client"
 import { ApiError } from "@/lib/api-error"
 import { canTransitionStatus, getAllowedTransitions } from "@/lib/asset-workflow"
 import { getCurrentUser } from "@/lib/auth"
@@ -174,7 +175,15 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
       )
     }
 
-    const assetNumber = await getNextAssetNumber(activeCycle.id, input.type)
+    const carryFloor =
+      (input.type === "reel"
+        ? activeCycle.alreadyPublishedReels
+        : activeCycle.alreadyPublishedPosters) + 1
+    const assetNumber = await getNextAssetNumber(
+      activeCycle.id,
+      input.type,
+      carryFloor,
+    )
     const clientRecord = await getClientById(input.clientId)
     const shortForm = extractClientShortForm(clientRecord?.name ?? "XX")
 
@@ -648,16 +657,35 @@ export async function rejectAsset(
   return mapped
 }
 
-export async function removeAsset(assetId: string): Promise<void> {
-  const asset = await getAssetById(assetId)
-  if (asset?.drive_file_id) {
+export async function removeAsset(assetId: string): Promise<void> {  const asset = await getAssetById(assetId)
+  // Every R2 object tied to this asset: current file, all revision files,
+  // and the video-poster thumbnail (stored as base/key URL).
+  const keys = new Set<string>()
+  if (asset?.drive_file_id) keys.add(asset.drive_file_id)
+  try {
+    const revisions = await listAssetRevisionsByAssetId(assetId)
+    for (const rev of revisions) {
+      if (rev.drive_file_id) keys.add(rev.drive_file_id)
+    }
+  } catch {
+    // Revision cleanup is best-effort; the row delete below still runs.
+  }
+  const thumbUrl = asset?.thumbnail_url ?? null
+  if (thumbUrl) {
     try {
-      await deleteFile(asset.drive_file_id)
+      const base = getR2PublicBaseUrl().replace(/\/+$/, "")
+      if (thumbUrl.startsWith(base + "/")) {
+        keys.add(thumbUrl.slice(base.length + 1))
+      }
     } catch {
-      console.warn("[asset][delete][r2-cleanup-failed]", {
-        assetId,
-        key: asset.drive_file_id,
-      })
+      // No public base configured — nothing to derive.
+    }
+  }
+  for (const key of keys) {
+    try {
+      await deleteFile(key)
+    } catch {
+      console.warn("[asset][delete][r2-cleanup-failed]", { assetId, key })
     }
   }
   try {
@@ -666,10 +694,25 @@ export async function removeAsset(assetId: string): Promise<void> {
       entityType: "asset",
       entityId: assetId,
       entityName: asset?.title ?? "",
-      metadata: { driveFileId: asset?.drive_file_id ?? null },
+      metadata: {
+        driveFileId: asset?.drive_file_id ?? null,
+        clientId: asset?.client_id ?? null,
+        title: asset?.title ?? null,
+        type: asset?.type ?? null,
+      },
     })
   } catch {
     // Audit logging should not block deletion.
   }
   await deleteAssetRow(assetId)
+}
+
+export async function clearClientAssets(clientId: string): Promise<number> {
+  const assets = await listAssetsByClientId(clientId)
+  let removed = 0
+  for (const asset of assets ?? []) {
+    await removeAsset(asset.id)
+    removed += 1
+  }
+  return removed
 }

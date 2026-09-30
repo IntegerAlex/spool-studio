@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import type { CreateCycleInput, ServiceCycle } from "@/types/index"
 
@@ -70,6 +71,16 @@ export function CycleFormDialog({
   const [postersTarget, setPostersTarget] = useState(
     String(prefill?.postersTarget ?? 7),
   )
+  const [carryOn, setCarryOn] = useState(
+    (prefill?.alreadyPublishedReels ?? 0) > 0 ||
+      (prefill?.alreadyPublishedPosters ?? 0) > 0,
+  )
+  const [alreadyReels, setAlreadyReels] = useState(
+    String(prefill?.alreadyPublishedReels ?? 0),
+  )
+  const [alreadyPosters, setAlreadyPosters] = useState(
+    String(prefill?.alreadyPublishedPosters ?? 0),
+  )
 
   useEffect(() => {
     if (open) {
@@ -78,6 +89,12 @@ export function CycleFormDialog({
       setEndDate(d.endDate)
       setReelsTarget(String(prefill?.reelsTarget ?? 6))
       setPostersTarget(String(prefill?.postersTarget ?? 7))
+      setCarryOn(
+        (prefill?.alreadyPublishedReels ?? 0) > 0 ||
+          (prefill?.alreadyPublishedPosters ?? 0) > 0,
+      )
+      setAlreadyReels(String(prefill?.alreadyPublishedReels ?? 0))
+      setAlreadyPosters(String(prefill?.alreadyPublishedPosters ?? 0))
     }
   }, [open, prefill])
 
@@ -114,10 +131,25 @@ export function CycleFormDialog({
 
     const reels = parseInt(reelsTarget, 10)
     const posters = parseInt(postersTarget, 10)
+    const doneReels = carryOn ? parseInt(alreadyReels, 10) : 0
+    const donePosters = carryOn ? parseInt(alreadyPosters, 10) : 0
 
     if (isNaN(reels) || reels < 0 || isNaN(posters) || posters < 0) {
       toast({
         title: "Targets must be non-negative numbers",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (
+      isNaN(doneReels) ||
+      doneReels < 0 ||
+      isNaN(donePosters) ||
+      donePosters < 0
+    ) {
+      toast({
+        title: "Already-published counts must be non-negative numbers",
         variant: "destructive",
       })
       return
@@ -131,6 +163,8 @@ export function CycleFormDialog({
         endDate,
         reelsTarget: reels,
         postersTarget: posters,
+        alreadyPublishedReels: doneReels,
+        alreadyPublishedPosters: donePosters,
       })
       onOpenChange(false)
       toast({
@@ -207,6 +241,49 @@ export function CycleFormDialog({
               />
             </div>
           </div>
+
+          <div className="flex items-center justify-between rounded-md border border-[rgba(255,255,255,0.08)] bg-[#1a1a1a] px-3 py-2">
+            <span className="text-[12px] text-[#a1a1aa]">
+              Client already published some content
+            </span>
+            <Switch checked={carryOn} onCheckedChange={setCarryOn} />
+          </div>
+
+          {carryOn && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-[#a1a1aa] uppercase tracking-wider">
+                  Reels Already Out
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={alreadyReels}
+                  onChange={(e) => setAlreadyReels(e.target.value)}
+                  className="h-9 bg-[#1a1a1a] border-[rgba(255,255,255,0.08)] text-[13px] text-white"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-medium text-[#a1a1aa] uppercase tracking-wider">
+                  Posters Already Out
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={alreadyPosters}
+                  onChange={(e) => setAlreadyPosters(e.target.value)}
+                  className="h-9 bg-[#1a1a1a] border-[rgba(255,255,255,0.08)] text-[13px] text-white"
+                />
+              </div>
+              <p className="col-span-2 text-[12px] text-[#71717a]">
+                Remaining:{" "}
+                {Math.max(0, (parseInt(reelsTarget, 10) || 0) - (parseInt(alreadyReels, 10) || 0))}{" "}
+                reels,{" "}
+                {Math.max(0, (parseInt(postersTarget, 10) || 0) - (parseInt(alreadyPosters, 10) || 0))}{" "}
+                posters — spread over weeks from today.
+              </p>
+            </div>
+          )}
 
           <DialogFooter className="pt-2">
             <Button

@@ -5,6 +5,7 @@ import {
   insertUser,
   listUsers,
   listUsersByIds,
+  updateUser,
 } from "@/repositories/users-repository"
 import type { User } from "@/types/index"
 
@@ -19,6 +20,7 @@ function mapUser(user: Awaited<ReturnType<typeof getUserById>>): User | null {
     name: user.full_name ?? user.email,
     role: user.role,
     avatar: user.avatar_url ?? undefined,
+    dailyCapacityUnits: user.daily_capacity_units ?? 4,
     createdAt: new Date(user.created_at),
   }
 }
@@ -99,4 +101,21 @@ export async function getUsersByIds(userIds: string[]): Promise<User[]> {
     })
     throw error
   }
+}
+
+export async function updateUserCapacity(
+  userId: string,
+  units: number,
+): Promise<User> {
+  const authUser = await getCurrentUser()
+  if (!authUser || authUser.role !== "admin") {
+    throw new Error("Forbidden")
+  }
+  if (!Number.isInteger(units) || units < 1 || units > 20) {
+    throw new Error("Capacity must be 1–20 units")
+  }
+  const row = await updateUser(userId, { daily_capacity_units: units })
+  const mapped = mapUser(row)
+  if (!mapped) throw new Error("User not found")
+  return mapped
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "day_plans" ADD COLUMN "done_qty" integer DEFAULT 0 NOT NULL;

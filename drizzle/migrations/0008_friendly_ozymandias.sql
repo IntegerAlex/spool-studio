@@ -1,0 +1,2 @@
+ALTER TABLE "service_cycles" ADD COLUMN "already_published_reels" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "service_cycles" ADD COLUMN "already_published_posters" integer DEFAULT 0 NOT NULL;
